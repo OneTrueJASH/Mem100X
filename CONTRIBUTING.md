@@ -1,10 +1,10 @@
-# 🤝 Contributing to Mem100x
+# Contributing to Mem100x
 
 First off, thank you for considering contributing to Mem100x! We're building the FASTEST MCP memory server, and your help can make it even better.
 
-## 🚀 How Can I Contribute?
+## How Can I Contribute?
 
-### 🐛 Reporting Bugs
+### Reporting Bugs
 
 Found a performance issue? Let us know!
 
@@ -16,7 +16,7 @@ Found a performance issue? Let us know!
    - **Performance metrics** (very important!)
    - Your environment details
 
-### 💡 Suggesting Enhancements
+### Suggesting Enhancements
 
 Have an idea to make Mem100x even faster? We're all ears!
 
@@ -27,7 +27,7 @@ Have an idea to make Mem100x even faster? We're all ears!
    - **Performance impact analysis**
    - Possible implementation approach
 
-### 🔧 Pull Requests
+### Pull Requests
 
 Ready to contribute code? Awesome!
 
@@ -59,11 +59,8 @@ git checkout -b feature/your-amazing-feature
 # Run type checking
 npm run build
 
-# Run ALL benchmarks
-npx tsx benchmark/full-benchmark.ts
-npx tsx benchmark/optimization-benchmark.ts
-
-# Ensure performance hasn't degraded!
+# Ensure the code compiles without errors
+# Performance standards must be maintained
 ```
 
 #### PR Requirements
@@ -74,7 +71,7 @@ npx tsx benchmark/optimization-benchmark.ts
 - [ ] Documentation is updated
 - [ ] Commit messages are clear
 
-### 📊 Performance Standards
+### Performance Standards
 
 Any PR must meet these standards:
 
@@ -83,15 +80,16 @@ Any PR must meet these standards:
 - No memory leaks
 - Cache hit rate: > 95% when applicable
 
-### 🧪 Testing
+### Quality Assurance
 
-While we don't have formal tests yet (PRs welcome!), every change must:
+Every change must:
 
-1. Run all benchmarks successfully
-2. Show no performance regression
+1. Compile successfully with TypeScript strict mode
+2. Maintain performance standards
 3. Work with both single and multi-context modes
+4. Include appropriate error handling
 
-## 🎯 Priority Areas
+## Priority Areas
 
 We especially welcome contributions in:
 
@@ -101,7 +99,7 @@ We especially welcome contributions in:
 4. **Documentation**: Examples, tutorials, guides
 5. **Tooling**: VS Code extension? CLI tools?
 
-## 💬 Code Style
+## Code Style
 
 - Use 2 spaces for indentation
 - Use single quotes for strings
@@ -123,7 +121,7 @@ searchNodes(query: string, limit: number = 20): GraphResult {
 }
 ```
 
-## 🏃 Quick Wins
+## Quick Wins
 
 Looking for easy contributions?
 
@@ -133,12 +131,12 @@ Looking for easy contributions?
 - Create example use cases
 - Improve documentation
 
-## 📜 License
+## License
 
 By contributing, you agree that your contributions will be licensed under the MIT License.
 
-## 🙏 Thank You!
+## Thank You!
 
 Every contribution, no matter how small, helps make Mem100x better. We appreciate your time and effort!
 
-**Let's make the FASTEST MCP server even FASTER together! 🚀**
+**Let's make the FASTEST MCP server even FASTER together!**

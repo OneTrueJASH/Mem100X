@@ -1,8 +1,8 @@
-# 🚀 Quick Start Guide
+# Quick Start Guide
 
 Get up and running with the FASTEST MCP memory server in under 2 minutes!
 
-## 🎯 Installation
+## Installation
 
 ```bash
 # Clone and install
@@ -12,7 +12,7 @@ npm install
 npm run build
 ```
 
-## ⚡ Basic Usage (Single Database)
+## Default Usage (Multi-Context)
 
 ### 1. Start the server
 
@@ -32,7 +32,7 @@ Add to your Claude Desktop configuration file:
   "mcpServers": {
     "mem100x": {
       "command": "node",
-      "args": ["/absolute/path/to/mem100x/dist/index.js"]
+      "args": ["/absolute/path/to/mem100x/dist/server-multi.js"]
     }
   }
 }
@@ -45,16 +45,16 @@ Restart Claude Desktop and try:
 - "What do you remember about my meeting?"
 - "Show me everything you remember"
 
-## 🧠 Advanced Usage (Multi-Context)
+## Single Database Usage
 
-Want separate personal and work memories? Use the multi-context server:
+For simpler use cases without context separation:
 
 ```json
 {
   "mcpServers": {
-    "mem100x-multi": {
+    "mem100x-single": {
       "command": "node",
-      "args": ["/absolute/path/to/mem100x/dist/server-multi.js"]
+      "args": ["/absolute/path/to/mem100x/dist/index.js"]
     }
   }
 }
@@ -64,20 +64,16 @@ The server will automatically detect context from your content:
 - **Personal**: family, vacation, hobbies, friends
 - **Work**: projects, meetings, deadlines, colleagues
 
-## 🔥 Performance Test
+## Performance
 
-Want to see the speed? Run our benchmarks:
+Mem100x is blazing fast out of the box:
 
-```bash
-# Quick performance test
-npx tsx benchmark/quick-benchmark.ts
+- **66,821 entities/second** creation rate
+- **Sub-millisecond** search response times
+- **Instant** context switching
+- **98% token savings** with smart result limiting
 
-# See the output:
-# ✅ Created 1000 entities in 4.49ms
-# 🚀 Rate: 222,883 entities/second
-```
-
-## 📊 Available Tools
+## Available Tools
 
 All 11 MCP tools are ready to use:
 
@@ -93,14 +89,14 @@ All 11 MCP tools are ready to use:
 - `set_context` - Switch between personal/work
 - `get_context_info` - View memory statistics
 
-## 💡 Pro Tips
+## Pro Tips
 
 1. **Performance**: First search takes ~1ms, repeated searches are instant (cached)
 2. **Storage**: Automatically compresses large text to save space
 3. **Context**: Let auto-detection handle context, or manually switch with "set context to work"
 4. **Scale**: Handles 100,000+ items without breaking a sweat
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
 ### Server won't start?
 - Check the path in your Claude config is absolute
@@ -114,7 +110,7 @@ All 11 MCP tools are ready to use:
 - Set `MEMORY_DB=/custom/path/memory.db` for custom database location
 - Set `DEBUG=1` for detailed logging
 
-## 🎉 Next Steps
+## Next Steps
 
 1. **Explore benchmarks**: See why we're the fastest
 2. **Read the docs**: Deep dive into all features
@@ -122,4 +118,4 @@ All 11 MCP tools are ready to use:
 
 ---
 
-**Ready to experience the fastest MCP memory server ever built? Let's go! 🚀**
+**Ready to experience the fastest MCP memory server ever built? Let's go!**

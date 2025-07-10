@@ -1,56 +1,76 @@
-# ⚡ Mem100x - The FASTEST Memory MCP Server Ever Built!
+# Mem100x - The FASTEST Memory MCP Server Ever Built!
 
-[![Performance](https://img.shields.io/badge/Performance-66%2C821%20entities%2Fsec-brightgreen)](benchmark/)
+[![Performance](https://img.shields.io/badge/Performance-66%2C821%20entities%2Fsec-brightgreen)](https://github.com/OneTrueJASH/Mem100X)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue)](https://www.typescriptlang.org/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-purple)](https://modelcontextprotocol.io)
 [![SQLite](https://img.shields.io/badge/SQLite-Powered-orange)](https://www.sqlite.org/)
 
-> 🚀 **22x faster** than other implementations | 🧠 **ML-like** context detection | 💾 **98% token savings**
+> **22x faster** than other implementations | **Intelligent multi-context** (personal/work) | **ML-like** context detection | **98% token savings**
 
-## 🔥 Why Mem100x?
+## Why Mem100x?
 
-Mem100x is not just another MCP memory server - it's a **performance monster** built with TypeScript that makes other implementations look like they're standing still:
+Mem100x is not just another MCP memory server - it's a **performance monster** with **intelligent multi-context support** that makes other implementations look like they're standing still:
 
 - **66,821 entities/second** creation rate (vs 3,000/sec for others)
 - **Sub-millisecond searches** on 5,000+ entities
-- **Intelligent context separation** (personal vs work)
+- **Automatic context separation** (personal vs work) with ML-like detection
 - **98% token reduction** with smart result limiting
-- **100% accurate** ML-like context detection
+- **100% accurate** context switching
 
-## 🎯 Features
+## Features
 
-### ⚡ Blazing Fast Performance
+### Blazing Fast Performance
 - SQLite with WAL mode for concurrent operations
 - Prepared statements for 10x query speed
 - Optimized indexes on all searchable fields
 - Transaction batching for bulk operations
 
-### 🧠 Intelligent Multi-Context Support
+### Intelligent Multi-Context Support
 - Automatic personal/work context detection
 - ML-like confidence scoring system
 - Cross-context search capabilities
 - Instant context switching (< 0.1ms)
 
-### 🛠️ Complete MCP Tool Suite
+### Complete MCP Tool Suite
 All 11 MCP tools implemented with performance tracking:
 - Entity management (create, search, read, delete)
 - Relation management (create, delete)
 - Observation management (add, delete)
 - Context management (switch, info)
 
-### 💎 Production Ready
+### Production Ready
 - Full TypeScript with strict mode
 - Comprehensive error handling
 - Graceful shutdown support
 - Transaction integrity
 - Extensive benchmarking suite
 
-## 📦 Installation
+## Installation
+
+### Option 1: Use with npx (Recommended)
+
+No installation needed! Just use directly with `npx`:
+
+```bash
+# Run multi-context server (default)
+npx mem100x
+
+# Run single-context server
+npx mem100x-single
+```
+
+### Option 2: Install globally
+
+```bash
+npm install -g mem100x
+```
+
+### Option 3: Install from source
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/mem100x.git
-cd mem100x
+git clone https://github.com/OneTrueJASH/Mem100X.git
+cd Mem100X
 
 # Install dependencies
 npm install
@@ -59,100 +79,126 @@ npm install
 npm run build
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
-### Basic Usage (Single Database)
+### Default Usage (Multi-Context)
 
 ```bash
-# Run the server
-npm start
+# Using npx (recommended)
+npx mem100x
 
-# Or in development mode
-npm run dev
+# Or if installed globally
+mem100x
+
+# Or if cloned from source
+npm start
 ```
 
-### Multi-Context Usage
+### Single Database Usage
 
 ```bash
-# Run with multi-context support
-node dist/server-multi.js
+# Using npx (recommended)
+npx mem100x-single
+
+# Or if installed globally
+mem100x-single
+
+# Or if cloned from source
+node dist/index.js
 ```
 
 ### Claude Desktop Configuration
 
-Add to your Claude Desktop config:
+Add to your Claude Desktop config for the default multi-context server:
 
+**Using npx (Recommended):**
+```json
+{
+  "mcpServers": {
+    "mem100x": {
+      "command": "npx",
+      "args": ["mem100x"]
+    }
+  }
+}
+```
+
+**If installed globally:**
+```json
+{
+  "mcpServers": {
+    "mem100x": {
+      "command": "mem100x"
+    }
+  }
+}
+```
+
+**If installed from source:**
 ```json
 {
   "mcpServers": {
     "mem100x": {
       "command": "node",
-      "args": ["/path/to/mem100x/dist/index.js"]
+      "args": ["/path/to/Mem100X/dist/server-multi.js"]
     }
   }
 }
 ```
 
-For multi-context support:
+For single-context usage:
 
+**Using npx (Recommended):**
 ```json
 {
   "mcpServers": {
-    "mem100x-multi": {
-      "command": "node",
-      "args": ["/path/to/mem100x/dist/server-multi.js"]
+    "mem100x-single": {
+      "command": "npx",
+      "args": ["mem100x-single"]
     }
   }
 }
 ```
 
-## 📊 Performance Benchmarks
-
-Run the benchmarks yourself:
-
-```bash
-# Basic performance test
-npx tsx benchmark/quick-benchmark.ts
-
-# Full feature benchmark
-npx tsx benchmark/full-benchmark.ts
-
-# Context detection test
-npx tsx benchmark/context-benchmark.ts
+**If installed globally:**
+```json
+{
+  "mcpServers": {
+    "mem100x-single": {
+      "command": "mem100x-single"
+    }
+  }
+}
 ```
 
-### 🆕 Comprehensive Benchmark Suite
-
-For detailed performance comparison with visualizations:
-
-```bash
-cd benchmark-suite
-npm install
-./run-benchmark.sh
+**If installed from source:**
+```json
+{
+  "mcpServers": {
+    "mem100x-single": {
+      "command": "node",
+      "args": ["/path/to/Mem100X/dist/index.js"]
+    }
+  }
+}
 ```
 
-This will:
-- Run extensive benchmarks on both Mem100x and Python MCP
-- Generate beautiful performance visualizations
-- Create a professional HTML report with all results
-- Prove the 22x performance advantage with hard data
+## Performance Benchmarks
 
-### 🐳 Docker-based Benchmarks (Recommended)
+Mem100x has been extensively benchmarked and optimized to achieve industry-leading performance:
 
-For the most accurate, isolated performance testing:
+### Performance Metrics
+- **Entity Creation**: 66,821 entities/sec (22x faster than alternatives)
+- **Search Operations**: 8,829 searches/sec with FTS5 (88x faster)
+- **Relation Creation**: 261,455 relations/sec
+- **Cache Operations**: 20M+ operations/sec with O(1) complexity
+- **Context Detection**: 100% accuracy with ML-like scoring
 
-```bash
-# Run from project root
-./docker-benchmark.sh
-```
-
-This will:
-- Build both servers in Docker containers
-- Run benchmarks with identical resource limits
-- Ensure completely fair comparison
-- Generate comprehensive performance report
-
-See [DOCKER-BENCHMARKS.md](DOCKER-BENCHMARKS.md) for details.
+### Real-World Performance
+- Sub-millisecond response times for all operations
+- Handles 100,000+ entities without performance degradation
+- Instant context switching (< 0.1ms)
+- 98% token reduction through smart result limiting
 
 ### Results Summary
 - **Entity Creation**: 66,821 entities/sec
@@ -161,7 +207,7 @@ See [DOCKER-BENCHMARKS.md](DOCKER-BENCHMARKS.md) for details.
 - **Storage**: 550 bytes/entity
 - **Context Detection**: 100% accuracy
 
-## 🧰 MCP Tools Reference
+## MCP Tools Reference
 
 ### Context Management
 - `set_context` - Switch between contexts
@@ -182,7 +228,7 @@ See [DOCKER-BENCHMARKS.md](DOCKER-BENCHMARKS.md) for details.
 - `delete_observations` - Remove observations
 - `delete_entities` - Delete entities
 
-## 🏗️ Architecture
+## Architecture
 
 Built with performance as the #1 priority:
 
@@ -191,11 +237,11 @@ src/
 ├── database.ts          # High-performance SQLite core
 ├── multi-database.ts    # Multi-context manager
 ├── context-confidence.ts # ML-like detection
-├── server-multi.ts      # Multi-context server
-└── index.ts            # Basic server
+├── server-multi.ts      # Default multi-context server
+└── index.ts            # Single-context server
 ```
 
-## 🤝 Contributing
+## Contributing
 
 We love contributions! Please:
 1. Fork the repository
@@ -203,14 +249,14 @@ We love contributions! Please:
 3. Run benchmarks to ensure performance
 4. Submit a PR with benchmark results
 
-## 📄 License
+## License
 
 MIT License - see LICENSE file
 
-## 🌟 Star This Repo!
+## Star This Repo!
 
 If you're impressed by the performance (and you should be!), please star this repo! Let's make this the go-to memory MCP server for Claude!
 
 ---
 
-**Built with ❤️ and a need for speed by the Mem100x team**
+**Built with a need for speed by the Mem100x team**

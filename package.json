@@ -2,14 +2,15 @@
   "name": "mem100x",
   "version": "1.0.0",
   "description": "⚡ The FASTEST MCP memory server ever built - 66k+ entities/sec with intelligent context detection",
-  "main": "dist/index.js",
+  "main": "dist/server-multi.js",
   "bin": {
-    "mem100x": "dist/index.js"
+    "mem100x": "dist/server-multi.js",
+    "mem100x-single": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsx src/index.ts",
-    "start": "node dist/index.js",
+    "dev": "tsx src/server-multi.ts",
+    "start": "node dist/server-multi.js",
     "prepare": "npm run build",
     "test": "vitest",
     "test:run": "vitest run",
@@ -30,16 +31,26 @@
     "context-detection",
     "typescript"
   ],
-  "author": "Mem100x Team",
+  "author": "OneTrueJASH",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR_GITHUB_USERNAME/mem100x"
+    "url": "https://github.com/OneTrueJASH/Mem100X"
   },
   "bugs": {
-    "url": "https://github.com/YOUR_GITHUB_USERNAME/mem100x/issues"
+    "url": "https://github.com/OneTrueJASH/Mem100X/issues"
   },
-  "homepage": "https://github.com/YOUR_GITHUB_USERNAME/mem100x#readme",
+  "homepage": "https://github.com/OneTrueJASH/Mem100X#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "type": "commonjs",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.13.3",

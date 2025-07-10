@@ -31,21 +31,6 @@ jobs:
     
     - name: Type check
       run: npx tsc --noEmit
-    
-    - name: Run quick benchmark
-      run: npx tsx benchmark/quick-benchmark.ts
-    
-    - name: Run full benchmark
-      run: npx tsx benchmark/full-benchmark.ts
-    
-    - name: Upload benchmark results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: benchmark-results-${{ matrix.node-version }}
-        path: |
-          *.db
-          benchmark-*.log
 
   publish:
     needs: build
