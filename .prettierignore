@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.db
+*.bloom
+.mem100x/
+coverage/
+.nyc_output/
+*.log

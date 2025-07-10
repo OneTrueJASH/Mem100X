@@ -1,0 +1,40 @@
+# Source files
+src/
+benchmark/
+
+# Config files
+.github/
+.gitignore
+.npmignore
+tsconfig.json
+CLAUDE.md
+HANDOFF.md
+
+# Development files
+*.ts
+!dist/**/*.d.ts
+*.log
+*.db
+.DS_Store
+
+# Test files
+test/
+__tests__/
+*.test.js
+*.spec.js
+
+# Documentation source
+docs/
+*.md
+!README.md
+!LICENSE
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak

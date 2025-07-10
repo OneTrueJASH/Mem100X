@@ -1,0 +1,61 @@
+{
+  "name": "mem100x",
+  "version": "1.0.0",
+  "description": "⚡ The FASTEST MCP memory server ever built - 66k+ entities/sec with intelligent context detection",
+  "main": "dist/index.js",
+  "bin": {
+    "mem100x": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "prepare": "npm run build",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest watch",
+    "format": "prettier --write \"src/**/*.ts\" \"benchmark/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"benchmark/**/*.ts\""
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "memory",
+    "knowledge-graph",
+    "sqlite",
+    "high-performance",
+    "claude",
+    "ai",
+    "context-detection",
+    "typescript"
+  ],
+  "author": "Mem100x Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_GITHUB_USERNAME/mem100x"
+  },
+  "bugs": {
+    "url": "https://github.com/YOUR_GITHUB_USERNAME/mem100x/issues"
+  },
+  "homepage": "https://github.com/YOUR_GITHUB_USERNAME/mem100x#readme",
+  "type": "commonjs",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.3",
+    "better-sqlite3": "^11.6.0",
+    "winston": "^3.17.0",
+    "xxhash-wasm": "^1.1.0",
+    "zod": "^3.25.71"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^24.0.10",
+    "@vitest/coverage-v8": "^3.2.4",
+    "dotenv": "^17.0.1",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}
