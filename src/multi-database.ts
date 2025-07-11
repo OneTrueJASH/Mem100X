@@ -26,11 +26,11 @@ import { config as appConfig } from './config.js';
 import { logInfo } from './utils/logger.js';
 
 export class MultiDatabaseManager {
-  private databases: Map<string, MemoryDatabase> = new Map();
-  private _currentContext: string;
-  private entityContextMap: Map<string, string> = new Map();
-  private confidenceScorer!: ContextConfidenceScorer;
-  private config!: MemoryConfig;
+  protected databases: Map<string, MemoryDatabase> = new Map();
+  protected _currentContext: string;
+  protected entityContextMap: Map<string, string> = new Map();
+  protected confidenceScorer!: ContextConfidenceScorer;
+  protected config!: MemoryConfig;
 
   public get currentContext(): string {
     return this._currentContext;
@@ -41,7 +41,7 @@ export class MultiDatabaseManager {
     this.initialize(config);
   }
 
-  private initialize(config: typeof appConfig): void {
+  protected initialize(config: typeof appConfig): void {
     this.config = this.loadConfig(config);
     this.initializeDatabases();
     this.loadEntityMappings();
@@ -90,7 +90,7 @@ export class MultiDatabaseManager {
     };
   }
 
-  private initializeDatabases(): void {
+  protected initializeDatabases(): void {
     for (const [context, dbConfig] of Object.entries(this.config.databases)) {
       const db = new MemoryDatabase(dbConfig.path);
       this.databases.set(context, db);
@@ -483,6 +483,15 @@ export class MultiDatabaseManager {
   public isInTransaction(): boolean {
     // Placeholder for transaction checking
     return false;
+  }
+  
+  public getDatabase(context?: string): MemoryDatabase {
+    const targetContext = context || this._currentContext;
+    const db = this.databases.get(targetContext);
+    if (!db) {
+      throw new Error(`No database found for context: ${targetContext}`);
+    }
+    return db;
   }
 
   public getNeighbors(entityName: string, options: GetNeighborsOptions): GraphResult {

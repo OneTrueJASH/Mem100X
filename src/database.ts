@@ -42,14 +42,14 @@ import { config } from './config.js';
 
 export class MemoryDatabase {
   private db!: Database.Database;
-  private readonly dbPath: string;
+  protected readonly dbPath: string;
   private readPool?: ConnectionPool;
   
   // Performance optimizations
-  private readonly entityCache: ICache<string, EntityResult>;
-  private readonly searchCache: ICache<string, GraphResult>;
-  private entityBloom!: CountingBloomFilter;
-  private readonly compressionEnabled: boolean = config.performance.compressionEnabled;
+  protected readonly entityCache: ICache<string, EntityResult>;
+  protected readonly searchCache: ICache<string, GraphResult>;
+  protected entityBloom!: CountingBloomFilter;
+  protected readonly compressionEnabled: boolean = config.performance.compressionEnabled;
   private readonly useReadPool: boolean = config.performance.useReadPool ?? true;
   private readonly relationQueryThreshold: number = config.performance.relationQueryThreshold;
   
