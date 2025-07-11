@@ -31,7 +31,7 @@
           "params": {
             "entities": [
               {
-                "name": "entity-{{index}}",
+                "name": "entity-{{timestamp}}-{{index}}",
                 "entityType": "benchmark",
                 "observations": ["Created at {{timestamp}}"]
               }

@@ -15,6 +15,8 @@ export const PRAGMAS = `
   PRAGMA busy_timeout = 5000;
   PRAGMA wal_autocheckpoint = 1000;
   PRAGMA page_size = 8192;
+  PRAGMA wal_checkpoint(TRUNCATE);
+  PRAGMA optimize;
 `;
 
 export const TABLES = `

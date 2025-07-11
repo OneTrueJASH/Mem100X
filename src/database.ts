@@ -56,10 +56,12 @@ export class MemoryDatabase {
   // Transaction management
   private transactionDepth: number = 0;
   private isInTransaction: boolean = false;
+  private searchCacheClearPending: boolean = false;
 
   // Prepared statements for maximum performance
   private statements: {
     createEntity?: Database.Statement;
+    createEntityFast?: Database.Statement;
     getEntity?: Database.Statement;
     searchEntities?: Database.Statement;
     searchEntitiesLike?: Database.Statement;
@@ -140,6 +142,12 @@ export class MemoryDatabase {
         entity_type = excluded.entity_type,
         observations = excluded.observations,
         updated_at = julianday('now')
+    `);
+
+    // Fast insert without conflict handling for new entities
+    this.statements.createEntityFast = this.db.prepare(`
+      INSERT INTO entities (name, entity_type, observations, created_at, updated_at)
+      VALUES (?, ?, ?, julianday('now'), julianday('now'))
     `);
 
     this.statements.getEntity = this.db.prepare(
@@ -258,6 +266,11 @@ export class MemoryDatabase {
   createEntities(entities: CreateEntityInput[]): EntityResult[] {
     const perf = new PerformanceTracker('createEntities', { count: entities.length });
     
+    // Fast path for single entity creation
+    if (entities.length === 1) {
+      return this.createSingleEntityOptimized(entities[0], perf);
+    }
+    
     const created = this.transaction(() => {
       const results: EntityResult[] = [];
       
@@ -288,6 +301,81 @@ export class MemoryDatabase {
     this.searchCache.clear();
     perf.end({ created: created.length });
     return created;
+  }
+
+  // Optimized single entity creation with minimal overhead
+  private createSingleEntityOptimized(entity: CreateEntityInput, perf: PerformanceTracker): EntityResult[] {
+    // Skip compression for small observations (< 100 chars total)
+    const observationsStr = stringifyObservations(entity.observations);
+    const shouldCompress = this.compressionEnabled && observationsStr.length > 100;
+    const observationsData = shouldCompress
+      ? CompressionUtils.compressObservations(entity.observations)
+      : observationsStr;
+    
+    const lowerName = entity.name.toLowerCase();
+    const exists = this.entityBloom.contains(lowerName);
+    
+    // Skip transaction for non-conflicting inserts
+    if (!exists) {
+      try {
+        // Use fast insert without ON CONFLICT
+        this.statements.createEntityFast!.run(entity.name, entity.entityType, observationsData);
+        
+        const result: EntityResult = {
+          type: 'entity',
+          name: entity.name,
+          entityType: entity.entityType,
+          observations: entity.observations
+        };
+        
+        // Update caches
+        this.entityCache.set(lowerName, result);
+        this.entityBloom.add(lowerName);
+        
+        // Skip search cache clearing for single entity
+        perf.end({ created: 1, optimized: true, fastPath: true });
+        return [result];
+      } catch (error: any) {
+        // If it's a unique constraint error, fall through to update path
+        if (!error.message?.includes('UNIQUE constraint')) {
+          throw error;
+        }
+      }
+    }
+    
+    // Fallback to transaction-based update
+    this.db.exec('BEGIN IMMEDIATE');
+    
+    try {
+      this.statements.createEntity!.run(entity.name, entity.entityType, observationsData);
+      this.db.exec('COMMIT');
+      
+      const result: EntityResult = {
+        type: 'entity',
+        name: entity.name,
+        entityType: entity.entityType,
+        observations: entity.observations
+      };
+      
+      // Update caches after commit
+      this.entityCache.set(lowerName, result);
+      this.entityBloom.add(lowerName);
+      
+      // Defer search cache clearing (batch with other operations)
+      if (!this.searchCacheClearPending) {
+        this.searchCacheClearPending = true;
+        process.nextTick(() => {
+          this.searchCache.clear();
+          this.searchCacheClearPending = false;
+        });
+      }
+      
+      perf.end({ created: 1, optimized: true, update: true });
+      return [result];
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
   }
 
   // Optimized batch entity creation for better performance
