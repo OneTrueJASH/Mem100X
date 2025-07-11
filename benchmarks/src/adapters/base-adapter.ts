@@ -14,6 +14,7 @@ export abstract class BaseAdapter implements ServerAdapter {
   protected client: Client | null = null;
   protected process: ChildProcess | null = null;
   protected config: ServerConfig;
+  protected createdEntities: string[] = [];
   
   constructor(public name: string, config: ServerConfig) {
     this.config = config;
@@ -145,15 +146,34 @@ export abstract class BaseAdapter implements ServerAdapter {
 
   // MCP operations - these use the standard tool names
   private async createEntities(params: any) {
-    return await this.client!.callTool({
-      name: 'create_entities',
-      arguments: params || {
+    // If no params provided, create default entities
+    if (!params) {
+      const entityName = `test-entity-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      params = {
         entities: [{
-          name: `test-entity-${Date.now()}`,
+          name: entityName,
           entityType: 'benchmark',
           observations: ['Test observation']
         }]
+      };
+    }
+    
+    // Track created entity names
+    if (params.entities) {
+      for (const entity of params.entities) {
+        if (entity.name) {
+          this.createdEntities.push(entity.name);
+          // Keep only last 1000 entities to avoid memory issues
+          if (this.createdEntities.length > 1000) {
+            this.createdEntities.shift();
+          }
+        }
       }
+    }
+    
+    return await this.client!.callTool({
+      name: 'create_entities',
+      arguments: params
     });
   }
 
@@ -167,27 +187,70 @@ export abstract class BaseAdapter implements ServerAdapter {
   }
 
   private async createRelations(params: any) {
-    return await this.client!.callTool({
-      name: 'create_relations',
-      arguments: params || {
+    // If no params provided, create relations between existing entities
+    if (!params) {
+      // Ensure we have at least 2 entities to create a relation
+      if (this.createdEntities.length < 2) {
+        // Create two entities first
+        await this.createEntities({
+          entities: [
+            {
+              name: `relation-entity-1-${Date.now()}`,
+              entityType: 'benchmark',
+              observations: ['Entity for relation test']
+            },
+            {
+              name: `relation-entity-2-${Date.now()}`,
+              entityType: 'benchmark', 
+              observations: ['Entity for relation test']
+            }
+          ]
+        });
+      }
+      
+      // Use last two created entities
+      const fromEntity = this.createdEntities[this.createdEntities.length - 2];
+      const toEntity = this.createdEntities[this.createdEntities.length - 1];
+      
+      params = {
         relations: [{
-          from: 'entity1',
-          to: 'entity2',
+          from: fromEntity,
+          to: toEntity,
           relationType: 'relates_to'
         }]
-      }
+      };
+    }
+    
+    return await this.client!.callTool({
+      name: 'create_relations',
+      arguments: params
     });
   }
 
   private async addObservations(params: any) {
+    // If no params provided, add observations to an existing entity
+    if (!params) {
+      // Ensure we have at least one entity
+      if (this.createdEntities.length === 0) {
+        await this.createEntities(null);
+      }
+      
+      // Use a random existing entity
+      const entityName = this.createdEntities[
+        Math.floor(Math.random() * this.createdEntities.length)
+      ];
+      
+      params = {
+        observations: [{
+          entityName: entityName,
+          contents: [`New observation at ${Date.now()}`]
+        }]
+      };
+    }
+    
     return await this.client!.callTool({
       name: 'add_observations',
-      arguments: params || {
-        observations: [{
-          entityName: 'test-entity',
-          contents: ['New observation']
-        }]
-      }
+      arguments: params
     });
   }
 
@@ -199,11 +262,28 @@ export abstract class BaseAdapter implements ServerAdapter {
   }
 
   private async deleteEntities(params: any) {
+    // If no params provided, delete some existing entities
+    if (!params) {
+      if (this.createdEntities.length === 0) {
+        // No entities to delete, create one first
+        await this.createEntities(null);
+      }
+      
+      // Delete a random entity
+      const indexToDelete = Math.floor(Math.random() * this.createdEntities.length);
+      const entityToDelete = this.createdEntities[indexToDelete];
+      
+      // Remove from tracking array
+      this.createdEntities.splice(indexToDelete, 1);
+      
+      params = {
+        entityNames: [entityToDelete]
+      };
+    }
+    
     return await this.client!.callTool({
       name: 'delete_entities',
-      arguments: params || {
-        entityNames: ['test-entity']
-      }
+      arguments: params
     });
   }
 }
