@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.1](https://github.com/OneTrueJASH/Mem100X/compare/v3.0.0...v3.0.1) (2025-07-11)
+
+
+### Bug Fixes
+
+* add tag trigger to CI workflow for npm publishing ([4659b57](https://github.com/OneTrueJASH/Mem100X/commit/4659b57f53736899042c49e6272f6b4cc60ff463))
+
 ## [3.0.0](https://github.com/OneTrueJASH/Mem100X/compare/v2.0.0...v3.0.0) (2025-07-11)
 
 
