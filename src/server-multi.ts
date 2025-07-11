@@ -6,6 +6,8 @@ import {
   ErrorCode,
   ListToolsRequestSchema,
   McpError,
+  InitializeRequestSchema,
+  InitializedNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { MultiDatabaseManager } from './multi-database.js';
 import { toolHandlers, ToolContext } from './tool-handlers.js';
@@ -15,6 +17,10 @@ import { logger, logError, logInfo } from './utils/logger.js';
 import { config } from './config.js';
 import { CircuitBreaker } from './utils/circuit-breaker.js';
 import { ZeroDelayWriteAggregator } from './utils/zero-delay-aggregator.js';
+import { mapErrorToMcpCode, createMcpError } from './utils/mcp-errors.js';
+import { validateToolInput } from './utils/input-validation.js';
+import { validateDestructiveOperation } from './utils/destructive-ops.js';
+import { createRateLimiters, getRateLimiterForTool } from './utils/rate-limiter.js';
 
 export async function main() {
   logInfo('Starting Mem100x Multi-Context MCP server...');
@@ -25,6 +31,10 @@ export async function main() {
   // Create zero-delay write aggregator for minimal-overhead batching
   const writeAggregator = new ZeroDelayWriteAggregator(manager);
   logInfo('Zero-delay write aggregator initialized.');
+  
+  // Create rate limiters
+  const rateLimiters = createRateLimiters();
+  logInfo('Rate limiters initialized.');
   
   // Create circuit breakers for each tool
   const circuitBreakers = new Map<string, CircuitBreaker>();
@@ -44,11 +54,13 @@ export async function main() {
   const server = new Server(
     {
       name: 'mem100x-multi',
-      version: '1.0.0',
+      version: '3.0.1', // Use actual package version
     },
     {
       capabilities: {
         tools: {},
+        resources: {},
+        prompts: {}
       },
     }
   );
@@ -62,12 +74,28 @@ export async function main() {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     const requestStartTime = process.hrtime.bigint();
+    
+    // Extract correlation ID from request meta
+    const correlationId = request.params._meta?.progressToken || 
+                         `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+    let requestSuccess = false;
+    
     try {
       const handler = toolHandlers[name];
       if (!handler) {
         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
       }
+      
+      // Apply rate limiting
+      const limiterType = getRateLimiterForTool(name);
+      await rateLimiters[limiterType].checkLimit(request);
+      
+      // Validate input size to prevent DoS
+      validateToolInput(name, args);
+      
+      // Validate destructive operations require confirmation
+      validateDestructiveOperation(name, args);
       
       const circuitBreaker = circuitBreakers.get(name);
       if (!circuitBreaker) {
@@ -89,6 +117,7 @@ export async function main() {
           manager,
           startTime: performance.now(),
           toolName: name,
+          correlationId,
         };
         result = await handler(args, context);
       }
@@ -101,6 +130,7 @@ export async function main() {
           manager,
           startTime: performance.now(),
           toolName: name,
+          correlationId,
         };
         
         const dbResult = await handler(args, context);
@@ -133,6 +163,8 @@ export async function main() {
         });
       }
       
+      requestSuccess = true;
+      
       return {
         content: [{ type: 'text', text: stringifyGeneric(result, true) }],
       };
@@ -157,8 +189,19 @@ export async function main() {
         const issues = zodError.issues.map((issue: any) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
         throw new McpError(ErrorCode.InvalidParams, `Invalid parameters for ${name}: ${issues}`);
       }
-      logError(`Error executing tool: ${name}`, error as Error, { args });
-      throw new McpError(ErrorCode.InternalError, `Error executing ${name}: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // Use proper error mapping
+      const mcpError = createMcpError(error);
+      logError(`Error executing tool: ${name}`, error as Error, { 
+        args, 
+        mcpError,
+        correlationId 
+      });
+      throw new McpError(mcpError.code, mcpError.message, mcpError.data);
+    } finally {
+      // Update rate limiter based on request outcome
+      const limiterType = getRateLimiterForTool(name);
+      rateLimiters[limiterType].updateAfterRequest(request, requestSuccess);
     }
   });
 
@@ -168,6 +211,11 @@ export async function main() {
     try {
       await server.close();
       logInfo('MCP server closed.');
+      
+      // Stop rate limiters
+      Object.values(rateLimiters).forEach(limiter => limiter.stop());
+      logInfo('Rate limiters stopped.');
+      
       manager.closeAll();
       logInfo('All databases closed.');
       process.exit(0);

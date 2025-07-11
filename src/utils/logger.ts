@@ -4,13 +4,7 @@
  */
 
 import winston from 'winston';
-import { join } from 'path';
-import { mkdirSync } from 'fs';
 import { config } from '../config.js';
-
-// Ensure logs directory exists
-const logsDir = join(process.cwd(), 'logs');
-mkdirSync(logsDir, { recursive: true });
 
 // Custom log levels
 const customLevels = {
@@ -41,65 +35,41 @@ const structuredFormat = winston.format.combine(
   winston.format.json()
 );
 
-// Console format for development
-const consoleFormat = winston.format.combine(
-  winston.format.colorize(),
+// Stderr format for MCP compliance
+const stderrFormat = winston.format.combine(
   winston.format.timestamp({
-    format: 'HH:mm:ss.SSS'
+    format: 'YYYY-MM-DD HH:mm:ss.SSS'
   }),
+  winston.format.errors({ stack: true }),
   winston.format.printf(({ timestamp, level, message, ...meta }) => {
-    const metaStr = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
-    return `[${timestamp}] ${level}: ${message}${metaStr}`;
+    // MCP servers must log to stderr in a format that doesn't interfere with JSON-RPC
+    const logObj = {
+      timestamp,
+      level,
+      message,
+      ...meta
+    };
+    return JSON.stringify(logObj);
   })
 );
 
-// Create logger instance
+// Create logger instance - MCP compliant (stderr only)
 const logger = winston.createLogger({
   levels: customLevels.levels,
   level: config.logging.level,
-  format: structuredFormat,
+  format: stderrFormat,
   defaultMeta: { 
     service: 'mem100x',
     pid: process.pid
   },
   transports: [
-    // Write all logs to combined.log
-    new winston.transports.File({ 
-      filename: join(logsDir, 'combined.log'),
-      maxsize: 10 * 1024 * 1024, // 10MB
-      maxFiles: 5,
-      tailable: true
-    }),
-    // Write errors to separate file
-    new winston.transports.File({ 
-      filename: join(logsDir, 'error.log'), 
-      level: 'error',
-      maxsize: 10 * 1024 * 1024,
-      maxFiles: 5
-    }),
-    // Write performance logs to separate file
-    new winston.transports.File({ 
-      filename: join(logsDir, 'performance.log'), 
-      level: 'perf',
-      maxsize: 10 * 1024 * 1024,
-      maxFiles: 5,
-      format: winston.format.combine(
-        structuredFormat,
-        winston.format((info) => {
-          return info.level === 'perf' ? info : false;
-        })()
-      )
+    // MCP servers MUST log to stderr only
+    new winston.transports.Stream({
+      stream: process.stderr,
+      format: stderrFormat
     })
   ]
 });
-
-// Add console transport if not in production
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: consoleFormat,
-    level: config.logging.level
-  }));
-}
 
 // Add colors
 winston.addColors(customLevels.colors);

@@ -30,6 +30,7 @@ export interface ToolContext {
   manager: MultiDatabaseManager;
   startTime: number;
   toolName: string;
+  correlationId?: string;
 }
 
 // Context management handlers

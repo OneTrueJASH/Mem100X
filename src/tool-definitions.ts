@@ -4,6 +4,7 @@
  */
 
 import { MCPToolDefinition } from './mcp-types.js';
+import { addDestructiveSafetyInfo } from './utils/destructive-ops.js';
 
 export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
   set_context: {
@@ -279,10 +280,12 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
 };
 
 /**
- * Get all tool definitions as an array
+ * Get all tool definitions as an array with safety info applied
  */
 export function getAllToolDefinitions(): MCPToolDefinition[] {
-  return Object.values(TOOL_DEFINITIONS);
+  return Object.entries(TOOL_DEFINITIONS).map(([name, def]) => 
+    addDestructiveSafetyInfo(def, name)
+  );
 }
 
 /**
