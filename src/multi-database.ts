@@ -5,7 +5,6 @@
 
 import { MemoryDatabase } from './database.js';
 import { ContextConfidenceScorer } from './context-confidence.js';
-import { WriteBatcher } from './utils/write-batcher.js';
 import { 
   MemoryConfig, 
   GraphResult, 
