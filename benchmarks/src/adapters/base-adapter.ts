@@ -1,12 +1,12 @@
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio';
 import { 
   ServerAdapter, 
   Operation, 
   OperationResult, 
   ResourceMetrics, 
   ServerConfig 
-} from '../types.js';
+} from '../types';
 import microtime from 'microtime';
 import { spawn, ChildProcess } from 'child_process';
 
@@ -145,47 +145,65 @@ export abstract class BaseAdapter implements ServerAdapter {
 
   // MCP operations - these use the standard tool names
   private async createEntities(params: any) {
-    return await this.client!.callTool('create_entities', params || {
-      entities: [{
-        name: `test-entity-${Date.now()}`,
-        entityType: 'benchmark',
-        observations: ['Test observation']
-      }]
+    return await this.client!.callTool({
+      name: 'create_entities',
+      arguments: params || {
+        entities: [{
+          name: `test-entity-${Date.now()}`,
+          entityType: 'benchmark',
+          observations: ['Test observation']
+        }]
+      }
     });
   }
 
   private async searchNodes(params: any) {
-    return await this.client!.callTool('search_nodes', params || {
-      query: 'test'
+    return await this.client!.callTool({
+      name: 'search_nodes',
+      arguments: params || {
+        query: 'test'
+      }
     });
   }
 
   private async createRelations(params: any) {
-    return await this.client!.callTool('create_relations', params || {
-      relations: [{
-        from: 'entity1',
-        to: 'entity2',
-        relationType: 'relates_to'
-      }]
+    return await this.client!.callTool({
+      name: 'create_relations',
+      arguments: params || {
+        relations: [{
+          from: 'entity1',
+          to: 'entity2',
+          relationType: 'relates_to'
+        }]
+      }
     });
   }
 
   private async addObservations(params: any) {
-    return await this.client!.callTool('add_observations', params || {
-      observations: [{
-        entityName: 'test-entity',
-        contents: ['New observation']
-      }]
+    return await this.client!.callTool({
+      name: 'add_observations',
+      arguments: params || {
+        observations: [{
+          entityName: 'test-entity',
+          contents: ['New observation']
+        }]
+      }
     });
   }
 
   private async readGraph(params: any) {
-    return await this.client!.callTool('read_graph', params || {});
+    return await this.client!.callTool({
+      name: 'read_graph',
+      arguments: params || {}
+    });
   }
 
   private async deleteEntities(params: any) {
-    return await this.client!.callTool('delete_entities', params || {
-      entityNames: ['test-entity']
+    return await this.client!.callTool({
+      name: 'delete_entities',
+      arguments: params || {
+        entityNames: ['test-entity']
+      }
     });
   }
 }

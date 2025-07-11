@@ -1,12 +1,9 @@
 #!/usr/bin/env node
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import chalk from 'chalk';
-import Table from 'cli-table3';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const fs = require('fs/promises');
+const path = require('path');
+const chalk = require('chalk');
+const Table = require('cli-table3');
 
 async function findLatestResults() {
   const resultsDir = path.join(__dirname, '..', 'results');

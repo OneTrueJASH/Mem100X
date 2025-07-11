@@ -1,5 +1,5 @@
-import { BaseAdapter } from './base-adapter.js';
-import { ServerConfig } from '../types.js';
+import { BaseAdapter } from './base-adapter';
+import { ServerConfig } from '../types';
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 

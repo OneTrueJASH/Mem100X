@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Common configuration for all benchmark containers
 x-benchmark-common: &benchmark-common
   build:
@@ -62,7 +60,7 @@ services:
     build:
       context: ../
       dockerfile: docker/base/Dockerfile
-    command: ["node", "src/runner.js"]
+    command: ["node", "dist/runner.js"]
     depends_on:
       - benchmark-mem100x
       - benchmark-official

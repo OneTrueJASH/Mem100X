@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "description": "Fair and reproducible benchmarking suite for MCP memory servers",
   "scripts": {
-    "benchmark": "node src/runner.js",
-    "benchmark:mem100x": "SERVERS=mem100x node src/runner.js",
-    "benchmark:official": "SERVERS=official-memory node src/runner.js",
-    "benchmark:all": "node src/runner.js",
+    "build": "tsc",
+    "benchmark": "node dist/runner.js",
+    "benchmark:mem100x": "SERVERS=mem100x node dist/runner.js",
+    "benchmark:official": "SERVERS=official-memory node dist/runner.js",
+    "benchmark:all": "node dist/runner.js",
     "compare": "node scripts/compare-results.js",
     "docker:build": "docker-compose build",
     "docker:run": "docker-compose run benchmark"

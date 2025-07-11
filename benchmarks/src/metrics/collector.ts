@@ -1,4 +1,4 @@
-import { ResourceMetrics } from '../types.js';
+import { ResourceMetrics } from '../types';
 import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';

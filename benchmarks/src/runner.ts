@@ -4,10 +4,10 @@ import {
   ServerConfig, 
   ScenarioConfig,
   Operation 
-} from './types.js';
-import { Mem100xAdapter } from './adapters/mem100x-adapter.js';
-import { OfficialMemoryAdapter } from './adapters/official-adapter.js';
-import { BaseAdapter } from './adapters/base-adapter.js';
+} from './types';
+import { Mem100xAdapter } from './adapters/mem100x-adapter';
+import { OfficialMemoryAdapter } from './adapters/official-adapter';
+import { BaseAdapter } from './adapters/base-adapter';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import chalk from 'chalk';
@@ -19,7 +19,7 @@ class BenchmarkRunner {
   private config: BenchmarkConfig;
   private results: BenchmarkResult[] = [];
 
-  constructor(configPath: string = './config/benchmark-config.json') {
+  constructor(configPath: string = '../config/benchmark-config.json') {
     this.config = require(configPath);
   }
 
@@ -281,7 +281,7 @@ class BenchmarkRunner {
 }
 
 // Run the benchmark
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (require.main === module) {
   const runner = new BenchmarkRunner();
   runner.run().catch(console.error);
 }

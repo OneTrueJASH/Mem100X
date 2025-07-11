@@ -37,11 +37,19 @@ RUN mkdir -p \
     /benchmark/metrics && \
     chown -R benchmark:benchmark /benchmark
 
-# Copy package.json for benchmark dependencies
-COPY package.json /benchmark/
+# Copy package files for benchmark dependencies
+COPY package*.json /benchmark/
+COPY tsconfig.json /benchmark/
 
 # Install benchmark dependencies
 RUN npm install
+
+# Copy source files
+COPY src /benchmark/src
+COPY scripts /benchmark/scripts
+
+# Build TypeScript files
+RUN npm run build
 
 # Switch to benchmark user
 USER benchmark
