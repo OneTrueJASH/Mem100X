@@ -154,27 +154,45 @@ class BenchmarkRunner {
     const startTime = Date.now();
     const errorMap = new Map<string, number>();
 
-    for (let i = 0; i < scenario.iterations; i++) {
-      const operation = this.selectOperation(scenario.operations);
-      const preparedOp = this.prepareOperation(operation, i);
-      
-      const opResult = await adapter.executeOperation(preparedOp);
-      
-      result.operations.total++;
-      
-      if (opResult.success) {
-        result.operations.successful++;
-        latencies.push(opResult.duration / 1000); // Convert to ms
-      } else {
-        result.operations.failed++;
-        const errorKey = `${operation.type}: ${opResult.error}`;
-        errorMap.set(errorKey, (errorMap.get(errorKey) || 0) + 1);
-      }
+    // Use concurrency if specified, otherwise run serially
+    const concurrency = scenario.concurrency || 1;
+    const batches = Math.ceil(scenario.iterations / concurrency);
 
-      // Update progress
-      if (i % 100 === 0) {
-        spinner.text = `${scenario.name} - Progress: ${i}/${scenario.iterations}`;
+    for (let batch = 0; batch < batches; batch++) {
+      const promises: Promise<void>[] = [];
+      const batchSize = Math.min(concurrency, scenario.iterations - (batch * concurrency));
+      
+      for (let j = 0; j < batchSize; j++) {
+        const operationIndex = batch * concurrency + j;
+        
+        // Create a promise for each concurrent operation
+        const promise = (async () => {
+          const operation = this.selectOperation(scenario.operations);
+          const preparedOp = this.prepareOperation(operation, operationIndex);
+          
+          const opResult = await adapter.executeOperation(preparedOp);
+          
+          result.operations.total++;
+          
+          if (opResult.success) {
+            result.operations.successful++;
+            latencies.push(opResult.duration / 1000); // Convert to ms
+          } else {
+            result.operations.failed++;
+            const errorKey = `${operation.type}: ${opResult.error}`;
+            errorMap.set(errorKey, (errorMap.get(errorKey) || 0) + 1);
+          }
+        })();
+        
+        promises.push(promise);
       }
+      
+      // Wait for all operations in this batch to complete
+      await Promise.all(promises);
+      
+      // Update progress
+      const completed = Math.min((batch + 1) * concurrency, scenario.iterations);
+      spinner.text = `${scenario.name} - Progress: ${completed}/${scenario.iterations} (concurrency: ${concurrency})`;
     }
 
     result.duration = Date.now() - startTime;

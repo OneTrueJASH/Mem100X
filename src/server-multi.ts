@@ -79,8 +79,12 @@ export async function main() {
       
       let result: any;
       
+      // Use zero-delay aggregator for write operations
+      if (writeTools.includes(name)) {
+        result = await writeAggregator.scheduleWrite(name as any, args);
+      }
       // For read operations, bypass circuit breaker for lower latency
-      if (readTools.includes(name)) {
+      else if (readTools.includes(name)) {
         const context: ToolContext = {
           manager,
           startTime: performance.now(),

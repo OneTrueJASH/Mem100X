@@ -418,6 +418,47 @@
       "iterations": 10000,
       "warmupIterations": 200,
       "concurrency": 50
+    },
+    {
+      "name": "realistic-workflow",
+      "description": "Simulates real user interaction patterns",
+      "operations": [
+        {
+          "type": "search_nodes",
+          "weight": 0.25,
+          "params": {
+            "query": "knowledge graph memory {{index}}"
+          }
+        },
+        {
+          "type": "create_entities",
+          "weight": 0.2,
+          "params": {
+            "entities": [
+              {
+                "name": "session-{{timestamp}}-{{index}}",
+                "entityType": "session",
+                "observations": ["User interaction at step {{index}}"]
+              }
+            ]
+          }
+        },
+        {
+          "type": "add_observations",
+          "weight": 0.3
+        },
+        {
+          "type": "create_relations",
+          "weight": 0.15
+        },
+        {
+          "type": "read_graph",
+          "weight": 0.1
+        }
+      ],
+      "iterations": 300,
+      "warmupIterations": 20,
+      "concurrency": 3
     }
   ],
   "options": {
