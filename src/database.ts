@@ -248,6 +248,90 @@ export class MemoryDatabase {
     return created;
   }
 
+  // Optimized batch entity creation for better performance
+  createEntitiesBatch(entities: CreateEntityInput[]): EntityResult[] {
+    if (entities.length === 0) return [];
+    
+    // Use regular method for small batches
+    if (entities.length < 10) {
+      return this.createEntities(entities);
+    }
+    
+    const perf = new PerformanceTracker('createEntitiesBatch', { count: entities.length });
+    
+    const created = this.transaction(() => {
+      // Temporarily disable FTS triggers for bulk insert
+      this.db.exec('DROP TRIGGER IF EXISTS entities_fts_insert');
+      
+      try {
+        // Pre-compress all observations
+        const preparedData = entities.map(e => ({
+          name: e.name,
+          entityType: e.entityType,
+          observations: e.observations,
+          observationsData: this.compressionEnabled 
+            ? CompressionUtils.compressObservations(e.observations)
+            : stringifyObservations(e.observations)
+        }));
+        
+        // Build bulk insert query
+        const placeholders = entities.map(() => '(?, ?, ?, julianday("now"), julianday("now"))').join(',');
+        const values = preparedData.flatMap(e => [e.name, e.entityType, e.observationsData]);
+        
+        // Execute bulk insert
+        this.db.prepare(
+          `INSERT OR IGNORE INTO entities (name, entity_type, observations, created_at, updated_at) 
+           VALUES ${placeholders}`
+        ).run(...values);
+        
+        // Bulk update FTS
+        const ftsPlaceholders = entities.map(() => '?').join(',');
+        this.db.prepare(
+          `INSERT INTO entities_fts (name, entity_type, observations) 
+           SELECT name, entity_type, observations FROM entities 
+           WHERE name IN (${ftsPlaceholders})`
+        ).run(...entities.map(e => e.name));
+        
+        // Build results and update caches in batch
+        const results: EntityResult[] = [];
+        const cacheUpdates: Array<[string, EntityResult]> = [];
+        
+        for (const data of preparedData) {
+          const result: EntityResult = {
+            type: 'entity',
+            name: data.name,
+            entityType: data.entityType,
+            observations: data.observations
+          };
+          results.push(result);
+          cacheUpdates.push([data.name.toLowerCase(), result]);
+          this.entityBloom.add(data.name.toLowerCase());
+        }
+        
+        // Batch cache update
+        for (const [key, value] of cacheUpdates) {
+          this.entityCache.set(key, value);
+        }
+        
+        return results;
+      } finally {
+        // Re-enable FTS trigger
+        this.db.exec(`
+          CREATE TRIGGER IF NOT EXISTS entities_fts_insert AFTER INSERT ON entities
+          BEGIN
+            INSERT INTO entities_fts(name, entity_type, observations)
+            VALUES (new.name, new.entity_type, new.observations);
+          END;
+        `);
+      }
+    });
+    
+    // Clear search cache as new entities were added
+    this.searchCache.clear();
+    perf.end({ created: created.length });
+    return created;
+  }
+
   createRelations(relations: CreateRelationInput[]): RelationResult[] {
     const created: RelationResult[] = [];
     

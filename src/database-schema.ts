@@ -12,6 +12,9 @@ export const PRAGMAS = `
   PRAGMA temp_store = MEMORY;
   PRAGMA mmap_size = ${config.database.mmapSizeMb * 1024 * 1024};
   PRAGMA foreign_keys = ON;
+  PRAGMA busy_timeout = 5000;
+  PRAGMA wal_autocheckpoint = 1000;
+  PRAGMA page_size = 8192;
 `;
 
 export const TABLES = `

@@ -152,7 +152,11 @@ export class MultiDatabaseManager {
     const db = this.databases.get(targetContext);
     if (!db) throw new Error(`Invalid context: ${targetContext}`);
     
-    const created = db.createEntities(entities);
+    // Use batch creation for larger sets
+    const created = entities.length >= 10 && db.createEntitiesBatch
+      ? db.createEntitiesBatch(entities)
+      : db.createEntities(entities);
+      
     for (const entity of created) {
       this.entityContextMap.set(entity.name.toLowerCase(), targetContext);
     }
