@@ -728,6 +728,12 @@ export class MemoryDatabase {
   addObservations(updates: ObservationUpdate[]): void {
     if (updates.length === 0) return;
 
+    // Use batch optimization for large updates
+    if (updates.length >= 10) {
+      this.addObservationsBatch(updates);
+      return;
+    }
+
     this.transaction(() => {
       for (const update of updates) {
         const row = this.statements.getEntity!.get(update.entityName) as EntityRow | undefined;
@@ -748,6 +754,53 @@ export class MemoryDatabase {
     });
     
     this.searchCache.clear();
+  }
+
+  private addObservationsBatch(updates: ObservationUpdate[]): void {
+    const perf = new PerformanceTracker('addObservationsBatch', { count: updates.length });
+    
+    this.transaction(() => {
+      // Prepare batch statement for fetching all entities at once
+      const entityNames = updates.map(u => u.entityName);
+      const placeholders = entityNames.map(() => '?').join(',');
+      
+      // Fetch all entities in one query
+      const entities = this.db.prepare(
+        `SELECT name, observations FROM entities WHERE name IN (${placeholders})`
+      ).all(...entityNames) as EntityRow[];
+      
+      // Create a map for quick lookup
+      const entityMap = new Map<string, EntityRow>();
+      for (const entity of entities) {
+        entityMap.set(entity.name.toLowerCase(), entity);
+      }
+      
+      // Prepare update statement outside the loop
+      const updateStmt = this.db.prepare(
+        'UPDATE entities SET observations = ?, updated_at = julianday(\'now\') WHERE name = ?'
+      );
+      
+      // Process updates
+      for (const update of updates) {
+        const entity = entityMap.get(update.entityName.toLowerCase());
+        if (entity) {
+          const existing = this.compressionEnabled 
+            ? CompressionUtils.decompressObservations(entity.observations)
+            : parseObservations(entity.observations);
+          
+          const combined = Array.from(new Set([...existing, ...update.contents]));
+          const observationsJson = this.compressionEnabled 
+            ? CompressionUtils.compressObservations(combined)
+            : stringifyObservations(combined);
+          
+          updateStmt.run(observationsJson, update.entityName);
+          this.entityCache.delete(update.entityName.toLowerCase());
+        }
+      }
+    });
+    
+    this.searchCache.clear();
+    perf.end();
   }
 
   deleteEntities(entityNames: string[]): void {
