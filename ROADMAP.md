@@ -38,7 +38,7 @@ Mem100x aims to be the **fastest and most reliable** Model Context Protocol (MCP
 - [ ] Fix cache interface edge cases (3 tests)
 - [ ] Add cache memory pressure monitoring
 - [ ] Implement cache size auto-tuning
-- [ ] Add cache performance benchmarks
+- [ ] Add cache performance metrics
 
 ### Benefits
 - Improved memory efficiency

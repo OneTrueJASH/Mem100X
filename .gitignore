@@ -64,20 +64,36 @@ tmp/
 .yarn/install-state.gz
 .pnp.*
 
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
 # Test files and configurations
 tests/
+test-db/
+*.test.js
+*.spec.js
 vitest.config.ts
 jest.config.js
 
 # Benchmarks
 benchmark/
 
-# Project-specific documentation
-CLAUDE.md
-BENCHMARK*.md
-PROJECT_STATUS.md
-COMPARISON.md
-PERFORMANCE.md
-LAUNCH-CHECKLIST.md
-PUBLISHING.md
+# Development scripts
 *.sh
+
+# Internal documentation
+BENCHMARKING.md
+BENCHMARK_RESULTS.md
+CLAUDE.md
+HANDOFF*.md
+PROJECT_STATUS.md
+PUBLISHING.md
+LAUNCH-CHECKLIST.md
+PERFORMANCE.md
+*-SESSION*.md
+IMPLEMENTATION*.md
+IMPROVEMENT*.md
+COMPARISON*.md
+TEST_SUMMARY*.md

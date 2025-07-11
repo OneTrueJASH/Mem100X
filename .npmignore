@@ -1,40 +1,13 @@
-# Source files
-src/
-benchmark/
+# Everything except dist and essential files
+**/*
 
-# Config files
-.github/
-.gitignore
-.npmignore
-tsconfig.json
-CLAUDE.md
-HANDOFF.md
-
-# Development files
-*.ts
-!dist/**/*.d.ts
-*.log
-*.db
-.DS_Store
-
-# Test files
-test/
-__tests__/
-*.test.js
-*.spec.js
-
-# Documentation source
-docs/
-*.md
+# Then explicitly include what we want
+!dist/**
 !README.md
 !LICENSE
+!CHANGELOG.md
+!package.json
 
-# IDE
-.vscode/
-.idea/
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-*.bak
+# But exclude TypeScript source from dist
+dist/**/*.ts
+!dist/**/*.d.ts

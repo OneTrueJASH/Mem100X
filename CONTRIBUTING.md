@@ -49,7 +49,7 @@ git checkout -b feature/your-amazing-feature
 
 1. **Performance First**: Every change must maintain or improve performance
 2. **TypeScript Strict**: All code must pass strict type checking
-3. **Benchmarks Required**: Add benchmarks for new features
+3. **Performance Focus**: Ensure changes don't degrade performance
 4. **Small Functions**: Keep functions under 50 lines
 5. **Clear Names**: Use descriptive variable and function names
 
@@ -66,7 +66,7 @@ npm run build
 #### PR Requirements
 
 - [ ] Passes all TypeScript checks
-- [ ] Includes benchmarks for new features
+- [ ] Performance impact has been considered
 - [ ] Performance is maintained or improved
 - [ ] Documentation is updated
 - [ ] Commit messages are clear
@@ -125,7 +125,7 @@ searchNodes(query: string, limit: number = 20): GraphResult {
 
 Looking for easy contributions?
 
-- Add more benchmarks
+- Add more examples
 - Improve error messages
 - Add debug logging options
 - Create example use cases

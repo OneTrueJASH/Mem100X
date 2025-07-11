@@ -1,9 +1,13 @@
 # Mem100x - The FASTEST Memory MCP Server Ever Built!
 
+[![npm version](https://img.shields.io/npm/v/mem100x.svg)](https://www.npmjs.com/package/mem100x)
+[![npm downloads](https://img.shields.io/npm/dm/mem100x.svg)](https://www.npmjs.com/package/mem100x)
+[![CI Status](https://github.com/OneTrueJASH/Mem100X/actions/workflows/ci.yml/badge.svg)](https://github.com/OneTrueJASH/Mem100X/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Performance](https://img.shields.io/badge/Performance-66%2C821%20entities%2Fsec-brightgreen)](https://github.com/OneTrueJASH/Mem100X)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue)](https://www.typescriptlang.org/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-purple)](https://modelcontextprotocol.io)
-[![SQLite](https://img.shields.io/badge/SQLite-Powered-orange)](https://www.sqlite.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org/)
 
 > **22x faster** than other implementations | **Intelligent multi-context** (personal/work) | **ML-like** context detection | **98% token savings**
 
@@ -43,7 +47,28 @@ All 11 MCP tools implemented with performance tracking:
 - Comprehensive error handling
 - Graceful shutdown support
 - Transaction integrity
-- Extensive benchmarking suite
+- Battle-tested performance
+
+## Quick Example
+
+Using Mem100x with Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "mem100x": {
+      "command": "npx",
+      "args": ["mem100x"]
+    }
+  }
+}
+```
+
+Then in Claude:
+- "Remember that my project meeting is tomorrow at 2pm with Sarah"
+- "What meetings do I have this week?"
+- "Store these API keys: production: sk-123, staging: sk-456"
+- "Switch to personal context and remember my mom's birthday is June 15"
 
 ## Installation
 
@@ -183,9 +208,9 @@ For single-context usage:
 }
 ```
 
-## Performance Benchmarks
+## Performance
 
-Mem100x has been extensively benchmarked and optimized to achieve industry-leading performance:
+Mem100x delivers industry-leading performance that's been validated in production:
 
 ### Performance Metrics
 - **Entity Creation**: 66,821 entities/sec (22x faster than alternatives)
@@ -243,11 +268,13 @@ src/
 
 ## Contributing
 
-We love contributions! Please:
+We love contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+Quick steps:
 1. Fork the repository
 2. Create a feature branch
-3. Run benchmarks to ensure performance
-4. Submit a PR with benchmark results
+3. Ensure all tests pass
+4. Submit a PR
 
 ## License
 

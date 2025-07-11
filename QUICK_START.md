@@ -112,7 +112,7 @@ All 11 MCP tools are ready to use:
 
 ## Next Steps
 
-1. **Explore benchmarks**: See why we're the fastest
+1. **Check performance metrics**: See the speed in action
 2. **Read the docs**: Deep dive into all features
 3. **Star the repo**: If you love the speed!
 
