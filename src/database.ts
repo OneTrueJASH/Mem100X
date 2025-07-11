@@ -343,8 +343,8 @@ export class MemoryDatabase {
       }
     }
     
-    // Fallback to transaction-based update
-    this.db.exec('BEGIN IMMEDIATE');
+    // For updates, use deferred transaction to reduce lock time
+    this.db.exec('BEGIN DEFERRED');
     
     try {
       this.statements.createEntity!.run(entity.name, entity.entityType, observationsData);
@@ -523,20 +523,95 @@ export class MemoryDatabase {
     const cached = this.searchCache.get(cacheKey);
     if (cached) return cached;
 
-    // FTS search first
-    const ftsQuery = query.split(/\s+/)
-      .filter(term => term.length > 0)
-      .map(term => `"${term}"*`)
-      .join(' OR ');
+    // Use read pool if available for better concurrency
+    const executeSearch = async () => {
+      if (this.readPool) {
+        const conn = await this.readPool.acquire();
+        try {
+          // Prepare statements on pooled connection
+          const searchStmt = conn.db.prepare(`
+            SELECT e.* FROM entities_fts fts
+            JOIN entities e ON e.name = fts.name
+            WHERE entities_fts MATCH ?
+            ORDER BY rank
+            LIMIT ?
+          `);
+          
+          const likeStmt = conn.db.prepare(`
+            SELECT * FROM entities 
+            WHERE name LIKE ? OR entity_type LIKE ? OR observations LIKE ?
+            LIMIT ?
+          `);
+          
+          // FTS search first
+          const ftsQuery = query.split(/\s+/)
+            .filter(term => term.length > 0)
+            .map(term => `"${term}"*`)
+            .join(' OR ');
+          
+          let rows = searchStmt.all(ftsQuery, limit) as EntityRow[];
+          
+          // Fallback to LIKE search if no FTS results
+          if (rows.length === 0) {
+            const likePattern = `%${query}%`;
+            rows = likeStmt.all(likePattern, likePattern, likePattern, limit) as EntityRow[];
+          }
+          
+          return rows;
+        } finally {
+          await this.readPool.release(conn);
+        }
+      } else {
+        // Fallback to main connection
+        const ftsQuery = query.split(/\s+/)
+          .filter(term => term.length > 0)
+          .map(term => `"${term}"*`)
+          .join(' OR ');
+        
+        let rows = this.statements.searchEntities!.all(ftsQuery, limit) as EntityRow[];
+        
+        if (rows.length === 0) {
+          const likePattern = `%${query}%`;
+          rows = this.statements.searchEntitiesLike!.all(
+            likePattern, likePattern, likePattern, limit
+          ) as EntityRow[];
+        }
+        
+        return rows;
+      }
+    };
     
-    let rows = this.statements.searchEntities!.all(ftsQuery, limit) as EntityRow[];
-
-    // Fallback to LIKE search if no FTS results
-    if (rows.length === 0) {
-      const likePattern = `%${query}%`;
-      rows = this.statements.searchEntitiesLike!.all(
-        likePattern, likePattern, likePattern, limit
-      ) as EntityRow[];
+    // Execute search (sync wrapper for now)
+    let rows: EntityRow[];
+    if (this.readPool) {
+      // For now, fall back to sync until we convert to async
+      const ftsQuery = query.split(/\s+/)
+        .filter(term => term.length > 0)
+        .map(term => `"${term}"*`)
+        .join(' OR ');
+      
+      rows = this.statements.searchEntities!.all(ftsQuery, limit) as EntityRow[];
+      
+      if (rows.length === 0) {
+        const likePattern = `%${query}%`;
+        rows = this.statements.searchEntitiesLike!.all(
+          likePattern, likePattern, likePattern, limit
+        ) as EntityRow[];
+      }
+    } else {
+      const ftsQuery = query.split(/\s+/)
+        .filter(term => term.length > 0)
+        .map(term => `"${term}"*`)
+        .join(' OR ');
+      
+      rows = this.statements.searchEntities!.all(ftsQuery, limit) as EntityRow[];
+      
+      if (rows.length === 0) {
+        const likePattern = `%${query}%`;
+        rows = this.statements.searchEntitiesLike!.all(
+          likePattern, likePattern, likePattern, limit
+        ) as EntityRow[];
+      }
     }
 
     // Convert rows to entities
