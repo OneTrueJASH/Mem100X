@@ -14,6 +14,7 @@ import { stringifyGeneric } from './utils/fast-json.js';
 import { logger, logError, logInfo } from './utils/logger.js';
 import { config } from './config.js';
 import { CircuitBreaker } from './utils/circuit-breaker.js';
+import { WriteAggregator, WriteOperation } from './utils/write-aggregator.js';
 
 export async function main() {
   logInfo('Starting Mem100x Multi-Context MCP server...');
@@ -21,9 +22,15 @@ export async function main() {
   const manager = new MultiDatabaseManager(config);
   logInfo('MultiDatabaseManager initialized.');
   
+  // Create write aggregator for batching operations
+  const writeAggregator = new WriteAggregator(manager, 5, 50);
+  logInfo('Write aggregator initialized for intelligent batching.');
+  
   // Create circuit breakers for each tool
   const circuitBreakers = new Map<string, CircuitBreaker>();
   const criticalTools = ['create_entities', 'add_observations', 'create_relations'];
+  const writeTools = ['create_entities', 'add_observations', 'create_relations', 'delete_entities'];
+  const readTools = ['search_nodes', 'read_graph', 'get_context_info'];
   
   for (const toolName of Object.keys(toolHandlers)) {
     // More strict settings for critical write operations
@@ -54,6 +61,7 @@ export async function main() {
   // Call tool handler
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
+    const requestStartTime = process.hrtime.bigint();
 
     try {
       const handler = toolHandlers[name];
@@ -66,15 +74,81 @@ export async function main() {
         throw new McpError(ErrorCode.InternalError, `No circuit breaker for tool: ${name}`);
       }
       
-      // Execute through circuit breaker
-      const result = await circuitBreaker.execute(async () => {
+      // Time circuit breaker execution
+      const circuitBreakerStartTime = process.hrtime.bigint();
+      
+      let result: any;
+      
+      // Use write aggregator for write operations
+      if (writeTools.includes(name)) {
+        const operation: WriteOperation = {
+          type: name as any,
+          data: args
+        };
+        
+        const aggregatorStartTime = process.hrtime.bigint();
+        result = await writeAggregator.scheduleWrite(operation);
+        const aggregatorEndTime = process.hrtime.bigint();
+        
+        const aggregatorTime = Number(aggregatorEndTime - aggregatorStartTime) / 1_000_000;
+        
+        if (aggregatorTime > 10) {
+          logInfo(`Write aggregator timing for ${name}`, { 
+            aggregatorTime_ms: aggregatorTime,
+            stats: writeAggregator.getStats()
+          });
+        }
+      }
+      // For read operations, bypass circuit breaker for lower latency
+      else if (readTools.includes(name)) {
         const context: ToolContext = {
           manager,
           startTime: performance.now(),
           toolName: name,
         };
-        return handler(args, context);
+        result = await handler(args, context);
+      }
+      
+      // Execute other operations through circuit breaker
+      else {
+        result = await circuitBreaker.execute(async () => {
+        const dbCallStartTime = process.hrtime.bigint();
+        
+        const context: ToolContext = {
+          manager,
+          startTime: performance.now(),
+          toolName: name,
+        };
+        
+        const dbResult = await handler(args, context);
+        
+        const dbCallEndTime = process.hrtime.bigint();
+        const dbCallTime = Number(dbCallEndTime - dbCallStartTime) / 1_000_000;
+        
+        // Log timing for operations
+        if (dbCallTime > 50) {
+          logInfo(`DB timing for ${name}`, { dbCallTime_ms: dbCallTime });
+        }
+        
+        return dbResult;
       });
+      }
+      
+      const circuitBreakerEndTime = process.hrtime.bigint();
+      const requestEndTime = process.hrtime.bigint();
+      
+      // Calculate timings
+      const totalRequestTime = Number(requestEndTime - requestStartTime) / 1_000_000;
+      const circuitBreakerTime = Number(circuitBreakerEndTime - circuitBreakerStartTime) / 1_000_000;
+      
+      // Log timing details for analysis
+      if (totalRequestTime > 50) { // Log slow requests
+        logInfo(`Request timing for ${name}`, {
+          totalRequestTime_ms: totalRequestTime,
+          circuitBreakerTime_ms: circuitBreakerTime,
+          overhead_ms: circuitBreakerTime - totalRequestTime
+        });
+      }
       
       return {
         content: [{ type: 'text', text: stringifyGeneric(result, true) }],
