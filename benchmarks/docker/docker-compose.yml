@@ -1,0 +1,84 @@
+version: '3.8'
+
+# Common configuration for all benchmark containers
+x-benchmark-common: &benchmark-common
+  build:
+    context: ../
+    dockerfile: docker/base/Dockerfile
+  # Resource limits - CRITICAL for fair comparison
+  deploy:
+    resources:
+      limits:
+        cpus: '1.0'
+        memory: 512M
+      reservations:
+        cpus: '1.0'
+        memory: 512M
+  # Disable swap to ensure consistent memory behavior
+  mem_swappiness: 0
+  # Network isolation
+  network_mode: bridge
+  # Security options
+  security_opt:
+    - no-new-privileges:true
+  read_only: false
+  tmpfs:
+    - /tmp
+  volumes:
+    - ../results:/benchmark/results
+    - ../logs:/benchmark/logs
+
+services:
+  # Mem100x server benchmark
+  benchmark-mem100x:
+    <<: *benchmark-common
+    container_name: benchmark-mem100x
+    build:
+      context: ../../
+      dockerfile: benchmarks/docker/servers/mem100x/Dockerfile
+    environment:
+      - SERVER_NAME=mem100x
+      - SERVER_TYPE=mem100x
+      - MEMORY_DB=/tmp/mem100x-benchmark.db
+      - NODE_ENV=production
+      - DEBUG=0
+
+  # Official memory server benchmark
+  benchmark-official:
+    <<: *benchmark-common
+    container_name: benchmark-official
+    build:
+      context: ../
+      dockerfile: docker/servers/official-memory/Dockerfile
+    environment:
+      - SERVER_NAME=official-memory
+      - SERVER_TYPE=official
+      - NODE_ENV=production
+
+  # Benchmark runner (controls the tests)
+  benchmark-runner:
+    <<: *benchmark-common
+    container_name: benchmark-runner
+    build:
+      context: ../
+      dockerfile: docker/base/Dockerfile
+    command: ["node", "src/runner.js"]
+    depends_on:
+      - benchmark-mem100x
+      - benchmark-official
+    environment:
+      - BENCHMARK_MODE=docker
+      - CONCURRENT_OPERATIONS=100
+      - TOTAL_OPERATIONS=10000
+    volumes:
+      - ../src:/benchmark/src:ro
+      - ../results:/benchmark/results
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+# Custom network for isolation
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

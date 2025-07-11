@@ -1,0 +1,164 @@
+{
+  "servers": [
+    {
+      "name": "mem100x",
+      "type": "mem100x",
+      "dockerImage": "benchmark-mem100x",
+      "startupTime": 2000,
+      "connectionConfig": {
+        "transport": "stdio"
+      }
+    },
+    {
+      "name": "official-memory",
+      "type": "official",
+      "dockerImage": "benchmark-official",
+      "startupTime": 3000,
+      "connectionConfig": {
+        "transport": "stdio"
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "entity-creation-throughput",
+      "description": "Measure raw entity creation speed",
+      "operations": [
+        {
+          "type": "create_entities",
+          "weight": 1.0,
+          "params": {
+            "entities": [
+              {
+                "name": "entity-{{index}}",
+                "entityType": "benchmark",
+                "observations": ["Created at {{timestamp}}"]
+              }
+            ]
+          }
+        }
+      ],
+      "iterations": 10000,
+      "warmupIterations": 100,
+      "concurrency": 1
+    },
+    {
+      "name": "search-performance",
+      "description": "Measure search speed on populated database",
+      "operations": [
+        {
+          "type": "search_nodes",
+          "weight": 1.0,
+          "params": {
+            "query": "entity"
+          }
+        }
+      ],
+      "iterations": 1000,
+      "warmupIterations": 50,
+      "concurrency": 1
+    },
+    {
+      "name": "mixed-workload",
+      "description": "Realistic mixed read/write workload",
+      "operations": [
+        {
+          "type": "create_entities",
+          "weight": 0.2,
+          "params": {
+            "entities": [
+              {
+                "name": "mixed-{{index}}",
+                "entityType": "data",
+                "observations": ["Mixed workload test"]
+              }
+            ]
+          }
+        },
+        {
+          "type": "search_nodes",
+          "weight": 0.5,
+          "params": {
+            "query": "mixed"
+          }
+        },
+        {
+          "type": "read_graph",
+          "weight": 0.2,
+          "params": {}
+        },
+        {
+          "type": "add_observations",
+          "weight": 0.1,
+          "params": {
+            "observations": [
+              {
+                "entityName": "mixed-1",
+                "contents": ["Updated at {{timestamp}}"]
+              }
+            ]
+          }
+        }
+      ],
+      "iterations": 5000,
+      "warmupIterations": 100,
+      "concurrency": 10
+    },
+    {
+      "name": "relation-performance",
+      "description": "Test relation creation and querying",
+      "operations": [
+        {
+          "type": "create_relations",
+          "weight": 1.0,
+          "params": {
+            "relations": [
+              {
+                "from": "entity-{{index}}",
+                "to": "entity-{{index + 1}}",
+                "relationType": "connected_to"
+              }
+            ]
+          }
+        }
+      ],
+      "iterations": 5000,
+      "warmupIterations": 50,
+      "concurrency": 1
+    },
+    {
+      "name": "stress-test",
+      "description": "High concurrency stress test",
+      "operations": [
+        {
+          "type": "create_entities",
+          "weight": 0.3
+        },
+        {
+          "type": "search_nodes",
+          "weight": 0.4
+        },
+        {
+          "type": "create_relations",
+          "weight": 0.2
+        },
+        {
+          "type": "delete_entities",
+          "weight": 0.1
+        }
+      ],
+      "iterations": 10000,
+      "warmupIterations": 200,
+      "concurrency": 50
+    }
+  ],
+  "options": {
+    "dockerLimits": {
+      "cpus": "1.0",
+      "memory": "512m"
+    },
+    "timeout": 300000,
+    "collectMetrics": true,
+    "outputFormat": "table"
+  }
+}
