@@ -2,7 +2,6 @@
   "name": "mcp-benchmark-suite",
   "version": "1.0.0",
   "description": "Fair and reproducible benchmarking suite for MCP memory servers",
-  "type": "module",
   "scripts": {
     "benchmark": "node src/runner.js",
     "benchmark:mem100x": "SERVERS=mem100x node src/runner.js",
