@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.0.0 (2025-07-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* mem100x command now runs multi-context server by default
+
+### Features
+
+* make multi-context server the default ([b648727](https://github.com/OneTrueJASH/Mem100X/commit/b648727be54fa614e199d60fd6c6e81913974a18))
+
 ## [2.0.0] - 2025-01-10
 
 - **Breaking Changes**
