@@ -79,11 +79,17 @@ jest.config.js
 
 # Benchmarks
 benchmark/
+benchmarks/servers/official-memory
+benchmarks/results/
+benchmarks/data/
+benchmarks/logs/
 
-# Development scripts
+# Development scripts (but not benchmark scripts)
 *.sh
+!benchmarks/*.sh
+!benchmarks/**/*.sh
 
-# Internal documentation
+# Internal documentation (but not benchmark docs)
 BENCHMARKING.md
 BENCHMARK_RESULTS.md
 CLAUDE.md
@@ -97,3 +103,4 @@ IMPLEMENTATION*.md
 IMPROVEMENT*.md
 COMPARISON*.md
 TEST_SUMMARY*.md
+!benchmarks/**/*.md

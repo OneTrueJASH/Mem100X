@@ -16,7 +16,8 @@
       "startupTime": 3000,
       "connectionConfig": {
         "transport": "stdio"
-      }
+      },
+      "description": "Official MCP memory server from modelcontextprotocol/servers"
     }
   ],
   "scenarios": [

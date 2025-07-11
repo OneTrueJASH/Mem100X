@@ -13,27 +13,70 @@ This benchmark suite provides:
 ## Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose
-- Node.js 20+
-- At least 2GB free RAM
+- Node.js 18+
+- Docker and Docker Compose (for production benchmarks)
+- Built main project (`npm run build` in parent directory)
+
+### Installation
+```bash
+cd benchmarks
+npm install
+npm run build
+```
 
 ### Running Benchmarks
 
+#### Local Development (Recommended for testing)
+
+1. **Quick Test** - Run a single scenario with reduced iterations:
 ```bash
-# Build all containers
-cd benchmarks
-npm install
-npm run docker:build
+./run-local-dev.js --quick --scenarios entity-creation-throughput
+```
 
-# Run all benchmarks
-npm run benchmark:all
+2. **Full Local Run** - Run all scenarios locally:
+```bash
+./run-local.js
+# or with enhanced features:
+./run-local-dev.js
+```
 
-# Run specific server
-npm run benchmark:mem100x
-npm run benchmark:official
+3. **Watch Mode** - Auto-rerun benchmarks on file changes:
+```bash
+./watch-benchmarks.js
+```
 
-# Compare results
-npm run compare
+4. **Custom Configuration**:
+```bash
+# Run specific servers
+./run-local-dev.js --servers mem100x,mem100x-single
+
+# Run specific scenarios
+./run-local-dev.js --scenarios entity-creation-throughput,search-performance
+
+# Custom iterations
+./run-local-dev.js --iterations 1000
+
+# Verbose mode (show server output)
+./run-local-dev.js --verbose
+
+# Keep database files after run
+./run-local-dev.js --keep-db
+```
+
+#### Docker Production Benchmarks
+
+```bash
+# Build and run all benchmarks
+./scripts/run-benchmark.sh
+
+# Run specific servers
+./scripts/run-benchmark.sh --servers mem100x,official
+
+# Build only
+./scripts/run-benchmark.sh --build-only
+
+# Skip build
+./scripts/run-benchmark.sh --skip-build
 ```
 
 ## Benchmark Scenarios
@@ -127,22 +170,40 @@ Results are saved in `results/` with timestamp:
 - **Memory**: Peak memory usage during test
 - **CPU**: Average CPU utilization
 
+## Available Scripts
+
+- `run-local.js` - Basic local benchmark runner
+- `run-local-dev.js` - Enhanced local runner with CLI options
+- `watch-benchmarks.js` - Development watch mode
+- `test-basic.js` - Test MCP client connection
+- `scripts/run-benchmark.sh` - Docker-based production benchmarks
+- `scripts/compare-results.js` - Compare benchmark results
+
 ## Troubleshooting
 
-### Container won't start
-- Check Docker daemon is running
-- Ensure ports aren't in use
-- Verify resource limits aren't too restrictive
+### Server won't start
+- Ensure main project is built: `cd .. && npm run build`
+- Check if database files need cleanup
+- Use `--verbose` flag to see server output
+- Check Docker daemon is running (for Docker benchmarks)
+
+### Module not found errors
+- Run `npm install` in both benchmarks and parent directory
+- Rebuild: `npm run build`
+
+### Permission denied
+- Make scripts executable: `chmod +x *.js scripts/*.sh`
 
 ### Benchmark hangs
 - Increase timeout in config
-- Check server logs in `logs/`
+- Check server logs in `logs/` or use `--verbose`
 - Ensure server supports all MCP operations
 
 ### Inconsistent results
 - Run multiple iterations
 - Ensure no other processes consuming resources
 - Check for thermal throttling
+- Use Docker mode for more consistent results
 
 ## Contributing
 

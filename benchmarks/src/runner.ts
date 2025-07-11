@@ -27,6 +27,7 @@ class BenchmarkRunner {
     console.log(chalk.bold.blue('\n🏁 MCP Memory Server Benchmark Suite\n'));
     
     const serversToTest = this.getServersToTest();
+    const scenariosToRun = this.getScenariosToRun();
     
     for (const serverConfig of serversToTest) {
       console.log(chalk.bold.yellow(`\n📊 Benchmarking ${serverConfig.name}...\n`));
@@ -36,7 +37,7 @@ class BenchmarkRunner {
       try {
         await adapter.connect();
         
-        for (const scenario of this.config.scenarios) {
+        for (const scenario of scenariosToRun) {
           await this.runScenario(adapter, serverConfig, scenario);
         }
         
@@ -58,6 +59,36 @@ class BenchmarkRunner {
       return this.config.servers.filter(s => serverNames.includes(s.name));
     }
     return this.config.servers;
+  }
+
+  private getScenariosToRun(): ScenarioConfig[] {
+    const scenariosEnv = process.env.SCENARIOS;
+    let scenarios = this.config.scenarios;
+    
+    if (scenariosEnv) {
+      const scenarioNames = scenariosEnv.split(',');
+      scenarios = scenarios.filter(s => scenarioNames.includes(s.name));
+    }
+    
+    // Apply quick mode if enabled
+    if (process.env.QUICK_MODE === 'true') {
+      scenarios = scenarios.map(scenario => ({
+        ...scenario,
+        iterations: Math.min(scenario.iterations, 100),
+        warmupIterations: Math.min(scenario.warmupIterations, 10)
+      }));
+    }
+    
+    // Apply custom iterations if provided
+    if (process.env.ITERATIONS) {
+      const iterations = parseInt(process.env.ITERATIONS, 10);
+      scenarios = scenarios.map(scenario => ({
+        ...scenario,
+        iterations
+      }));
+    }
+    
+    return scenarios;
   }
 
   private createAdapter(config: ServerConfig): BaseAdapter {

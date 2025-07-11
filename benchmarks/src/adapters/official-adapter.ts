@@ -13,14 +13,28 @@ export class OfficialMemoryAdapter extends BaseAdapter {
     if (process.env.BENCHMARK_MODE === 'docker') {
       this.execPath = '/app/servers/src/memory/build/index.js';
     } else {
-      // Local development mode - assumes you've cloned the official repo
-      this.execPath = path.join(
+      // Local development mode
+      // Check if symlink exists first
+      const symlinkPath = path.join(
         process.cwd(), 
         'servers', 
         'official-memory', 
-        'build', 
+        'dist', 
         'index.js'
       );
+      
+      // Fallback to direct path if symlink doesn't exist
+      const directPath = '/Users/josh/source/personal/mcp-servers-official/src/memory/dist/index.js';
+      
+      // Use fs.existsSync to check which path to use
+      const fs = require('fs');
+      if (fs.existsSync(symlinkPath)) {
+        this.execPath = symlinkPath;
+      } else if (fs.existsSync(directPath)) {
+        this.execPath = directPath;
+      } else {
+        throw new Error('Official memory server not found. Please run setup-official-server.sh first.');
+      }
     }
   }
 
