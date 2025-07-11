@@ -44,6 +44,273 @@
       "concurrency": 1
     },
     {
+      "name": "batch-entity-creation",
+      "description": "Test batch entity creation performance",
+      "operations": [
+        {
+          "type": "create_entities",
+          "weight": 1.0,
+          "params": {
+            "entities": [
+              {
+                "name": "batch-{{index}}-1",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 1 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-2",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 2 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-3",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 3 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-4",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 4 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-5",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 5 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-6",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 6 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-7",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 7 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-8",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 8 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-9",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 9 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-10",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 10 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-11",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 11 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-12",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 12 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-13",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 13 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-14",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 14 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-15",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 15 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-16",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 16 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-17",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 17 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-18",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 18 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-19",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 19 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-20",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 20 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-21",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 21 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-22",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 22 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-23",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 23 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-24",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 24 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-25",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 25 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-26",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 26 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-27",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 27 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-28",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 28 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-29",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 29 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-30",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 30 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-31",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 31 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-32",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 32 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-33",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 33 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-34",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 34 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-35",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 35 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-36",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 36 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-37",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 37 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-38",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 38 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-39",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 39 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-40",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 40 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-41",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 41 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-42",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 42 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-43",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 43 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-44",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 44 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-45",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 45 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-46",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 46 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-47",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 47 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-48",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 48 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-49",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 49 created at {{timestamp}}"]
+              },
+              {
+                "name": "batch-{{index}}-50",
+                "entityType": "benchmark",
+                "observations": ["Batch entity 50 created at {{timestamp}}"]
+              }
+            ]
+          }
+        }
+      ],
+      "iterations": 200,
+      "warmupIterations": 10,
+      "concurrency": 1
+    },
+    {
       "name": "search-performance",
       "description": "Measure search speed on populated database",
       "operations": [

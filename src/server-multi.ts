@@ -13,12 +13,26 @@ import { getAllToolDefinitions } from './tool-definitions.js';
 import { stringifyGeneric } from './utils/fast-json.js';
 import { logger, logError, logInfo } from './utils/logger.js';
 import { config } from './config.js';
+import { CircuitBreaker } from './utils/circuit-breaker.js';
 
 export async function main() {
   logInfo('Starting Mem100x Multi-Context MCP server...');
 
   const manager = new MultiDatabaseManager(config);
   logInfo('MultiDatabaseManager initialized.');
+  
+  // Create circuit breakers for each tool
+  const circuitBreakers = new Map<string, CircuitBreaker>();
+  const criticalTools = ['create_entities', 'add_observations', 'create_relations'];
+  
+  for (const toolName of Object.keys(toolHandlers)) {
+    // More strict settings for critical write operations
+    const options = criticalTools.includes(toolName) 
+      ? { failureThreshold: 3, resetTimeout: 10000, halfOpenMaxAttempts: 2 }
+      : { failureThreshold: 5, resetTimeout: 5000, halfOpenMaxAttempts: 3 };
+      
+    circuitBreakers.set(toolName, new CircuitBreaker(options));
+  }
 
   const server = new Server(
     {
@@ -47,12 +61,20 @@ export async function main() {
         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
       }
       
-      const context: ToolContext = {
-        manager,
-        startTime: performance.now(),
-        toolName: name,
-      };
-      const result = handler(args, context);
+      const circuitBreaker = circuitBreakers.get(name);
+      if (!circuitBreaker) {
+        throw new McpError(ErrorCode.InternalError, `No circuit breaker for tool: ${name}`);
+      }
+      
+      // Execute through circuit breaker
+      const result = await circuitBreaker.execute(async () => {
+        const context: ToolContext = {
+          manager,
+          startTime: performance.now(),
+          toolName: name,
+        };
+        return handler(args, context);
+      });
       
       return {
         content: [{ type: 'text', text: stringifyGeneric(result, true) }],
@@ -61,6 +83,18 @@ export async function main() {
       if (error instanceof McpError) {
         throw error;
       }
+      
+      // Handle circuit breaker open state
+      if (error instanceof Error && error.message.includes('Circuit breaker is open')) {
+        const breaker = circuitBreakers.get(name);
+        const stats = breaker?.getStats();
+        logError(`Circuit breaker open for ${name}`, error, { stats });
+        throw new McpError(
+          ErrorCode.InternalError, 
+          `Service temporarily unavailable for ${name} - too many failures. Please retry in a few seconds.`
+        );
+      }
+      
       if (error && typeof error === 'object' && 'issues' in error) {
         const zodError = error as any;
         const issues = zodError.issues.map((issue: any) => `${issue.path.join('.')}: ${issue.message}`).join(', ');

@@ -25,6 +25,7 @@ const configSchema = z.object({
     relationQueryThreshold: z.number().default(200),
     compressionEnabled: z.boolean().default(true),
     cacheStrategy: z.enum(['lru', '2q', 'arc', 'radix']).default('lru'),
+    useReadPool: z.boolean().default(true),
   }),
   
   // Bloom Filter Configuration
@@ -78,6 +79,9 @@ function loadConfig() {
         ? process.env.COMPRESSION_ENABLED === 'true'
         : undefined,
       cacheStrategy: process.env.CACHE_STRATEGY as 'lru' | '2q' | 'arc' | 'radix' | undefined,
+      useReadPool: process.env.USE_READ_POOL
+        ? process.env.USE_READ_POOL === 'true'
+        : undefined,
     },
     bloomFilter: {
       expectedItems: process.env.BLOOM_FILTER_EXPECTED_ITEMS

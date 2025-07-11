@@ -25,6 +25,7 @@ import {
 import { ICache, createStringCache } from './utils/cache-interface.js';
 import { CountingBloomFilter } from './utils/counting-bloom-filter.js';
 import { CompressionUtils } from './utils/compression.js';
+import { ConnectionPool } from './utils/connection-pool.js';
 import { getCompleteSchema, getPragmas } from './database-schema.js';
 import { 
   logger, 
@@ -42,12 +43,14 @@ import { config } from './config.js';
 export class MemoryDatabase {
   private db!: Database.Database;
   private readonly dbPath: string;
+  private readPool?: ConnectionPool;
   
   // Performance optimizations
   private readonly entityCache: ICache<string, EntityResult>;
   private readonly searchCache: ICache<string, GraphResult>;
   private entityBloom!: CountingBloomFilter;
   private readonly compressionEnabled: boolean = config.performance.compressionEnabled;
+  private readonly useReadPool: boolean = config.performance.useReadPool ?? true;
   private readonly relationQueryThreshold: number = config.performance.relationQueryThreshold;
   
   // Transaction management
@@ -83,6 +86,21 @@ export class MemoryDatabase {
 
     // Initialize database
     this.initDatabase();
+    
+    // Initialize read pool if enabled
+    if (this.useReadPool && existsSync(this.dbPath)) {
+      this.readPool = new ConnectionPool(this.dbPath, {
+        minConnections: 2,
+        maxConnections: 5,
+        acquireTimeout: 5000,
+        idleTimeout: 60000,
+        readonly: true
+      });
+      logInfo('Read pool initialized', { 
+        minConnections: 2, 
+        maxConnections: 5 
+      });
+    }
     
     // Initialize bloom filter
     this.initializeBloomFilter();
@@ -167,6 +185,30 @@ export class MemoryDatabase {
     );
   }
   
+  // Helper method to execute read queries through the pool if available
+  private async executeRead<T>(
+    callback: (db: Database.Database) => T
+  ): Promise<T> {
+    if (this.readPool) {
+      const conn = await this.readPool.acquire();
+      try {
+        return callback(conn.db);
+      } finally {
+        this.readPool.release(conn);
+      }
+    }
+    return callback(this.db);
+  }
+
+  // Synchronous wrapper for read operations
+  private executeReadSync<T>(
+    callback: (db: Database.Database) => T
+  ): T {
+    // For now, fall back to main connection for sync operations
+    // TODO: Implement sync pool operations if needed
+    return callback(this.db);
+  }
+
   private initializeBloomFilter(): void {
     const bloomPath = this.dbPath.replace('.db', '.cbloom');
     const loadedFilter = CountingBloomFilter.loadFromFileSync(bloomPath);
@@ -275,7 +317,7 @@ export class MemoryDatabase {
         }));
         
         // Build bulk insert query
-        const placeholders = entities.map(() => '(?, ?, ?, julianday("now"), julianday("now"))').join(',');
+        const placeholders = entities.map(() => "(?, ?, ?, julianday('now'), julianday('now'))").join(',');
         const values = preparedData.flatMap(e => [e.name, e.entityType, e.observationsData]);
         
         // Execute bulk insert
@@ -739,6 +781,13 @@ export class MemoryDatabase {
       }
       this.transactionDepth = 0;
       this.isInTransaction = false;
+    }
+    
+    // Close read pool if it exists
+    if (this.readPool) {
+      this.readPool.close().catch(err => {
+        logError('Error closing read pool', err as Error);
+      });
     }
     
     this.saveBloomFilter();
