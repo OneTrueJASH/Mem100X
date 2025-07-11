@@ -2,13 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2025-01-10
+
+- **Breaking Changes**
+  - Multi-context server is now the default (`mem100x` command)
+  - Single-context server moved to `mem100x-single` command
+
+- **Changed**
+  - Default binary `mem100x` now runs multi-context server
+  - Single database server available as separate `mem100x-single` binary
+  - Updated all documentation to reflect multi-context as primary mode
+
+[2.0.0]: https://github.com/OneTrueJASH/Mem100X/releases/tag/v2.0.0
+
 ## [1.0.0] - 2025-01-10
 
 ### Initial Release
-
-- **Breaking Change**
-  - Multi-context server is now the default (`mem100x` command)
-  - Single-context server is now available as `mem100x-single`
 
 - **Core Features**
   - High-performance SQLite database with better-sqlite3
@@ -33,7 +42,6 @@ All notable changes to this project will be documented in this file.
   - TypeScript with strict mode
   - Comprehensive error handling
   - Graceful shutdown support
-  - Docker support
   - GitHub Actions CI/CD
 
 [1.0.0]: https://github.com/OneTrueJASH/Mem100X/releases/tag/v1.0.0
