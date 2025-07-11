@@ -27,7 +27,9 @@ export class Mem100xAdapter extends BaseAdapter {
       MEMORY_DB: process.env.MEMORY_DB || '/tmp/mem100x-benchmark.db',
       DEBUG: '0',
       // Disable any console output that might interfere with stdio
-      QUIET: '1'
+      QUIET: '1',
+      // Disable rate limiting for benchmarks
+      DISABLE_RATE_LIMITING: 'true'
     };
 
     const serverProcess = spawn('node', [this.execPath], {
@@ -45,12 +47,29 @@ export class Mem100xAdapter extends BaseAdapter {
       console.error(`[${this.name}] Server stderr:`, data.toString());
     });
 
-    // Wait for server to be ready
+    // Wait for server to be ready by monitoring stderr for the "running on stdio" message
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error('Server startup timeout'));
       }, 10000);
 
+      let stderrBuffer = '';
+      
+      const checkReady = (data: Buffer) => {
+        stderrBuffer += data.toString();
+        
+        // Check if the server is ready (look for the running message in JSON logs)
+        if (stderrBuffer.includes('running on stdio') || 
+            stderrBuffer.includes('Server running on stdio')) {
+          clearTimeout(timeout);
+          serverProcess.stderr.removeListener('data', checkReady);
+          resolve();
+        }
+      };
+      
+      serverProcess.stderr.on('data', checkReady);
+      
+      // Also check stdout for backward compatibility
       serverProcess.stdout.once('data', (data) => {
         clearTimeout(timeout);
         console.log(`[${this.name}] Server started:`, data.toString().trim());

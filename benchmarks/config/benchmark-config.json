@@ -377,17 +377,22 @@
       "description": "Test relation creation and querying",
       "operations": [
         {
-          "type": "create_relations",
-          "weight": 1.0,
+          "type": "create_entities",
+          "weight": 0.2,
           "params": {
-            "relations": [
+            "entities": [
               {
-                "from": "entity-{{index}}",
-                "to": "entity-{{index + 1}}",
-                "relationType": "connected_to"
+                "name": "relation-entity-{{index}}",
+                "entityType": "benchmark",
+                "observations": ["Entity for relation test"]
               }
             ]
           }
+        },
+        {
+          "type": "create_relations",
+          "weight": 0.8,
+          "params": null
         }
       ],
       "iterations": 5000,

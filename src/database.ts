@@ -39,6 +39,7 @@ import {
   parseObservations 
 } from './utils/fast-json.js';
 import { config } from './config.js';
+import { ValidationError } from './errors.js';
 
 export class MemoryDatabase {
   private db!: Database.Database;
@@ -275,6 +276,11 @@ export class MemoryDatabase {
       const results: EntityResult[] = [];
       
       for (const entity of entities) {
+        // Validate entity has required fields
+        if (!entity.name) {
+          throw new ValidationError('Entity name is required', 'name', entity);
+        }
+        
         const observationsData = this.compressionEnabled 
           ? CompressionUtils.compressObservations(entity.observations)
           : stringifyObservations(entity.observations);
@@ -305,6 +311,10 @@ export class MemoryDatabase {
 
   // Optimized single entity creation with minimal overhead
   private createSingleEntityOptimized(entity: CreateEntityInput, perf: PerformanceTracker): EntityResult[] {
+    // Validate entity has required fields
+    if (!entity.name) {
+      throw new ValidationError('Entity name is required', 'name', entity);
+    }
     // Skip compression for small observations (< 100 chars total)
     const observationsStr = stringifyObservations(entity.observations);
     const shouldCompress = this.compressionEnabled && observationsStr.length > 100;

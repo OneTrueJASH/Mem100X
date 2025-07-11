@@ -262,6 +262,11 @@ export abstract class BaseAdapter implements ServerAdapter {
   }
 
   private async deleteEntities(params: any) {
+    // Ensure confirm is always set for destructive operations
+    if (params && !params.confirm) {
+      params.confirm = true;
+    }
+    
     // If no params provided, delete some existing entities
     if (!params) {
       if (this.createdEntities.length === 0) {
@@ -277,7 +282,8 @@ export abstract class BaseAdapter implements ServerAdapter {
       this.createdEntities.splice(indexToDelete, 1);
       
       params = {
-        entityNames: [entityToDelete]
+        entityNames: [entityToDelete],
+        confirm: true  // Required for destructive operations
       };
     }
     

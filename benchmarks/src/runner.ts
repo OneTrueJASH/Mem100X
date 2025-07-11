@@ -250,10 +250,11 @@ class BenchmarkRunner {
     
     if (prepared.params) {
       const params = JSON.stringify(prepared.params);
+      const timestamp = Date.now().toString();
       const replaced = params
-        .replace(/{{index}}/g, index.toString())
-        .replace(/{{timestamp}}/g, Date.now().toString())
-        .replace(/{{index \+ 1}}/g, (index + 1).toString());
+        .replace(/\{\{index\}\}/g, index.toString())
+        .replace(/\{\{timestamp\}\}/g, timestamp)
+        .replace(/\{\{index \+ 1\}\}/g, (index + 1).toString());
       prepared.params = JSON.parse(replaced);
     }
     

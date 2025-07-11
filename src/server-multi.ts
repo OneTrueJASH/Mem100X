@@ -32,9 +32,10 @@ export async function main() {
   const writeAggregator = new ZeroDelayWriteAggregator(manager);
   logInfo('Zero-delay write aggregator initialized.');
   
-  // Create rate limiters
-  const rateLimiters = createRateLimiters();
-  logInfo('Rate limiters initialized.');
+  // Create rate limiters (can be disabled for benchmarks)
+  const rateLimitingEnabled = process.env.DISABLE_RATE_LIMITING !== 'true';
+  const rateLimiters = rateLimitingEnabled ? createRateLimiters() : null;
+  logInfo(rateLimitingEnabled ? 'Rate limiters initialized.' : 'Rate limiting disabled.');
   
   // Create circuit breakers for each tool
   const circuitBreakers = new Map<string, CircuitBreaker>();
@@ -76,8 +77,8 @@ export async function main() {
     const requestStartTime = process.hrtime.bigint();
     
     // Extract correlation ID from request meta
-    const correlationId = request.params._meta?.progressToken || 
-                         `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const correlationId = String(request.params._meta?.progressToken || 
+                         `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
 
     let requestSuccess = false;
     
@@ -87,9 +88,11 @@ export async function main() {
         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
       }
       
-      // Apply rate limiting
-      const limiterType = getRateLimiterForTool(name);
-      await rateLimiters[limiterType].checkLimit(request);
+      // Apply rate limiting if enabled
+      if (rateLimiters) {
+        const limiterType = getRateLimiterForTool(name);
+        await rateLimiters[limiterType].checkLimit(request);
+      }
       
       // Validate input size to prevent DoS
       validateToolInput(name, args);
@@ -200,8 +203,10 @@ export async function main() {
       throw new McpError(mcpError.code, mcpError.message, mcpError.data);
     } finally {
       // Update rate limiter based on request outcome
-      const limiterType = getRateLimiterForTool(name);
-      rateLimiters[limiterType].updateAfterRequest(request, requestSuccess);
+      if (rateLimiters) {
+        const limiterType = getRateLimiterForTool(name);
+        rateLimiters[limiterType].updateAfterRequest(request, requestSuccess);
+      }
     }
   });
 
@@ -212,9 +217,11 @@ export async function main() {
       await server.close();
       logInfo('MCP server closed.');
       
-      // Stop rate limiters
-      Object.values(rateLimiters).forEach(limiter => limiter.stop());
-      logInfo('Rate limiters stopped.');
+      // Stop rate limiters if enabled
+      if (rateLimiters) {
+        Object.values(rateLimiters).forEach(limiter => limiter.stop());
+        logInfo('Rate limiters stopped.');
+      }
       
       manager.closeAll();
       logInfo('All databases closed.');
