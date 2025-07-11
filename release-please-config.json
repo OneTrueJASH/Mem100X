@@ -8,6 +8,7 @@
       "draft": false,
       "prerelease": false,
       "include-component-in-tag": false,
+      "package-name": "",
       "skip-labeling": true,
       "changelog-sections": [
         {"type": "feat", "section": "Features", "hidden": false},
