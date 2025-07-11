@@ -69,7 +69,9 @@ services:
       - CONCURRENT_OPERATIONS=100
       - TOTAL_OPERATIONS=10000
     volumes:
-      - ../src:/benchmark/src:ro
+      - ../dist:/benchmark/dist:ro
+      - ../config:/benchmark/config:ro
+      - ../node_modules:/benchmark/node_modules:ro
       - ../results:/benchmark/results
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
