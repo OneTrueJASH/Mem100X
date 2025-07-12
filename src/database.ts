@@ -412,10 +412,35 @@ export class MemoryDatabase {
       return this.createEntities(entities);
     }
 
+    // Calculate optimal batch size if dynamic sizing is enabled
+    let batchSize = entities.length;
+    if (config.performance.enableDynamicBatchSizing) {
+      const averageEntitySize = this.calculateAverageEntitySize(entities);
+      const optimalBatchSize = Math.min(
+        config.performance.maxBatchSize,
+        Math.floor((config.performance.targetBatchMemoryMb * 1024 * 1024) / averageEntitySize),
+        entities.length
+      );
+
+      if (optimalBatchSize < entities.length) {
+        // Process in smaller batches
+        const results: EntityResult[] = [];
+        for (let i = 0; i < entities.length; i += optimalBatchSize) {
+          const batch = entities.slice(i, i + optimalBatchSize);
+          const batchResults = this.createEntitiesBatch(batch);
+          results.push(...batchResults);
+        }
+        return results;
+      }
+
+      batchSize = optimalBatchSize;
+    }
+
     const perf = new PerformanceTracker('createEntitiesBatch', {
       count: entities.length,
       ftsOptimization: true,
-      batchSize: entities.length
+      batchSize: batchSize,
+      dynamicSizing: config.performance.enableDynamicBatchSizing
     });
 
     // Use circuit breaker for bulk operations
@@ -423,6 +448,27 @@ export class MemoryDatabase {
       () => this.executeBulkEntityCreation(entities, perf),
       'createEntitiesBatch'
     );
+  }
+
+  // Calculate average entity size for dynamic batch sizing
+  private calculateAverageEntitySize(entities: CreateEntityInput[]): number {
+    if (entities.length === 0) return 1024; // Default 1KB
+
+    const totalSize = entities.reduce((sum, entity) => {
+      const nameSize = entity.name.length;
+      const typeSize = entity.entityType.length;
+      const observationsSize = entity.observations.reduce((obsSum, obs) => {
+        if (obs.type === 'text') return obsSum + obs.text.length;
+        if (obs.type === 'image' || obs.type === 'audio' || obs.type === 'resource') {
+          return obsSum + (obs.data?.length || 0);
+        }
+        if (obs.type === 'resource_link') return obsSum + (obs.uri?.length || 0);
+        return obsSum + 100; // Default size for unknown types
+      }, 0);
+      return sum + nameSize + typeSize + observationsSize;
+    }, 0);
+
+    return Math.max(totalSize / entities.length, 100); // Minimum 100 bytes
   }
 
   private executeBulkEntityCreation(entities: CreateEntityInput[], perf: PerformanceTracker): EntityResult[] {
@@ -434,6 +480,14 @@ export class MemoryDatabase {
       heapTotal: Math.round(memoryBefore.heapTotal / 1024 / 1024),
       external: Math.round(memoryBefore.external / 1024 / 1024)
     });
+
+    // Store original PRAGMA settings for restoration
+    const originalDeferForeignKeys = this.db.pragma('defer_foreign_keys', { simple: true });
+    const originalSynchronous = this.db.pragma('synchronous', { simple: true });
+
+    // Optimize for bulk operations
+    this.db.exec('PRAGMA defer_foreign_keys = ON');
+    this.db.exec('PRAGMA synchronous = NORMAL');
 
     const created = this.transaction(() => {
       const triggerDisableStart = Date.now();
@@ -524,30 +578,21 @@ export class MemoryDatabase {
           };
           results.push(result);
           cacheUpdates.push([data.name.toLowerCase(), result]);
-          this.entityBloom.add(data.name.toLowerCase());
         }
 
-        // Batch cache update
+        // Batch update caches
         for (const [key, value] of cacheUpdates) {
           this.entityCache.set(key, value);
+          this.entityBloom.add(key);
         }
 
         const cacheTime = Date.now() - cacheStart;
         logDebug('Cache updates completed', {
           entities: entities.length,
           cacheTime,
-          bloomFilterUpdates: entities.length
+          avgPerEntity: Math.round(cacheTime / entities.length)
         });
 
-        return results;
-                  } catch (error) {
-        const errorObj = error instanceof Error ? error : new Error(String(error));
-        logError('Bulk entity creation failed', errorObj, {
-          entities: entities.length,
-          stage: 'bulk_operation'
-        });
-        throw error;
-      } finally {
         const triggerRestoreStart = Date.now();
 
         // Re-enable FTS trigger (ALWAYS executes, even on error)
@@ -564,40 +609,44 @@ export class MemoryDatabase {
           duration: triggerRestoreTime,
           optimization: 'completed'
         });
+
+        return results;
+      } catch (error) {
+        // Re-enable FTS trigger even on error
+        this.db.exec(`
+          CREATE TRIGGER IF NOT EXISTS entities_fts_insert AFTER INSERT ON entities
+          BEGIN
+            INSERT INTO entities_fts(name, entity_type, observations)
+            VALUES (new.name, new.entity_type, new.observations);
+          END;
+        `);
+        throw error;
       }
     });
+
+    // Restore original PRAGMA settings
+    this.db.exec(`PRAGMA defer_foreign_keys = ${originalDeferForeignKeys}`);
+    this.db.exec(`PRAGMA synchronous = ${originalSynchronous}`);
 
     // Clear search cache as new entities were added
     this.searchCache.clear();
 
-        // Enhanced performance logging
-    perf.end({
-      created: created.length,
-      ftsOptimization: true,
-      batchOperation: true,
-      cacheCleared: true
-    });
-
     // Monitor memory usage after bulk operations
     const memoryAfter = process.memoryUsage();
-    const memoryDelta = {
-      rss: Math.round((memoryAfter.rss - memoryBefore.rss) / 1024 / 1024),
-      heapUsed: Math.round((memoryAfter.heapUsed - memoryBefore.heapUsed) / 1024 / 1024),
-      heapTotal: Math.round((memoryAfter.heapTotal - memoryBefore.heapTotal) / 1024 / 1024),
-      external: Math.round((memoryAfter.external - memoryBefore.external) / 1024 / 1024)
-    };
-
-    logDebug('Bulk operation memory impact', {
-      entities: entities.length,
-      memoryDelta,
-      memoryAfter: {
-        rss: Math.round(memoryAfter.rss / 1024 / 1024),
-        heapUsed: Math.round(memoryAfter.heapUsed / 1024 / 1024),
-        heapTotal: Math.round(memoryAfter.heapTotal / 1024 / 1024),
-        external: Math.round(memoryAfter.external / 1024 / 1024)
-      }
+    logDebug('Bulk operation memory after', {
+      rss: Math.round(memoryAfter.rss / 1024 / 1024),
+      heapUsed: Math.round(memoryAfter.heapUsed / 1024 / 1024),
+      heapTotal: Math.round(memoryAfter.heapTotal / 1024 / 1024),
+      external: Math.round(memoryAfter.external / 1024 / 1024),
+      rssDelta: Math.round((memoryAfter.rss - memoryBefore.rss) / 1024 / 1024),
+      heapDelta: Math.round((memoryAfter.heapUsed - memoryBefore.heapUsed) / 1024 / 1024)
     });
 
+    perf.end({
+      created: created.length,
+      memoryDelta: Math.round((memoryAfter.heapUsed - memoryBefore.heapUsed) / 1024 / 1024),
+      optimization: 'bulk'
+    });
     return created;
   }
 

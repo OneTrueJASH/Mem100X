@@ -34,6 +34,9 @@ const configSchema = z.object({
     batchSize: z.number().default(1000), // New: batch size for bulk operations
     enableBulkOperations: z.boolean().default(true), // New: enable bulk operations
     enablePreparedStatements: z.boolean().default(true), // New: enable prepared statements
+    enableDynamicBatchSizing: z.boolean().default(true), // New: enable dynamic batch sizing
+    maxBatchSize: z.number().default(5000), // New: maximum batch size
+    targetBatchMemoryMb: z.number().default(50), // New: target memory per batch
   }),
 
   // Bloom Filter Configuration
@@ -106,6 +109,13 @@ function loadConfig() {
         : undefined,
       enablePreparedStatements: process.env.ENABLE_PREPARED_STATEMENTS
         ? process.env.ENABLE_PREPARED_STATEMENTS === 'true'
+        : undefined,
+      enableDynamicBatchSizing: process.env.ENABLE_DYNAMIC_BATCH_SIZING
+        ? process.env.ENABLE_DYNAMIC_BATCH_SIZING === 'true'
+        : undefined,
+      maxBatchSize: process.env.MAX_BATCH_SIZE ? parseInt(process.env.MAX_BATCH_SIZE, 10) : undefined,
+      targetBatchMemoryMb: process.env.TARGET_BATCH_MEMORY_MB
+        ? parseInt(process.env.TARGET_BATCH_MEMORY_MB, 10)
         : undefined,
     },
     bloomFilter: {
