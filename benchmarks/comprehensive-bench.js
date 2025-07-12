@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-const { MemoryDatabase } = require('../dist/database.js');
+const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
+const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -8,7 +9,8 @@ const os = require('os');
 class ComprehensiveBenchmark {
   constructor() {
     this.tempDbPath = path.join(os.tmpdir(), `mem100x-comprehensive-${Date.now()}.db`);
-    this.db = null;
+    this.client = null;
+    this.transport = null;
     this.results = [];
     this.testData = {
       entities: [],
@@ -24,11 +26,31 @@ class ComprehensiveBenchmark {
     this.log('🔧 Setting up comprehensive benchmark...');
     this.log(`📁 Using temporary database: ${this.tempDbPath}`);
 
-    const startTime = Date.now();
-    this.db = new MemoryDatabase(this.tempDbPath);
-    const initTime = Date.now() - startTime;
+    // Create transport to Mem100x server with temp database
+    this.transport = new StdioClientTransport({
+      command: '/opt/homebrew/bin/node',
+      args: ['/Users/josh/source/personal/Mem100x/dist/index.js'],
+      env: {
+        NODE_ENV: 'test',
+        LOG_LEVEL: 'info',
+        MEMORY_DB: this.tempDbPath
+      }
+    });
 
-    this.log(`✅ Database initialized in ${initTime}ms`);
+    // Create client
+    this.client = new Client({
+      name: "mem100x-comprehensive-benchmark-client",
+      version: "1.0.0"
+    }, {
+      capabilities: {
+        tools: {}
+      }
+    });
+
+    // Connect to server
+    this.log('📡 Connecting to MCP server...');
+    await this.client.connect(this.transport);
+    this.log('✅ Connected to MCP server');
 
     // Generate test data
     this.generateTestData();
@@ -43,14 +65,14 @@ class ComprehensiveBenchmark {
       ...Array.from({ length: 100 }, (_, i) => ({
         name: `simple-${i}`,
         entityType: 'simple',
-        observations: [{ type: 'text', text: `Simple entity ${i}` }]
+        content: [{ type: 'text', text: `Simple entity ${i}` }]
       })),
 
       // Entities with multiple observations
       ...Array.from({ length: 50 }, (_, i) => ({
         name: `complex-${i}`,
         entityType: 'complex',
-        observations: [
+        content: [
           { type: 'text', text: `Complex entity ${i} - primary observation` },
           { type: 'text', text: `Complex entity ${i} - secondary observation` },
           { type: 'text', text: `Complex entity ${i} - tertiary observation` }
@@ -61,13 +83,13 @@ class ComprehensiveBenchmark {
       ...Array.from({ length: 25 }, (_, i) => ({
         name: `person-${i}`,
         entityType: 'person',
-        observations: [{ type: 'text', text: `Person ${i} - age ${20 + i}, location: city-${i % 5}` }]
+        content: [{ type: 'text', text: `Person ${i} - age ${20 + i}, location: city-${i % 5}` }]
       })),
 
       ...Array.from({ length: 25 }, (_, i) => ({
         name: `city-${i}`,
         entityType: 'city',
-        observations: [{ type: 'text', text: `City ${i} - population ${10000 + i * 1000}` }]
+        content: [{ type: 'text', text: `City ${i} - population ${10000 + i * 1000}` }]
       }))
     ];
 
@@ -92,12 +114,12 @@ class ComprehensiveBenchmark {
   async cleanup() {
     this.log('🧹 Cleaning up...');
 
-    if (this.db) {
+    if (this.client) {
       try {
-        this.db.close();
-        this.log('✅ Database closed');
+        await this.client.close();
+        this.log('✅ MCP client closed');
       } catch (error) {
-        this.log(`⚠️  Database close warning: ${error.message}`);
+        this.log(`⚠️  Client close warning: ${error.message}`);
       }
     }
 
@@ -122,9 +144,9 @@ class ComprehensiveBenchmark {
     this.log('✅ Cleanup complete');
   }
 
-  measure(name, fn) {
+  async measure(name, fn) {
     const startTime = Date.now();
-    const result = fn();
+    const result = await fn();
     const duration = Date.now() - startTime;
 
     this.results.push({ name, duration, result });
@@ -138,8 +160,11 @@ class ComprehensiveBenchmark {
     this.log('========================');
 
     // Insert all test entities
-    this.measure('Bulk Insert All Entities', () => {
-      return this.db.createEntities(this.testData.entities);
+    await this.measure('Bulk Insert All Entities', async () => {
+      return await this.client.callTool({
+        name: "create_entities",
+        arguments: { entities: this.testData.entities }
+      });
     });
 
     // Insert in smaller batches
@@ -149,10 +174,14 @@ class ComprehensiveBenchmark {
       batches.push(this.testData.entities.slice(i, i + batchSize));
     }
 
-    this.measure(`Batched Insert (${batchSize} per batch)`, () => {
+    await this.measure(`Batched Insert (${batchSize} per batch)`, async () => {
       const results = [];
       for (const batch of batches) {
-        results.push(...this.db.createEntities(batch));
+        const result = await this.client.callTool({
+          name: "create_entities",
+          arguments: { entities: batch }
+        });
+        results.push(result);
       }
       return results;
     });
@@ -163,31 +192,47 @@ class ComprehensiveBenchmark {
     this.log('===============================');
 
     // Simple text search
-    this.measure('Simple Text Search', () => {
-      return this.db.searchNodes({ query: 'simple', limit: 20 });
+    await this.measure('Simple Text Search', async () => {
+      return await this.client.callTool({
+        name: "search_nodes",
+        arguments: { query: 'simple', limit: 20 }
+      });
     });
 
     // Entity type search
-    this.measure('Entity Type Search', () => {
-      return this.db.searchNodes({ query: 'person', limit: 30 });
+    await this.measure('Entity Type Search', async () => {
+      return await this.client.callTool({
+        name: "search_nodes",
+        arguments: { query: 'person', limit: 30 }
+      });
     });
 
     // Complex text search
-    this.measure('Complex Text Search', () => {
-      return this.db.searchNodes({ query: 'observation', limit: 50 });
+    await this.measure('Complex Text Search', async () => {
+      return await this.client.callTool({
+        name: "search_nodes",
+        arguments: { query: 'observation', limit: 50 }
+      });
     });
 
     // Number search
-    this.measure('Number Search', () => {
-      return this.db.searchNodes({ query: '1000', limit: 10 });
+    await this.measure('Number Search', async () => {
+      return await this.client.callTool({
+        name: "search_nodes",
+        arguments: { query: '1000', limit: 10 }
+      });
     });
 
     // Multiple searches (simulating real usage)
-    this.measure('Multiple Searches', () => {
+    await this.measure('Multiple Searches', async () => {
       const searches = ['simple', 'person', 'city', 'complex', 'observation'];
       const results = [];
       for (const query of searches) {
-        results.push(this.db.searchNodes({ query, limit: 10 }));
+        const result = await this.client.callTool({
+          name: "search_nodes",
+          arguments: { query, limit: 10 }
+        });
+        results.push(result);
       }
       return results;
     });
@@ -198,18 +243,30 @@ class ComprehensiveBenchmark {
     this.log('=====================');
 
     // Create all relations
-    this.measure('Create All Relations', () => {
-      return this.db.createRelations(this.testData.relations);
+    await this.measure('Create All Relations', async () => {
+      return await this.client.callTool({
+        name: "create_relations",
+        arguments: { relations: this.testData.relations }
+      });
     });
 
-    // Get relations for specific entities
-    this.measure('Get Relations for Person', () => {
-      return this.db.getRelationsForEntities(['person-0', 'person-1', 'person-2']);
-    });
+    // Create relations in batches
+    const relationBatchSize = 10;
+    const relationBatches = [];
+    for (let i = 0; i < this.testData.relations.length; i += relationBatchSize) {
+      relationBatches.push(this.testData.relations.slice(i, i + relationBatchSize));
+    }
 
-    // Get relations for cities
-    this.measure('Get Relations for Cities', () => {
-      return this.db.getRelationsForEntities(['city-0', 'city-1']);
+    await this.measure(`Batched Relations (${relationBatchSize} per batch)`, async () => {
+      const results = [];
+      for (const batch of relationBatches) {
+        const result = await this.client.callTool({
+          name: "create_relations",
+          arguments: { relations: batch }
+        });
+        results.push(result);
+      }
+      return results;
     });
   }
 
@@ -218,23 +275,34 @@ class ComprehensiveBenchmark {
     this.log('=============================');
 
     // Read entire graph
-    this.measure('Read Full Graph', () => {
-      return this.db.readGraph();
+    await this.measure('Read Entire Graph', async () => {
+      return await this.client.callTool({
+        name: "read_graph",
+        arguments: {}
+      });
     });
 
-    // Read limited graph
-    this.measure('Read Limited Graph (50)', () => {
-      return this.db.readGraph(50);
+    // Read graph with pagination
+    await this.measure('Read Graph with Pagination', async () => {
+      return await this.client.callTool({
+        name: "read_graph",
+        arguments: { limit: 50, offset: 0 }
+      });
     });
 
-    // Read with offset
-    this.measure('Read Graph with Offset', () => {
-      return this.db.readGraph(25, 25);
+    // Read graph with different limits
+    await this.measure('Read Graph (Limit 100)', async () => {
+      return await this.client.callTool({
+        name: "read_graph",
+        arguments: { limit: 100 }
+      });
     });
 
-    // Get database statistics
-    this.measure('Get Database Stats', () => {
-      return this.db.getStats();
+    await this.measure('Read Graph (Limit 200)', async () => {
+      return await this.client.callTool({
+        name: "read_graph",
+        arguments: { limit: 200 }
+      });
     });
   }
 
@@ -246,63 +314,81 @@ class ComprehensiveBenchmark {
     const observationUpdates = [
       {
         entityName: 'simple-0',
-        contents: [
-          { type: 'text', text: 'Updated observation 1' },
-          { type: 'text', text: 'Updated observation 2' }
+        content: [
+          { type: 'text', text: 'Additional observation for simple-0' },
+          { type: 'text', text: 'Another observation for simple-0' }
         ]
       },
       {
         entityName: 'person-0',
-        contents: [
-          { type: 'text', text: 'New person observation' }
+        content: [
+          { type: 'text', text: 'New observation for person-0' }
+        ]
+      },
+      {
+        entityName: 'city-0',
+        content: [
+          { type: 'text', text: 'Updated city information' },
+          { type: 'text', text: 'Population growth data' }
         ]
       }
     ];
 
-    this.measure('Add Observations', () => {
-      this.db.addObservations(observationUpdates);
-      return { success: true };
+    await this.measure('Add Multiple Observations', async () => {
+      return await this.client.callTool({
+        name: "add_observations",
+        arguments: { updates: observationUpdates }
+      });
     });
 
-    // Add observations to multiple entities
-    const bulkUpdates = Array.from({ length: 10 }, (_, i) => ({
-      entityName: `simple-${i}`,
-      contents: [{ type: 'text', text: `Bulk update observation ${i}` }]
-    }));
+    // Add observations in batches
+    const batchUpdates = [];
+    for (let i = 0; i < 10; i++) {
+      batchUpdates.push({
+        entityName: `simple-${i}`,
+        content: [{ type: 'text', text: `Batch observation ${i}` }]
+      });
+    }
 
-    this.measure('Bulk Add Observations', () => {
-      this.db.addObservations(bulkUpdates);
-      return { success: true };
+    await this.measure('Batch Add Observations', async () => {
+      return await this.client.callTool({
+        name: "add_observations",
+        arguments: { updates: batchUpdates }
+      });
     });
   }
 
   async runConcurrentOperationsBenchmark() {
     this.log('\n⚡ Concurrent Operations Benchmark');
-    this.log('===================================');
+    this.log('==================================');
 
-    // Simulate concurrent reads
-    this.measure('Concurrent Reads', () => {
-      const results = [];
-      for (let i = 0; i < 10; i++) {
-        results.push(this.db.searchNodes({ query: 'simple', limit: 5 }));
-      }
-      return results;
+    // Simulate concurrent searches
+    await this.measure('Concurrent Searches', async () => {
+      const searchPromises = [
+        this.client.callTool({ name: "search_nodes", arguments: { query: 'simple', limit: 10 } }),
+        this.client.callTool({ name: "search_nodes", arguments: { query: 'person', limit: 10 } }),
+        this.client.callTool({ name: "search_nodes", arguments: { query: 'city', limit: 10 } }),
+        this.client.callTool({ name: "search_nodes", arguments: { query: 'complex', limit: 10 } })
+      ];
+
+      return await Promise.all(searchPromises);
     });
 
     // Simulate mixed operations
-    this.measure('Mixed Operations', () => {
-      const results = [];
-      results.push(this.db.searchNodes({ query: 'person', limit: 5 }));
-      results.push(this.db.readGraph(10));
-      results.push(this.db.getStats());
-      results.push(this.db.searchNodes({ query: 'city', limit: 3 }));
-      return results;
+    await this.measure('Mixed Operations', async () => {
+      const operations = [
+        this.client.callTool({ name: "read_graph", arguments: { limit: 20 } }),
+        this.client.callTool({ name: "search_nodes", arguments: { query: 'simple', limit: 5 } }),
+        this.client.callTool({ name: "search_nodes", arguments: { query: 'person', limit: 5 } })
+      ];
+
+      return await Promise.all(operations);
     });
   }
 
   printDetailedSummary() {
     this.log('\n📊 Comprehensive Benchmark Summary');
-    this.log('===================================');
+    this.log('==================================');
 
     const totalTime = this.results.reduce((sum, r) => sum + r.duration, 0);
     const avgTime = totalTime / this.results.length;
@@ -315,21 +401,22 @@ class ComprehensiveBenchmark {
     this.log(`Min time: ${minTime}ms`);
     this.log(`Max time: ${maxTime}ms`);
 
-    // Group by operation type
-    const groups = {
-      'Insert': this.results.filter(r => r.name.includes('Insert')),
+    // Group results by category
+    const categories = {
+      'Entity Creation': this.results.filter(r => r.name.includes('Entity') || r.name.includes('Insert')),
       'Search': this.results.filter(r => r.name.includes('Search')),
       'Relations': this.results.filter(r => r.name.includes('Relation')),
-      'Graph': this.results.filter(r => r.name.includes('Graph')),
+      'Graph Operations': this.results.filter(r => r.name.includes('Graph')),
       'Observations': this.results.filter(r => r.name.includes('Observation')),
-      'Concurrent': this.results.filter(r => r.name.includes('Concurrent'))
+      'Concurrent': this.results.filter(r => r.name.includes('Concurrent') || r.name.includes('Mixed'))
     };
 
     this.log('\nResults by Category:');
-    Object.entries(groups).forEach(([category, ops]) => {
-      if (ops.length > 0) {
-        const avg = ops.reduce((sum, r) => sum + r.duration, 0) / ops.length;
-        this.log(`  ${category}: ${ops.length} ops, avg ${avg.toFixed(2)}ms`);
+    Object.entries(categories).forEach(([category, results]) => {
+      if (results.length > 0) {
+        const categoryTime = results.reduce((sum, r) => sum + r.duration, 0);
+        const categoryAvg = categoryTime / results.length;
+        this.log(`  ${category}: ${results.length} operations, ${categoryTime}ms total, ${categoryAvg.toFixed(2)}ms avg`);
       }
     });
 
@@ -351,16 +438,15 @@ class ComprehensiveBenchmark {
       await this.runConcurrentOperationsBenchmark();
 
       this.printDetailedSummary();
-
     } catch (error) {
       this.log(`❌ Benchmark failed: ${error.message}`);
-      console.error(error.stack);
+      console.error(error);
     } finally {
       await this.cleanup();
     }
   }
 }
 
-// Run the comprehensive benchmark
+// Run the benchmark
 const benchmark = new ComprehensiveBenchmark();
-benchmark.run();
+benchmark.run().catch(console.error);

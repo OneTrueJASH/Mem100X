@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-const { MemoryDatabase } = require('../dist/database.js');
+const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
+const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -8,7 +9,8 @@ const os = require('os');
 class SimpleBenchmark {
   constructor() {
     this.tempDbPath = path.join(os.tmpdir(), `mem100x-simple-bench-${Date.now()}.db`);
-    this.db = null;
+    this.client = null;
+    this.transport = null;
     this.results = [];
   }
 
@@ -20,22 +22,42 @@ class SimpleBenchmark {
     this.log('🔧 Setting up benchmark...');
     this.log(`📁 Using temporary database: ${this.tempDbPath}`);
 
-    const startTime = Date.now();
-    this.db = new MemoryDatabase(this.tempDbPath);
-    const initTime = Date.now() - startTime;
+    // Create transport to Mem100x server with temp database
+    this.transport = new StdioClientTransport({
+      command: '/opt/homebrew/bin/node',
+      args: ['/Users/josh/source/personal/Mem100x/dist/index.js'],
+      env: {
+        NODE_ENV: 'test',
+        LOG_LEVEL: 'info',
+        MEMORY_DB: this.tempDbPath
+      }
+    });
 
-    this.log(`✅ Database initialized in ${initTime}ms`);
+    // Create client
+    this.client = new Client({
+      name: "mem100x-benchmark-client",
+      version: "1.0.0"
+    }, {
+      capabilities: {
+        tools: {}
+      }
+    });
+
+    // Connect to server
+    this.log('📡 Connecting to MCP server...');
+    await this.client.connect(this.transport);
+    this.log('✅ Connected to MCP server');
   }
 
   async cleanup() {
-    this.log('�� Cleaning up...');
+    this.log('🧹 Cleaning up...');
 
-    if (this.db) {
+    if (this.client) {
       try {
-        this.db.close();
-        this.log('✅ Database closed');
+        await this.client.close();
+        this.log('✅ MCP client closed');
       } catch (error) {
-        this.log(`⚠️  Database close warning: ${error.message}`);
+        this.log(`⚠️  Client close warning: ${error.message}`);
       }
     }
 
@@ -60,18 +82,7 @@ class SimpleBenchmark {
     this.log('✅ Cleanup complete');
   }
 
-  measure(name, fn) {
-    const startTime = Date.now();
-    const result = fn();
-    const duration = Date.now() - startTime;
-
-    this.results.push({ name, duration, result });
-    this.log(`✅ ${name}: ${duration}ms`);
-
-    return { duration, result };
-  }
-
-  async measureAsync(name, fn) {
+  async measure(name, fn) {
     const startTime = Date.now();
     const result = await fn();
     const duration = Date.now() - startTime;
@@ -87,34 +98,45 @@ class SimpleBenchmark {
     this.log('============================');
 
     // Single entity creation
-    this.measure('Single Entity Creation', () => {
-      return this.db.createEntities([{
-        name: 'test-entity-1',
-        entityType: 'test',
-        observations: [{ type: 'text', text: 'Test observation' }]
-      }]);
+    await this.measure('Single Entity Creation', async () => {
+      return await this.client.callTool({
+        name: "create_entities",
+        arguments: {
+          entities: [{
+            name: 'test-entity-1',
+            entityType: 'test',
+            content: [{ type: 'text', text: 'Test observation' }]
+          }]
+        }
+      });
     });
 
     // Batch entity creation (10 entities)
     const batchEntities = Array.from({ length: 10 }, (_, i) => ({
       name: `batch-entity-${i}`,
       entityType: 'batch',
-      observations: [{ type: 'text', text: `Batch observation ${i}` }]
+      content: [{ type: 'text', text: `Batch observation ${i}` }]
     }));
 
-    this.measure('Batch Entity Creation (10)', () => {
-      return this.db.createEntities(batchEntities);
+    await this.measure('Batch Entity Creation (10)', async () => {
+      return await this.client.callTool({
+        name: "create_entities",
+        arguments: { entities: batchEntities }
+      });
     });
 
     // Large batch (100 entities)
     const largeBatch = Array.from({ length: 100 }, (_, i) => ({
       name: `large-batch-${i}`,
       entityType: 'large',
-      observations: [{ type: 'text', text: `Large batch observation ${i}` }]
+      content: [{ type: 'text', text: `Large batch observation ${i}` }]
     }));
 
-    this.measure('Large Batch Creation (100)', () => {
-      return this.db.createEntities(largeBatch);
+    await this.measure('Large Batch Creation (100)', async () => {
+      return await this.client.callTool({
+        name: "create_entities",
+        arguments: { entities: largeBatch }
+      });
     });
   }
 
@@ -123,18 +145,27 @@ class SimpleBenchmark {
     this.log('==================');
 
     // Simple search
-    this.measure('Simple Search', () => {
-      return this.db.searchNodes({ query: 'test', limit: 10 });
+    await this.measure('Simple Search', async () => {
+      return await this.client.callTool({
+        name: "search_nodes",
+        arguments: { query: 'test', limit: 10 }
+      });
     });
 
     // Search with more results
-    this.measure('Search with Limit', () => {
-      return this.db.searchNodes({ query: 'batch', limit: 50 });
+    await this.measure('Search with Limit', async () => {
+      return await this.client.callTool({
+        name: "search_nodes",
+        arguments: { query: 'batch', limit: 50 }
+      });
     });
 
     // Full text search
-    this.measure('Full Text Search', () => {
-      return this.db.searchNodes({ query: 'observation', limit: 20 });
+    await this.measure('Full Text Search', async () => {
+      return await this.client.callTool({
+        name: "search_nodes",
+        arguments: { query: 'observation', limit: 20 }
+      });
     });
   }
 
@@ -143,18 +174,19 @@ class SimpleBenchmark {
     this.log('=============================');
 
     // Read graph
-    this.measure('Read Graph (All)', () => {
-      return this.db.readGraph();
+    await this.measure('Read Graph (All)', async () => {
+      return await this.client.callTool({
+        name: "read_graph",
+        arguments: {}
+      });
     });
 
     // Read graph with limit
-    this.measure('Read Graph (Limited)', () => {
-      return this.db.readGraph(50);
-    });
-
-    // Get stats
-    this.measure('Get Database Stats', () => {
-      return this.db.getStats();
+    await this.measure('Read Graph (Limited)', async () => {
+      return await this.client.callTool({
+        name: "read_graph",
+        arguments: { limit: 50 }
+      });
     });
   }
 
@@ -169,13 +201,11 @@ class SimpleBenchmark {
       { from: 'large-batch-0', to: 'large-batch-1', relationType: 'similar_to' }
     ];
 
-    this.measure('Create Relations', () => {
-      return this.db.createRelations(relations);
-    });
-
-    // Get relations for entities
-    this.measure('Get Relations', () => {
-      return this.db.getRelationsForEntities(['test-entity-1', 'batch-entity-0']);
+    await this.measure('Create Relations', async () => {
+      return await this.client.callTool({
+        name: "create_relations",
+        arguments: { relations }
+      });
     });
   }
 
@@ -184,19 +214,21 @@ class SimpleBenchmark {
     this.log('=========================');
 
     // Add observations
-    const observations = [
+    const updates = [
       {
         entityName: 'test-entity-1',
-        contents: [
+        content: [
           { type: 'text', text: 'Additional observation 1' },
           { type: 'text', text: 'Additional observation 2' }
         ]
       }
     ];
 
-    this.measure('Add Observations', () => {
-      this.db.addObservations(observations);
-      return { success: true };
+    await this.measure('Add Observations', async () => {
+      return await this.client.callTool({
+        name: "add_observations",
+        arguments: { updates }
+      });
     });
   }
 
@@ -228,10 +260,9 @@ class SimpleBenchmark {
       await this.runObservationsBenchmark();
 
       this.printSummary();
-
     } catch (error) {
       this.log(`❌ Benchmark failed: ${error.message}`);
-      console.error(error.stack);
+      console.error(error);
     } finally {
       await this.cleanup();
     }
@@ -240,4 +271,4 @@ class SimpleBenchmark {
 
 // Run the benchmark
 const benchmark = new SimpleBenchmark();
-benchmark.run();
+benchmark.run().catch(console.error);
