@@ -6,7 +6,7 @@ async function test() {
   
   const transport = new StdioClientTransport({
     command: 'node',
-    args: ['../dist/server-multi.js']
+    args: [require('path').join(__dirname, '../dist/server-multi.js')]
   });
   
   const client = new Client({

@@ -6,7 +6,7 @@
 export interface Entity {
   name: string;
   entityType: string;
-  observations: string[];
+  observations: RichContent[];
 }
 
 export interface Relation {
@@ -107,7 +107,7 @@ export interface ShortestPathResult {
 export interface CreateEntityInput {
   name: string;
   entityType: string;
-  observations: string[];
+  observations: RichContent[];
 }
 
 export interface CreateRelationInput {
@@ -116,14 +116,55 @@ export interface CreateRelationInput {
   relationType: string;
 }
 
+// MCP Content Block Union - matches official MCP specification
+export interface TextContent {
+  type: 'text';
+  text: string;
+}
+
+export interface ImageContent {
+  type: 'image';
+  data: string; // base64 encoded
+  mimeType: string;
+}
+
+export interface AudioContent {
+  type: 'audio';
+  data: string; // base64 encoded
+  mimeType: string;
+}
+
+export interface ResourceLinkContent {
+  type: 'resource_link';
+  uri: string;
+  title?: string;
+  description?: string;
+}
+
+export interface ResourceContent {
+  type: 'resource';
+  data: string; // base64 encoded
+  mimeType: string;
+  title?: string;
+  description?: string;
+}
+
+// Discriminated union for all content types
+export type RichContent =
+  | TextContent
+  | ImageContent
+  | AudioContent
+  | ResourceLinkContent
+  | ResourceContent;
+
 export interface ObservationUpdate {
   entityName: string;
-  contents: string[];
+  contents: RichContent[];
 }
 
 export interface ObservationDeletion {
   entityName: string;
-  observations: string[];
+  observations: RichContent[];
 }
 
 // Multi-database configuration types

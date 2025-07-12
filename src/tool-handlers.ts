@@ -25,6 +25,8 @@ import {
   GetNeighborsInput,
   FindShortestPathInput,
 } from './tool-schemas.js';
+import { createMCPToolResponse } from './mcp-types.js';
+import { createTextContent } from './utils/fast-json.js';
 
 export interface ToolContext {
   manager: MultiDatabaseManager;
@@ -37,12 +39,19 @@ export interface ToolContext {
 export function handleSetContext(args: any, ctx: ToolContext) {
   const validated = toolSchemas.set_context.parse(args) as SetContextInput;
   const message = ctx.manager.setContext(validated.context);
-  return { message };
+  return createMCPToolResponse(
+    { message },
+    `Context set to: ${validated.context}`
+  );
 }
 
 export function handleGetContextInfo(args: any, ctx: ToolContext) {
   toolSchemas.get_context_info.parse(args); // Validate empty object
-  return ctx.manager.getContextInfo();
+  const contextInfo = ctx.manager.getContextInfo();
+  return createMCPToolResponse(
+    contextInfo,
+    `Current context: ${contextInfo.currentContext}`
+  );
 }
 
 // Entity operation handlers
@@ -51,36 +60,46 @@ export function handleCreateEntities(args: any, ctx: ToolContext) {
   const created = ctx.manager.createEntities(validated.entities, validated.context);
   const duration = performance.now() - ctx.startTime;
   const rate = Math.round(validated.entities.length / (duration / 1000));
-  
-  return {
+
+  const result = {
     created,
     performance: {
       duration: `${duration.toFixed(2)}ms`,
       rate: `${rate} entities/sec`,
     },
   };
+
+  return createMCPToolResponse(
+    result,
+    `Created ${created.length} entities successfully`
+  );
 }
 
 export function handleSearchNodes(args: any, ctx: ToolContext) {
   const validated = toolSchemas.search_nodes.parse(args) as SearchNodesInput;
   const results = ctx.manager.searchNodes(validated);
   const duration = performance.now() - ctx.startTime;
-  
-  return {
+
+  const result = {
     ...results,
     performance: {
       duration: `${duration.toFixed(2)}ms`,
       resultCount: results.entities.length,
     },
   };
+
+  return createMCPToolResponse(
+    result,
+    `Found ${results.entities.length} entities matching "${validated.query}"`
+  );
 }
 
 export function handleReadGraph(args: any, ctx: ToolContext) {
   const validated = toolSchemas.read_graph.parse(args) as ReadGraphInput;
   const graph = ctx.manager.readGraph(validated.limit, validated.offset || 0, validated.context);
   const duration = performance.now() - ctx.startTime;
-  
-  return {
+
+  const result = {
     ...graph,
     performance: {
       duration: `${duration.toFixed(2)}ms`,
@@ -88,14 +107,19 @@ export function handleReadGraph(args: any, ctx: ToolContext) {
       relationCount: graph.relations.length,
     },
   };
+
+  return createMCPToolResponse(
+    result,
+    `Graph contains ${graph.entities.length} entities and ${graph.relations.length} relations`
+  );
 }
 
 export function handleOpenNodes(args: any, ctx: ToolContext) {
   const validated = toolSchemas.open_nodes.parse(args) as OpenNodesInput;
   const result = ctx.manager.openNodes(validated.names);
   const duration = performance.now() - ctx.startTime;
-  
-  return {
+
+  const response = {
     ...result,
     performance: {
       duration: `${duration.toFixed(2)}ms`,
@@ -103,6 +127,11 @@ export function handleOpenNodes(args: any, ctx: ToolContext) {
       relationsFound: result.relations.length,
     },
   };
+
+  return createMCPToolResponse(
+    response,
+    `Opened ${result.entities.length} entities and found ${result.relations.length} relations`
+  );
 }
 
 // Relation operation handlers
@@ -110,26 +139,36 @@ export function handleCreateRelations(args: any, ctx: ToolContext) {
   const validated = toolSchemas.create_relations.parse(args) as CreateRelationsInput;
   const created = ctx.manager.createRelations(validated.relations);
   const duration = performance.now() - ctx.startTime;
-  
-  return {
+
+  const result = {
     created,
     performance: {
       duration: `${duration.toFixed(2)}ms`,
       rate: `${Math.round(validated.relations.length / (duration / 1000))} relations/sec`,
     },
   };
+
+  return createMCPToolResponse(
+    result,
+    `Created ${created.length} relations successfully`
+  );
 }
 
 export function handleDeleteRelations(args: any, ctx: ToolContext) {
   const validated = toolSchemas.delete_relations.parse(args) as DeleteRelationsInput;
   ctx.manager.deleteRelations(validated.relations);
   const duration = performance.now() - ctx.startTime;
-  
-  return {
+
+  const result = {
     success: true,
     relationsDeleted: validated.relations.length,
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
+
+  return createMCPToolResponse(
+    result,
+    `Deleted ${validated.relations.length} relations successfully`
+  );
 }
 
 // Observation operation handlers
@@ -137,24 +176,34 @@ export function handleAddObservations(args: any, ctx: ToolContext) {
   const validated = toolSchemas.add_observations.parse(args) as AddObservationsInput;
   ctx.manager.addObservations(validated.observations);
   const duration = performance.now() - ctx.startTime;
-  
-  return {
+
+  const result = {
     success: true,
     observationsAdded: validated.observations.length,
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
+
+  return createMCPToolResponse(
+    result,
+    `Added observations to ${validated.observations.length} entities successfully`
+  );
 }
 
 export function handleDeleteObservations(args: any, ctx: ToolContext) {
   const validated = toolSchemas.delete_observations.parse(args) as DeleteObservationsInput;
   ctx.manager.deleteObservations(validated.deletions);
   const duration = performance.now() - ctx.startTime;
-  
-  return {
+
+  const result = {
     success: true,
     deletionsProcessed: validated.deletions.length,
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
+
+  return createMCPToolResponse(
+    result,
+    `Deleted observations from ${validated.deletions.length} entities successfully`
+  );
 }
 
 // Entity deletion handler
@@ -162,12 +211,17 @@ export function handleDeleteEntities(args: any, ctx: ToolContext) {
   const validated = toolSchemas.delete_entities.parse(args) as DeleteEntitiesInput;
   ctx.manager.deleteEntities(validated.entityNames);
   const duration = performance.now() - ctx.startTime;
-  
-  return {
+
+  const result = {
     success: true,
     entitiesDeleted: validated.entityNames.length,
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
+
+  return createMCPToolResponse(
+    result,
+    `Deleted ${validated.entityNames.length} entities successfully`
+  );
 }
 
 // Transaction handlers
@@ -175,37 +229,52 @@ export function handleBeginTransaction(args: any, ctx: ToolContext) {
   const validated = toolSchemas.begin_transaction.parse(args) as BeginTransactionInput;
   const transactionId = ctx.manager.beginTransaction(validated.name);
   const duration = performance.now() - ctx.startTime;
-  
-  return {
+
+  const result = {
     success: true,
     transactionId,
     message: `Transaction ${transactionId} started`,
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
+
+  return createMCPToolResponse(
+    result,
+    `Transaction ${transactionId} started successfully`
+  );
 }
 
 export function handleCommitTransaction(args: any, ctx: ToolContext) {
   toolSchemas.commit_transaction.parse(args); // Validate empty object
   ctx.manager.commitTransaction();
   const duration = performance.now() - ctx.startTime;
-  
-  return {
+
+  const result = {
     success: true,
     message: 'Transaction committed successfully',
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
+
+  return createMCPToolResponse(
+    result,
+    'Transaction committed successfully'
+  );
 }
 
 export function handleRollbackTransaction(args: any, ctx: ToolContext) {
   toolSchemas.rollback_transaction.parse(args); // Validate empty object
   ctx.manager.rollbackTransaction();
   const duration = performance.now() - ctx.startTime;
-  
-  return {
+
+  const result = {
     success: true,
     message: 'Transaction rolled back successfully',
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
+
+  return createMCPToolResponse(
+    result,
+    'Transaction rolled back successfully'
+  );
 }
 
 // Backup and restore handlers
@@ -216,8 +285,8 @@ export function handleCreateBackup(args: any, ctx: ToolContext) {
     validated.context || ctx.manager.currentContext
   );
   const duration = performance.now() - ctx.startTime;
-  
-  return {
+
+  const result = {
     success: true,
     backupPath: backupInfo.path,
     size: backupInfo.size,
@@ -226,21 +295,26 @@ export function handleCreateBackup(args: any, ctx: ToolContext) {
     message: `Backup created successfully at ${backupInfo.path}`,
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
+
+  return createMCPToolResponse(
+    result,
+    `Backup created successfully at ${backupInfo.path}`
+  );
 }
 
 export function handleRestoreBackup(args: any, ctx: ToolContext) {
   const validated = toolSchemas.restore_backup.parse(args) as RestoreBackupInput;
-  
+
   if (!validated.confirmRestore) {
     throw new Error('Restore operation must be confirmed by setting confirmRestore to true');
   }
   const restoreInfo = ctx.manager.restoreBackup(
-    validated.backupPath, 
+    validated.backupPath,
     validated.context ?? ctx.manager.currentContext
   );
   const duration = performance.now() - ctx.startTime;
-  
-  return {
+
+  const result = {
     success: true,
     restoredFrom: restoreInfo.backupPath,
     context: restoreInfo.context,
@@ -249,6 +323,11 @@ export function handleRestoreBackup(args: any, ctx: ToolContext) {
     message: `Database restored successfully from ${restoreInfo.backupPath}`,
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
+
+  return createMCPToolResponse(
+    result,
+    `Database restored successfully from ${restoreInfo.backupPath}`
+  );
 }
 
 // Graph traversal handlers
@@ -265,16 +344,21 @@ export function handleGetNeighbors(args: any, ctx: ToolContext) {
     }
   );
   const duration = performance.now() - ctx.startTime;
-  
-  return {
+
+  const response = {
     ...result,
-    performance: { 
+    performance: {
       duration: `${duration.toFixed(2)}ms`,
       nodesVisited: result.entities.length,
       relationsFound: result.relations?.length || 0,
       depth: validated.depth || 1
     },
   };
+
+  return createMCPToolResponse(
+    response,
+    `Found ${result.entities.length} neighbors for "${validated.entityName}"`
+  );
 }
 
 export function handleFindShortestPath(args: any, ctx: ToolContext) {
@@ -290,17 +374,26 @@ export function handleFindShortestPath(args: any, ctx: ToolContext) {
     }
   );
   const duration = performance.now() - ctx.startTime;
-  
-  return {
+
+  const response = {
     found: result.found,
     path: result.path,
     distance: result.distance,
-    performance: { 
+    performance: {
       duration: `${duration.toFixed(2)}ms`,
       nodesExplored: result.nodesExplored || 0,
       pathLength: result.distance
     },
   };
+
+  const message = result.found
+    ? `Found path from "${validated.from}" to "${validated.to}" with distance ${result.distance}`
+    : `No path found from "${validated.from}" to "${validated.to}"`;
+
+  return createMCPToolResponse(
+    response,
+    message
+  );
 }
 
 // Tool handler registry
@@ -308,33 +401,33 @@ export const toolHandlers: Record<string, (args: any, ctx: ToolContext) => any> 
   // Context management
   'set_context': handleSetContext,
   'get_context_info': handleGetContextInfo,
-  
+
   // Entity operations
   'create_entities': handleCreateEntities,
   'search_nodes': handleSearchNodes,
   'read_graph': handleReadGraph,
   'open_nodes': handleOpenNodes,
-  
+
   // Relation operations
   'create_relations': handleCreateRelations,
   'delete_relations': handleDeleteRelations,
-  
+
   // Observation operations
   'add_observations': handleAddObservations,
   'delete_observations': handleDeleteObservations,
-  
+
   // Entity deletion
   'delete_entities': handleDeleteEntities,
-  
+
   // Transaction management
   'begin_transaction': handleBeginTransaction,
   'commit_transaction': handleCommitTransaction,
   'rollback_transaction': handleRollbackTransaction,
-  
+
   // Backup and restore
   'create_backup': handleCreateBackup,
   'restore_backup': handleRestoreBackup,
-  
+
   // Graph traversal
   'get_neighbors': handleGetNeighbors,
   'find_shortest_path': handleFindShortestPath,

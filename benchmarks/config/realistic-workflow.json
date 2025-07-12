@@ -21,8 +21,8 @@
             "name": "user-session-{{timestamp}}-{{index}}",
             "entityType": "session",
             "observations": [
-              "User interaction at step {{index}}",
-              "Context from previous search"
+              { "type": "text", "text": "User interaction at step {{index}}" },
+              { "type": "text", "text": "Context from previous search" }
             ]
           }
         ]
@@ -36,8 +36,8 @@
           {
             "entityName": "user-session-{{timestamp}}-1",
             "contents": [
-              "Follow-up thought at step {{index}}",
-              "Additional context from interaction"
+              { "type": "text", "text": "Follow-up thought at step {{index}}" },
+              { "type": "text", "text": "Additional context from interaction" }
             ]
           }
         ]

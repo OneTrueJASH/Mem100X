@@ -12,7 +12,8 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { stringifyToolResponse } from './utils/fast-json.js';
 import { getAllToolDefinitions } from './tool-definitions.js';
-import { MCPToolResponse } from './mcp-types.js';
+import { createTextContent } from './utils/fast-json.js';
+import { toolSchemas, AddObservationsInput, CreateRelationsInput } from './tool-schemas.js';
 
 async function main() {
   // Initialize high-performance SQLite database
@@ -45,220 +46,202 @@ async function main() {
         case 'create_entities': {
           const { entities } = args as { entities: any[] };
           const startTime = performance.now();
-          
+
           const created = db.createEntities(entities);
-          
+
           const duration = performance.now() - startTime;
           const rate = Math.round(entities.length / (duration / 1000));
-          
+
+          const structuredContent = {
+            created,
+            performance: {
+              duration: `${duration.toFixed(2)}ms`,
+              rate: `${rate} entities/sec`
+            }
+          };
+
           return {
-            content: [
-              {
-                type: 'text',
-                text: stringifyToolResponse({
-                  created,
-                  performance: {
-                    duration: `${duration.toFixed(2)}ms`,
-                    rate: `${rate} entities/sec`
-                  }
-                }),
-              },
-            ],
+            content: [createTextContent(`Created ${created.length} entities successfully`)],
+            structuredContent,
           };
         }
 
         case 'search_nodes': {
           const { query, limit } = args as { query: string; limit?: number };
           const startTime = performance.now();
-          
+
           const results = db.searchNodes({ query, limit });
-          
+
           const duration = performance.now() - startTime;
-          
+
+          const structuredContent = {
+            ...results,
+            performance: {
+              duration: `${duration.toFixed(2)}ms`,
+              resultCount: results.entities.length
+            }
+          };
+
           return {
-            content: [
-              {
-                type: 'text',
-                text: stringifyToolResponse({
-                  ...results,
-                  performance: {
-                    duration: `${duration.toFixed(2)}ms`,
-                    resultCount: results.entities.length
-                  }
-                }),
-              },
-            ],
+            content: [createTextContent(`Found ${results.entities.length} entities matching "${query}"`)],
+            structuredContent,
           };
         }
 
         case 'read_graph': {
           const { limit } = args as { limit?: number };
           const startTime = performance.now();
-          
+
           const graph = db.readGraph(limit, 0);
-          
+
           const duration = performance.now() - startTime;
-          
+
+          const structuredContent = {
+            ...graph,
+            performance: {
+              duration: `${duration.toFixed(2)}ms`,
+              entityCount: graph.entities.length,
+              relationCount: graph.relations.length
+            }
+          };
+
           return {
-            content: [
-              {
-                type: 'text',
-                text: stringifyToolResponse({
-                  ...graph,
-                  performance: {
-                    duration: `${duration.toFixed(2)}ms`,
-                    entityCount: graph.entities.length,
-                    relationCount: graph.relations.length
-                  }
-                }),
-              },
-            ],
+            content: [createTextContent(`Graph contains ${graph.entities.length} entities and ${graph.relations.length} relations`)],
+            structuredContent,
           };
         }
 
         case 'create_relations': {
-          const { relations } = args as { relations: any[] };
+          const validated = toolSchemas.create_relations.parse(args) as CreateRelationsInput;
           const startTime = performance.now();
-          
-          const created = db.createRelations(relations);
-          
+
+          const created = db.createRelations(validated.relations);
+
           const duration = performance.now() - startTime;
-          const rate = Math.round(relations.length / (duration / 1000));
-          
+          const rate = Math.round(validated.relations.length / (duration / 1000));
+
+          const structuredContent = {
+            created,
+            performance: {
+              duration: `${duration.toFixed(2)}ms`,
+              rate: `${rate} relations/sec`
+            }
+          };
+
           return {
-            content: [
-              {
-                type: 'text',
-                text: stringifyToolResponse({
-                  created,
-                  performance: {
-                    duration: `${duration.toFixed(2)}ms`,
-                    rate: `${rate} relations/sec`
-                  }
-                }),
-              },
-            ],
+            content: [createTextContent(`Created ${created.length} relations successfully`)],
+            structuredContent,
           };
         }
 
         case 'add_observations': {
-          const { observations } = args as { observations: any[] };
+          const validated = toolSchemas.add_observations.parse(args) as AddObservationsInput;
           const startTime = performance.now();
-          
-          db.addObservations(observations);
-          
+
+          db.addObservations(validated.observations);
+
           const duration = performance.now() - startTime;
-          
+
+          const structuredContent = {
+            success: true,
+            observationsAdded: validated.observations.length,
+            performance: {
+              duration: `${duration.toFixed(2)}ms`
+            }
+          };
+
           return {
-            content: [
-              {
-                type: 'text',
-                text: stringifyToolResponse({
-                  success: true,
-                  observationsAdded: observations.length,
-                  performance: {
-                    duration: `${duration.toFixed(2)}ms`
-                  }
-                }),
-              },
-            ],
+            content: [createTextContent(`Added observations to ${validated.observations.length} entities successfully`)],
+            structuredContent,
           };
         }
 
         case 'delete_entities': {
           const { entityNames } = args as { entityNames: string[] };
           const startTime = performance.now();
-          
+
           db.deleteEntities(entityNames);
-          
+
           const duration = performance.now() - startTime;
-          
+
+          const structuredContent = {
+            success: true,
+            deletedCount: entityNames.length,
+            performance: {
+              duration: `${duration.toFixed(2)}ms`
+            }
+          };
+
           return {
-            content: [
-              {
-                type: 'text',
-                text: stringifyToolResponse({
-                  success: true,
-                  deletedCount: entityNames.length,
-                  performance: {
-                    duration: `${duration.toFixed(2)}ms`
-                  }
-                }),
-              },
-            ],
+            content: [createTextContent(`Deleted ${entityNames.length} entities successfully`)],
+            structuredContent,
           };
         }
 
         case 'delete_observations': {
           const { deletions } = args as { deletions: any[] };
           const startTime = performance.now();
-          
+
           db.deleteObservations(deletions);
-          
+
           const duration = performance.now() - startTime;
-          
+
+          const structuredContent = {
+            success: true,
+            deletionsProcessed: deletions.length,
+            performance: {
+              duration: `${duration.toFixed(2)}ms`
+            }
+          };
+
           return {
-            content: [
-              {
-                type: 'text',
-                text: stringifyToolResponse({
-                  success: true,
-                  deletionsProcessed: deletions.length,
-                  performance: {
-                    duration: `${duration.toFixed(2)}ms`
-                  }
-                }),
-              },
-            ],
+            content: [createTextContent(`Deleted observations from ${deletions.length} entities successfully`)],
+            structuredContent,
           };
         }
 
         case 'delete_relations': {
           const { relations } = args as { relations: any[] };
           const startTime = performance.now();
-          
+
           db.deleteRelations(relations);
-          
+
           const duration = performance.now() - startTime;
-          
+
+          const structuredContent = {
+            success: true,
+            deletedCount: relations.length,
+            performance: {
+              duration: `${duration.toFixed(2)}ms`
+            }
+          };
+
           return {
-            content: [
-              {
-                type: 'text',
-                text: stringifyToolResponse({
-                  success: true,
-                  deletedCount: relations.length,
-                  performance: {
-                    duration: `${duration.toFixed(2)}ms`
-                  }
-                }),
-              },
-            ],
+            content: [createTextContent(`Deleted ${relations.length} relations successfully`)],
+            structuredContent,
           };
         }
 
         case 'open_nodes': {
           const { names } = args as { names: string[] };
           const startTime = performance.now();
-          
+
           const results = db.openNodes(names);
-          
+
           const duration = performance.now() - startTime;
-          
+
+          const structuredContent = {
+            ...results,
+            performance: {
+              duration: `${duration.toFixed(2)}ms`,
+              requestedCount: names.length,
+              foundCount: results.entities.length
+            }
+          };
+
           return {
-            content: [
-              {
-                type: 'text',
-                text: stringifyToolResponse({
-                  ...results,
-                  performance: {
-                    duration: `${duration.toFixed(2)}ms`,
-                    requestedCount: names.length,
-                    foundCount: results.entities.length
-                  }
-                }),
-              },
-            ],
+            content: [createTextContent(`Opened ${results.entities.length} entities and found ${results.relations.length} relations`)],
+            structuredContent,
           };
         }
 
@@ -269,10 +252,11 @@ async function main() {
           );
       }
     } catch (error) {
-      throw new McpError(
-        ErrorCode.InternalError,
-        `Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      // Always return a valid MCP response structure
+      return {
+        content: [createTextContent(`Error: ${error instanceof Error ? error.message : String(error)}`)],
+        structuredContent: { error: error instanceof Error ? error.message : String(error) },
+      };
     }
   });
 
@@ -294,20 +278,20 @@ async function main() {
   });
 
   const transport = new StdioServerTransport();
-  
+
   // Graceful shutdown
   process.on('SIGINT', () => {
     console.error('Shutting down gracefully...');
     db.close();
     process.exit(0);
   });
-  
+
   process.on('SIGTERM', () => {
     console.error('Shutting down gracefully...');
     db.close();
     process.exit(0);
   });
-  
+
   await server.connect(transport);
   console.error('⚡ Mem100x MCP server started - The fastest memory server in the universe!');
 }

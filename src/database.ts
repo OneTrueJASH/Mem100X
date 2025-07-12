@@ -6,11 +6,11 @@
 import Database from 'better-sqlite3';
 import { existsSync, mkdirSync, copyFileSync, statSync } from 'fs';
 import { dirname } from 'path';
-import { 
-  EntityRow, 
-  RelationRow, 
-  GraphResult, 
-  EntityResult, 
+import {
+  EntityRow,
+  RelationRow,
+  GraphResult,
+  EntityResult,
   RelationResult,
   DatabaseStats,
   SearchOptions,
@@ -20,23 +20,25 @@ import {
   ObservationDeletion,
   GetNeighborsOptions,
   FindShortestPathOptions,
-  ShortestPathResult
+  ShortestPathResult,
+  RichContent,
+  TextContent
 } from './types.js';
 import { ICache, createStringCache } from './utils/cache-interface.js';
 import { CountingBloomFilter } from './utils/counting-bloom-filter.js';
 import { CompressionUtils } from './utils/compression.js';
 import { ConnectionPool } from './utils/connection-pool.js';
 import { getCompleteSchema, getPragmas } from './database-schema.js';
-import { 
-  logger, 
-  logInfo, 
-  logDebug, 
-  logError, 
-  PerformanceTracker 
+import {
+  logger,
+  logInfo,
+  logDebug,
+  logError,
+  PerformanceTracker
 } from './utils/logger.js';
-import { 
-  stringifyObservations, 
-  parseObservations 
+import {
+  stringifyObservations,
+  parseObservations
 } from './utils/fast-json.js';
 import { config } from './config.js';
 import { ValidationError } from './errors.js';
@@ -45,7 +47,7 @@ export class MemoryDatabase {
   private db!: Database.Database;
   protected readonly dbPath: string;
   private readPool?: ConnectionPool;
-  
+
   // Performance optimizations
   protected readonly entityCache: ICache<string, EntityResult>;
   protected readonly searchCache: ICache<string, GraphResult>;
@@ -53,7 +55,7 @@ export class MemoryDatabase {
   protected readonly compressionEnabled: boolean = config.performance.compressionEnabled;
   private readonly useReadPool: boolean = config.performance.useReadPool ?? true;
   private readonly relationQueryThreshold: number = config.performance.relationQueryThreshold;
-  
+
   // Transaction management
   private transactionDepth: number = 0;
   private isInTransaction: boolean = false;
@@ -76,10 +78,10 @@ export class MemoryDatabase {
 
   constructor(dbPath: string) {
     this.dbPath = dbPath;
-    
+
     // Initialize caches
     this.entityCache = createStringCache<EntityResult>(
-      config.performance.cacheStrategy, 
+      config.performance.cacheStrategy,
       config.performance.entityCacheSize
     );
     this.searchCache = createStringCache<GraphResult>(
@@ -89,7 +91,7 @@ export class MemoryDatabase {
 
     // Initialize database
     this.initDatabase();
-    
+
     // Initialize read pool if enabled
     if (this.useReadPool && existsSync(this.dbPath)) {
       this.readPool = new ConnectionPool(this.dbPath, {
@@ -99,12 +101,12 @@ export class MemoryDatabase {
         idleTimeout: 60000,
         readonly: true
       });
-      logInfo('Read pool initialized', { 
-        minConnections: Math.max(2, Math.floor(config.performance.readPoolSize / 4)), 
-        maxConnections: 5 
+      logInfo('Read pool initialized', {
+        minConnections: Math.max(2, Math.floor(config.performance.readPoolSize / 4)),
+        maxConnections: 5
       });
     }
-    
+
     // Initialize bloom filter
     this.initializeBloomFilter();
   }
@@ -162,7 +164,7 @@ export class MemoryDatabase {
     `);
 
     this.statements.searchEntitiesLike = this.db.prepare(`
-      SELECT * FROM entities 
+      SELECT * FROM entities
       WHERE name LIKE ? OR entity_type LIKE ? OR observations LIKE ?
       ORDER BY updated_at DESC LIMIT ?
     `);
@@ -185,7 +187,7 @@ export class MemoryDatabase {
     );
 
     this.statements.getRelationsByEntity = this.db.prepare(`
-      SELECT * FROM relations 
+      SELECT * FROM relations
       WHERE from_entity = ? OR to_entity = ?
     `);
 
@@ -193,7 +195,7 @@ export class MemoryDatabase {
       'SELECT entity_type, COUNT(*) as count FROM entities GROUP BY entity_type'
     );
   }
-  
+
   // Helper method to execute read queries through the pool if available
   private async executeRead<T>(
     callback: (db: Database.Database) => T
@@ -221,7 +223,7 @@ export class MemoryDatabase {
   private initializeBloomFilter(): void {
     const bloomPath = this.dbPath.replace('.db', '.cbloom');
     const loadedFilter = CountingBloomFilter.loadFromFileSync(bloomPath);
-    
+
     if (loadedFilter) {
       this.entityBloom = loadedFilter;
       logInfo('Counting Bloom filter loaded from disk', { path: bloomPath });
@@ -231,9 +233,9 @@ export class MemoryDatabase {
         config.bloomFilter.falsePositiveRate
       );
       this.entityBloom.initSync();
-      logInfo('New Counting Bloom filter created', { 
-        expectedItems: config.bloomFilter.expectedItems, 
-        falsePositiveRate: config.bloomFilter.falsePositiveRate 
+      logInfo('New Counting Bloom filter created', {
+        expectedItems: config.bloomFilter.expectedItems,
+        falsePositiveRate: config.bloomFilter.falsePositiveRate
       });
       this.populateBloomFilter();
       this.saveBloomFilter();
@@ -266,27 +268,32 @@ export class MemoryDatabase {
 
   createEntities(entities: CreateEntityInput[]): EntityResult[] {
     const perf = new PerformanceTracker('createEntities', { count: entities.length });
-    
+
     // Fast path for single entity creation
     if (entities.length === 1) {
       return this.createSingleEntityOptimized(entities[0], perf);
     }
-    
+
+    // Use batch method if enabled and above threshold
+    if (config.performance.enableBulkOperations && entities.length >= config.performance.batchSize) {
+      return this.createEntitiesBatch(entities);
+    }
+
     const created = this.transaction(() => {
       const results: EntityResult[] = [];
-      
+
       for (const entity of entities) {
         // Validate entity has required fields
         if (!entity.name) {
           throw new ValidationError('Entity name is required', 'name', entity);
         }
-        
-        const observationsData = this.compressionEnabled 
+
+        const observationsData = this.compressionEnabled
           ? CompressionUtils.compressObservations(entity.observations)
           : stringifyObservations(entity.observations);
-        
+
         this.statements.createEntity!.run(entity.name, entity.entityType, observationsData);
-        
+
         const result: EntityResult = {
           type: 'entity',
           name: entity.name,
@@ -294,12 +301,12 @@ export class MemoryDatabase {
           observations: entity.observations
         };
         results.push(result);
-        
+
         // Update caches
         this.entityCache.set(entity.name.toLowerCase(), result);
         this.entityBloom.add(entity.name.toLowerCase());
       }
-      
+
       return results;
     });
 
@@ -321,27 +328,27 @@ export class MemoryDatabase {
     const observationsData = shouldCompress
       ? CompressionUtils.compressObservations(entity.observations)
       : observationsStr;
-    
+
     const lowerName = entity.name.toLowerCase();
     const exists = this.entityBloom.contains(lowerName);
-    
+
     // Skip transaction for non-conflicting inserts
     if (!exists) {
       try {
         // Use fast insert without ON CONFLICT
         this.statements.createEntityFast!.run(entity.name, entity.entityType, observationsData);
-        
+
         const result: EntityResult = {
           type: 'entity',
           name: entity.name,
           entityType: entity.entityType,
           observations: entity.observations
         };
-        
+
         // Update caches
         this.entityCache.set(lowerName, result);
         this.entityBloom.add(lowerName);
-        
+
         // Skip search cache clearing for single entity
         perf.end({ created: 1, optimized: true, fastPath: true });
         return [result];
@@ -352,25 +359,25 @@ export class MemoryDatabase {
         }
       }
     }
-    
+
     // For updates, use deferred transaction to reduce lock time
     this.db.exec('BEGIN DEFERRED');
-    
+
     try {
       this.statements.createEntity!.run(entity.name, entity.entityType, observationsData);
       this.db.exec('COMMIT');
-      
+
       const result: EntityResult = {
         type: 'entity',
         name: entity.name,
         entityType: entity.entityType,
         observations: entity.observations
       };
-      
+
       // Update caches after commit
       this.entityCache.set(lowerName, result);
       this.entityBloom.add(lowerName);
-      
+
       // Defer search cache clearing (batch with other operations)
       if (!this.searchCacheClearPending) {
         this.searchCacheClearPending = true;
@@ -379,7 +386,7 @@ export class MemoryDatabase {
           this.searchCacheClearPending = false;
         });
       }
-      
+
       perf.end({ created: 1, optimized: true, update: true });
       return [result];
     } catch (error) {
@@ -391,51 +398,51 @@ export class MemoryDatabase {
   // Optimized batch entity creation for better performance
   createEntitiesBatch(entities: CreateEntityInput[]): EntityResult[] {
     if (entities.length === 0) return [];
-    
+
     // Use regular method for small batches
     if (entities.length < 10) {
       return this.createEntities(entities);
     }
-    
+
     const perf = new PerformanceTracker('createEntitiesBatch', { count: entities.length });
-    
+
     const created = this.transaction(() => {
       // Temporarily disable FTS triggers for bulk insert
       this.db.exec('DROP TRIGGER IF EXISTS entities_fts_insert');
-      
+
       try {
         // Pre-compress all observations
         const preparedData = entities.map(e => ({
           name: e.name,
           entityType: e.entityType,
           observations: e.observations,
-          observationsData: this.compressionEnabled 
+          observationsData: this.compressionEnabled
             ? CompressionUtils.compressObservations(e.observations)
             : stringifyObservations(e.observations)
         }));
-        
+
         // Build bulk insert query
         const placeholders = entities.map(() => "(?, ?, ?, julianday('now'), julianday('now'))").join(',');
         const values = preparedData.flatMap(e => [e.name, e.entityType, e.observationsData]);
-        
+
         // Execute bulk insert
         this.db.prepare(
-          `INSERT OR IGNORE INTO entities (name, entity_type, observations, created_at, updated_at) 
+          `INSERT OR IGNORE INTO entities (name, entity_type, observations, created_at, updated_at)
            VALUES ${placeholders}`
         ).run(...values);
-        
+
         // Bulk update FTS
         const ftsPlaceholders = entities.map(() => '?').join(',');
         this.db.prepare(
-          `INSERT INTO entities_fts (name, entity_type, observations) 
-           SELECT name, entity_type, observations FROM entities 
+          `INSERT INTO entities_fts (name, entity_type, observations)
+           SELECT name, entity_type, observations FROM entities
            WHERE name IN (${ftsPlaceholders})`
         ).run(...entities.map(e => e.name));
-        
+
         // Build results and update caches in batch
         const results: EntityResult[] = [];
         const cacheUpdates: Array<[string, EntityResult]> = [];
-        
+
         for (const data of preparedData) {
           const result: EntityResult = {
             type: 'entity',
@@ -447,12 +454,12 @@ export class MemoryDatabase {
           cacheUpdates.push([data.name.toLowerCase(), result]);
           this.entityBloom.add(data.name.toLowerCase());
         }
-        
+
         // Batch cache update
         for (const [key, value] of cacheUpdates) {
           this.entityCache.set(key, value);
         }
-        
+
         return results;
       } finally {
         // Re-enable FTS trigger
@@ -465,7 +472,7 @@ export class MemoryDatabase {
         `);
       }
     });
-    
+
     // Clear search cache as new entities were added
     this.searchCache.clear();
     perf.end({ created: created.length });
@@ -473,16 +480,21 @@ export class MemoryDatabase {
   }
 
   createRelations(relations: CreateRelationInput[]): RelationResult[] {
+    // Use batch method if enabled and above threshold
+    if (config.performance.enableBulkOperations && relations.length >= config.performance.batchSize) {
+      return this.createRelationsBatch(relations);
+    }
+
     const created: RelationResult[] = [];
-    
+
     this.transaction(() => {
       for (const relation of relations) {
         const result = this.statements.createRelation!.run(
-          relation.from, 
-          relation.to, 
+          relation.from,
+          relation.to,
           relation.relationType
         );
-        
+
         if (result.changes > 0) {
           created.push({
             type: 'relation',
@@ -493,33 +505,76 @@ export class MemoryDatabase {
         }
       }
     });
-    
+
+    return created;
+  }
+
+  createRelationsBatch(relations: CreateRelationInput[]): RelationResult[] {
+    const perf = new PerformanceTracker('createRelationsBatch', { count: relations.length });
+
+    if (relations.length === 0) {
+      perf.end({ status: 'empty' });
+      return [];
+    }
+
+    const created: RelationResult[] = [];
+
+    this.transaction(() => {
+      // Build bulk insert query
+      const placeholders = relations.map(() => '(?, ?, ?)').join(', ');
+      const bulkQuery = `
+        INSERT OR IGNORE INTO relations (from_entity, to_entity, relation_type)
+        VALUES ${placeholders}
+      `;
+
+      // Flatten parameters
+      const params = relations.flatMap(relation => [
+        relation.from,
+        relation.to,
+        relation.relationType
+      ]);
+
+      // Execute bulk insert
+      const result = this.db.prepare(bulkQuery).run(...params);
+
+      // Build results (all relations are considered created due to OR IGNORE)
+      relations.forEach(relation => {
+        created.push({
+          type: 'relation',
+          from: relation.from,
+          to: relation.to,
+          relationType: relation.relationType
+        });
+      });
+    });
+
+    perf.end({ status: 'success', created: created.length });
     return created;
   }
 
   getEntity(name: string): EntityResult | undefined {
     const lowerName = name.toLowerCase();
-    
+
     // Check cache first
     const cached = this.entityCache.get(lowerName);
     if (cached) return cached;
-    
+
     // Check bloom filter
     if (!this.entityBloom.contains(lowerName)) return undefined;
-    
+
     // Query database
     const row = this.statements.getEntity!.get(name) as EntityRow | undefined;
     if (!row) return undefined;
-    
+
     const entity: EntityResult = {
       type: 'entity',
       name: row.name,
       entityType: row.entity_type,
-      observations: this.compressionEnabled 
+      observations: this.compressionEnabled
         ? CompressionUtils.decompressObservations(row.observations)
         : parseObservations(row.observations)
     };
-    
+
     // Cache the result
     this.entityCache.set(lowerName, entity);
     return entity;
@@ -528,7 +583,7 @@ export class MemoryDatabase {
   searchNodes(options: SearchOptions): GraphResult {
     const { query, limit = 20 } = options;
     const cacheKey = `search:${query}:${limit}`;
-    
+
     // Check cache
     const cached = this.searchCache.get(cacheKey);
     if (cached) return cached;
@@ -546,27 +601,27 @@ export class MemoryDatabase {
             ORDER BY rank
             LIMIT ?
           `);
-          
+
           const likeStmt = conn.db.prepare(`
-            SELECT * FROM entities 
+            SELECT * FROM entities
             WHERE name LIKE ? OR entity_type LIKE ? OR observations LIKE ?
             LIMIT ?
           `);
-          
+
           // FTS search first
           const ftsQuery = query.split(/\s+/)
             .filter(term => term.length > 0)
             .map(term => `"${term}"*`)
             .join(' OR ');
-          
+
           let rows = searchStmt.all(ftsQuery, limit) as EntityRow[];
-          
+
           // Fallback to LIKE search if no FTS results
           if (rows.length === 0) {
             const likePattern = `%${query}%`;
             rows = likeStmt.all(likePattern, likePattern, likePattern, limit) as EntityRow[];
           }
-          
+
           return rows;
         } finally {
           await this.readPool.release(conn);
@@ -577,20 +632,20 @@ export class MemoryDatabase {
           .filter(term => term.length > 0)
           .map(term => `"${term}"*`)
           .join(' OR ');
-        
+
         let rows = this.statements.searchEntities!.all(ftsQuery, limit) as EntityRow[];
-        
+
         if (rows.length === 0) {
           const likePattern = `%${query}%`;
           rows = this.statements.searchEntitiesLike!.all(
             likePattern, likePattern, likePattern, limit
           ) as EntityRow[];
         }
-        
+
         return rows;
       }
     };
-    
+
     // Execute search (sync wrapper for now)
     let rows: EntityRow[];
     if (this.readPool) {
@@ -599,9 +654,9 @@ export class MemoryDatabase {
         .filter(term => term.length > 0)
         .map(term => `"${term}"*`)
         .join(' OR ');
-      
+
       rows = this.statements.searchEntities!.all(ftsQuery, limit) as EntityRow[];
-      
+
       if (rows.length === 0) {
         const likePattern = `%${query}%`;
         rows = this.statements.searchEntitiesLike!.all(
@@ -613,9 +668,9 @@ export class MemoryDatabase {
         .filter(term => term.length > 0)
         .map(term => `"${term}"*`)
         .join(' OR ');
-      
+
       rows = this.statements.searchEntities!.all(ftsQuery, limit) as EntityRow[];
-      
+
       if (rows.length === 0) {
         const likePattern = `%${query}%`;
         rows = this.statements.searchEntitiesLike!.all(
@@ -629,22 +684,22 @@ export class MemoryDatabase {
       type: 'entity',
       name: row.name,
       entityType: row.entity_type,
-      observations: this.compressionEnabled 
+      observations: this.compressionEnabled
         ? CompressionUtils.decompressObservations(row.observations)
         : parseObservations(row.observations)
     }));
 
     // Update entity cache
-    entities.forEach(entity => 
+    entities.forEach(entity =>
       this.entityCache.set(entity.name.toLowerCase(), entity)
     );
-    
+
     // Get relations for found entities
     const entityNames = entities.map(e => e.name);
-    const relations = entityNames.length > 0 
-      ? this.getRelationsForEntities(entityNames) 
+    const relations = entityNames.length > 0
+      ? this.getRelationsForEntities(entityNames)
       : [];
-    
+
     const result = { entities, relations };
     this.searchCache.set(cacheKey, result);
     return result;
@@ -653,28 +708,28 @@ export class MemoryDatabase {
   readGraph(limit?: number, offset: number = 0): GraphResult {
     const totalEntities = (this.db.prepare('SELECT COUNT(*) as count FROM entities').get() as any).count;
     const totalRelations = (this.db.prepare('SELECT COUNT(*) as count FROM relations').get() as any).count;
-    
-    const entityQuery = limit 
+
+    const entityQuery = limit
       ? `SELECT * FROM entities ORDER BY updated_at DESC LIMIT ${limit} OFFSET ${offset}`
       : 'SELECT * FROM entities ORDER BY updated_at DESC';
-    
+
     const entityRows = this.db.prepare(entityQuery).all() as EntityRow[];
-    
+
     const entities: EntityResult[] = entityRows.map(row => ({
       type: 'entity',
       name: row.name,
       entityType: row.entity_type,
-      observations: this.compressionEnabled 
+      observations: this.compressionEnabled
         ? CompressionUtils.decompressObservations(row.observations)
         : parseObservations(row.observations)
     }));
-    
-    const relations = entities.length > 0 
-      ? this.getRelationsForEntities(entities.map(e => e.name)) 
+
+    const relations = entities.length > 0
+      ? this.getRelationsForEntities(entities.map(e => e.name))
       : [];
-    
-    return { 
-      entities, 
+
+    return {
+      entities,
       relations,
       pagination: limit ? {
         totalEntities,
@@ -694,22 +749,22 @@ export class MemoryDatabase {
       return this.transaction(() => {
         // Create temp table
         this.db.exec('CREATE TEMP TABLE IF NOT EXISTS temp_entities (name TEXT PRIMARY KEY)');
-        
+
         const insertStmt = this.db.prepare('INSERT OR IGNORE INTO temp_entities VALUES (?)');
         for (const name of entityNames) {
           insertStmt.run(name);
         }
-        
+
         // Query using temp table
         const rows = this.db.prepare(`
           SELECT DISTINCT r.* FROM relations r
           WHERE r.from_entity IN (SELECT name FROM temp_entities)
              OR r.to_entity IN (SELECT name FROM temp_entities)
         `).all() as RelationRow[];
-        
+
         // Clean up
         this.db.exec('DROP TABLE temp_entities');
-        
+
         return rows.map(row => ({
           type: 'relation',
           from: row.from_entity,
@@ -722,11 +777,11 @@ export class MemoryDatabase {
     // Use IN clause for small queries
     const placeholders = entityNames.map(() => '?').join(',');
     const rows = this.db.prepare(`
-      SELECT * FROM relations 
-      WHERE from_entity IN (${placeholders}) 
+      SELECT * FROM relations
+      WHERE from_entity IN (${placeholders})
          OR to_entity IN (${placeholders})
     `).all(...entityNames, ...entityNames) as RelationRow[];
-    
+
     return rows.map(row => ({
       type: 'relation',
       from: row.from_entity,
@@ -748,67 +803,110 @@ export class MemoryDatabase {
       for (const update of updates) {
         const row = this.statements.getEntity!.get(update.entityName) as EntityRow | undefined;
         if (row) {
-          const existing = this.compressionEnabled 
+          const existing = this.compressionEnabled
             ? CompressionUtils.decompressObservations(row.observations)
             : parseObservations(row.observations);
-          
-          const combined = Array.from(new Set([...existing, ...update.contents]));
-          const observationsJson = this.compressionEnabled 
+
+          // Merge new observations with existing ones, avoiding duplicates
+          const combined = this.mergeObservations(existing, update.contents);
+          const observationsJson = this.compressionEnabled
             ? CompressionUtils.compressObservations(combined)
             : stringifyObservations(combined);
-          
+
           this.statements.updateObservations!.run(observationsJson, update.entityName);
           this.entityCache.delete(update.entityName.toLowerCase());
         }
       }
     });
-    
+
     this.searchCache.clear();
+  }
+
+  // Helper method to merge observations and avoid duplicates
+  private mergeObservations(existing: RichContent[], newObservations: RichContent[]): RichContent[] {
+    const combined = [...existing];
+
+    for (const newObs of newObservations) {
+      // Check if this observation already exists (by type and content)
+      const exists = combined.some(existingObs => {
+        if (existingObs.type !== newObs.type) return false;
+
+        // Compare based on content type
+        switch (newObs.type) {
+          case 'text':
+            return existingObs.type === 'text' && existingObs.text === newObs.text;
+          case 'image':
+            return existingObs.type === 'image' &&
+                   existingObs.data === newObs.data &&
+                   existingObs.mimeType === newObs.mimeType;
+          case 'audio':
+            return existingObs.type === 'audio' &&
+                   existingObs.data === newObs.data &&
+                   existingObs.mimeType === newObs.mimeType;
+          case 'resource_link':
+            return existingObs.type === 'resource_link' &&
+                   existingObs.uri === newObs.uri;
+          case 'resource':
+            return existingObs.type === 'resource' &&
+                   existingObs.data === newObs.data &&
+                   existingObs.mimeType === newObs.mimeType;
+          default:
+            return false;
+        }
+      });
+
+      if (!exists) {
+        combined.push(newObs);
+      }
+    }
+
+    return combined;
   }
 
   private addObservationsBatch(updates: ObservationUpdate[]): void {
     const perf = new PerformanceTracker('addObservationsBatch', { count: updates.length });
-    
+
     this.transaction(() => {
       // Prepare batch statement for fetching all entities at once
       const entityNames = updates.map(u => u.entityName);
       const placeholders = entityNames.map(() => '?').join(',');
-      
+
       // Fetch all entities in one query
       const entities = this.db.prepare(
         `SELECT name, observations FROM entities WHERE name IN (${placeholders})`
       ).all(...entityNames) as EntityRow[];
-      
+
       // Create a map for quick lookup
       const entityMap = new Map<string, EntityRow>();
       for (const entity of entities) {
         entityMap.set(entity.name.toLowerCase(), entity);
       }
-      
+
       // Prepare update statement outside the loop
       const updateStmt = this.db.prepare(
         'UPDATE entities SET observations = ?, updated_at = julianday(\'now\') WHERE name = ?'
       );
-      
+
       // Process updates
       for (const update of updates) {
         const entity = entityMap.get(update.entityName.toLowerCase());
         if (entity) {
-          const existing = this.compressionEnabled 
+          const existing = this.compressionEnabled
             ? CompressionUtils.decompressObservations(entity.observations)
             : parseObservations(entity.observations);
-          
-          const combined = Array.from(new Set([...existing, ...update.contents]));
-          const observationsJson = this.compressionEnabled 
+
+          // Merge new observations with existing ones, avoiding duplicates
+          const combined = this.mergeObservations(existing, update.contents);
+          const observationsJson = this.compressionEnabled
             ? CompressionUtils.compressObservations(combined)
             : stringifyObservations(combined);
-          
+
           updateStmt.run(observationsJson, update.entityName);
           this.entityCache.delete(update.entityName.toLowerCase());
         }
       }
     });
-    
+
     this.searchCache.clear();
     perf.end();
   }
@@ -821,34 +919,61 @@ export class MemoryDatabase {
         this.entityCache.delete(name.toLowerCase());
       }
     });
-    
+
     this.searchCache.clear();
   }
 
   deleteObservations(deletions: ObservationDeletion[]): void {
     if (deletions.length === 0) return;
-    
+
     this.transaction(() => {
       for (const deletion of deletions) {
         const row = this.statements.getEntity!.get(deletion.entityName) as EntityRow | undefined;
         if (row) {
-          const existing = this.compressionEnabled 
+          const existing = this.compressionEnabled
             ? CompressionUtils.decompressObservations(row.observations)
             : parseObservations(row.observations);
-          
-          const toRemove = new Set(deletion.observations);
-          const updated = existing.filter(obs => !toRemove.has(obs));
-          
-          const observationsJson = this.compressionEnabled 
+
+          // Remove observations that match by type and content
+          const updated = existing.filter(existingObs =>
+            !deletion.observations.some(toRemove => {
+              if (toRemove.type !== existingObs.type) return false;
+
+              // Compare based on content type
+              switch (toRemove.type) {
+                case 'text':
+                  return existingObs.type === 'text' && existingObs.text === toRemove.text;
+                case 'image':
+                  return existingObs.type === 'image' &&
+                         existingObs.data === toRemove.data &&
+                         existingObs.mimeType === toRemove.mimeType;
+                case 'audio':
+                  return existingObs.type === 'audio' &&
+                         existingObs.data === toRemove.data &&
+                         existingObs.mimeType === toRemove.mimeType;
+                case 'resource_link':
+                  return existingObs.type === 'resource_link' &&
+                         existingObs.uri === toRemove.uri;
+                case 'resource':
+                  return existingObs.type === 'resource' &&
+                         existingObs.data === toRemove.data &&
+                         existingObs.mimeType === toRemove.mimeType;
+                default:
+                  return false;
+              }
+            })
+          );
+
+          const observationsJson = this.compressionEnabled
             ? CompressionUtils.compressObservations(updated)
             : stringifyObservations(updated);
-          
+
           this.statements.updateObservations!.run(observationsJson, deletion.entityName);
           this.entityCache.delete(deletion.entityName.toLowerCase());
         }
       }
     });
-    
+
     this.searchCache.clear();
   }
 
@@ -874,13 +999,13 @@ export class MemoryDatabase {
     for (const name of names) {
       const lowerName = name.toLowerCase();
       if (!this.entityBloom.contains(lowerName)) continue;
-      
+
       const cached = this.entityCache.get(lowerName);
       if (cached) {
         entities.push(cached);
       } else {
         namesToQuery.push(name);
-      } 
+      }
     }
 
     // Query remaining entities
@@ -889,13 +1014,13 @@ export class MemoryDatabase {
       const entityRows = this.db.prepare(
         `SELECT * FROM entities WHERE name IN (${placeholders})`
       ).all(...namesToQuery) as EntityRow[];
-      
+
       for (const row of entityRows) {
         const entity: EntityResult = {
           type: 'entity',
           name: row.name,
           entityType: row.entity_type,
-          observations: this.compressionEnabled 
+          observations: this.compressionEnabled
             ? CompressionUtils.decompressObservations(row.observations)
             : parseObservations(row.observations)
         };
@@ -903,25 +1028,25 @@ export class MemoryDatabase {
         this.entityCache.set(row.name.toLowerCase(), entity);
       }
     }
-    
+
     const foundNames = entities.map(e => e.name);
-    const relations = foundNames.length > 0 
-      ? this.getRelationsForEntities(foundNames) 
+    const relations = foundNames.length > 0
+      ? this.getRelationsForEntities(foundNames)
       : [];
-    
+
     return { entities, relations };
   }
 
   getStats(): DatabaseStats {
     const entityCount = (this.db.prepare('SELECT COUNT(*) as count FROM entities').get() as any).count;
     const relationCount = (this.db.prepare('SELECT COUNT(*) as count FROM relations').get() as any).count;
-    
+
     const typeRows = this.statements.getEntityStats!.all() as Array<{ entity_type: string; count: number }>;
     const entityTypes = typeRows.reduce((acc, row) => {
       acc[row.entity_type] = row.count;
       return acc;
     }, {} as Record<string, number>);
-    
+
     const dbFileSize = statSync(this.dbPath).size;
 
     return {
@@ -949,7 +1074,7 @@ export class MemoryDatabase {
     if (this.isInTransaction) {
       throw new Error('A transaction is already active');
     }
-    
+
     this.db.prepare('BEGIN').run();
     this.isInTransaction = true;
     this.transactionDepth = 1;
@@ -959,7 +1084,7 @@ export class MemoryDatabase {
     if (!this.isInTransaction) {
       throw new Error('No active transaction to commit');
     }
-    
+
     this.db.prepare('COMMIT').run();
     this.isInTransaction = false;
     this.transactionDepth = 0;
@@ -972,7 +1097,7 @@ export class MemoryDatabase {
     if (!this.isInTransaction) {
       throw new Error('No active transaction to rollback');
     }
-    
+
     this.db.prepare('ROLLBACK').run();
     this.isInTransaction = false;
     this.transactionDepth = 0;
@@ -985,10 +1110,10 @@ export class MemoryDatabase {
   backup(backupPath: string): void {
     // Save bloom filter before backup
     this.saveBloomFilter();
-    
+
     // Checkpoint WAL to ensure all changes are in main database file
     this.db.pragma('wal_checkpoint(TRUNCATE)');
-    
+
     copyFileSync(this.dbPath, backupPath);
     const bloomPath = this.dbPath.replace('.db', '.cbloom');
     const backupBloomPath = backupPath.replace('.db', '.cbloom');
@@ -1008,14 +1133,14 @@ export class MemoryDatabase {
       this.transactionDepth = 0;
       this.isInTransaction = false;
     }
-    
+
     // Close read pool if it exists
     if (this.readPool) {
       this.readPool.close().catch(err => {
         logError('Error closing read pool', err as Error);
       });
     }
-    
+
     this.saveBloomFilter();
     this.db.close();
   }

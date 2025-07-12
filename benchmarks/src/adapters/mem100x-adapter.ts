@@ -14,70 +14,8 @@ export class Mem100xAdapter extends BaseAdapter {
       this.execPath = '/app/dist/server-multi.js';
     } else {
       // Local development mode
-      this.execPath = path.join(process.cwd(), '..', 'dist', 'server-multi.js');
+      this.execPath = path.join(__dirname, '..', '..', '..', 'dist', 'server-multi.js');
     }
-  }
-
-  protected async startServer(): Promise<ChildProcess> {
-    console.log(`[${this.name}] Starting Mem100x server at ${this.execPath}`);
-    
-    const env = {
-      ...process.env,
-      NODE_ENV: 'production',
-      MEMORY_DB: process.env.MEMORY_DB || '/tmp/mem100x-benchmark.db',
-      DEBUG: '0',
-      // Disable any console output that might interfere with stdio
-      QUIET: '1',
-      // Disable rate limiting for benchmarks
-      DISABLE_RATE_LIMITING: 'true'
-    };
-
-    const serverProcess = spawn('node', [this.execPath], {
-      env,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      detached: false
-    });
-
-    // Handle server errors
-    serverProcess.on('error', (error) => {
-      console.error(`[${this.name}] Server process error:`, error);
-    });
-
-    serverProcess.stderr.on('data', (data) => {
-      console.error(`[${this.name}] Server stderr:`, data.toString());
-    });
-
-    // Wait for server to be ready by monitoring stderr for the "running on stdio" message
-    await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Server startup timeout'));
-      }, 10000);
-
-      let stderrBuffer = '';
-      
-      const checkReady = (data: Buffer) => {
-        stderrBuffer += data.toString();
-        
-        // Check if the server is ready (look for the running message in JSON logs)
-        if (stderrBuffer.includes('running on stdio') || 
-            stderrBuffer.includes('Server running on stdio')) {
-          clearTimeout(timeout);
-          serverProcess.stderr.removeListener('data', checkReady);
-          resolve();
-        }
-      };
-      
-      serverProcess.stderr.on('data', checkReady);
-      
-      // Also check stdout for backward compatibility
-      serverProcess.stdout.once('data', (data) => {
-        clearTimeout(timeout);
-        console.log(`[${this.name}] Server started:`, data.toString().trim());
-        resolve();
-      });
-    });
-
-    return serverProcess;
   }
 
   protected getCommand(): string {
@@ -86,6 +24,20 @@ export class Mem100xAdapter extends BaseAdapter {
 
   protected getArgs(): string[] {
     return [this.execPath];
+  }
+  
+  protected getEnv(): Record<string, string> {
+    return {
+      ...process.env,
+      NODE_ENV: 'production',
+      MEMORY_DB: process.env.MEMORY_DB || '/tmp/mem100x-benchmark.db',
+      DEBUG: '0',
+      QUIET: '1',
+      DISABLE_RATE_LIMITING: 'true',
+      // Suppress dotenv output
+      DOTENV_CONFIG_OVERRIDE: 'true',
+      SUPPRESS_NO_CONFIG_WARNING: 'true'
+    } as Record<string, string>;
   }
 
   // Override getMetrics to get actual process metrics

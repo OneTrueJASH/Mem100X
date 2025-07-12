@@ -5,11 +5,53 @@
 
 import { z } from 'zod';
 
+// MCP Content Block Union Schema - matches official MCP specification
+const TextContentSchema = z.object({
+  type: z.literal('text'),
+  text: z.string().min(1, 'Text content cannot be empty'),
+});
+
+const ImageContentSchema = z.object({
+  type: z.literal('image'),
+  data: z.string().min(1, 'Image data cannot be empty'),
+  mimeType: z.string().min(1, 'MIME type cannot be empty'),
+});
+
+const AudioContentSchema = z.object({
+  type: z.literal('audio'),
+  data: z.string().min(1, 'Audio data cannot be empty'),
+  mimeType: z.string().min(1, 'MIME type cannot be empty'),
+});
+
+const ResourceLinkContentSchema = z.object({
+  type: z.literal('resource_link'),
+  uri: z.string().min(1, 'URI cannot be empty'),
+  title: z.string().optional(),
+  description: z.string().optional(),
+});
+
+const ResourceContentSchema = z.object({
+  type: z.literal('resource'),
+  data: z.string().min(1, 'Resource data cannot be empty'),
+  mimeType: z.string().min(1, 'MIME type cannot be empty'),
+  title: z.string().optional(),
+  description: z.string().optional(),
+});
+
+// Discriminated union for all content types
+const RichContentSchema = z.discriminatedUnion('type', [
+  TextContentSchema,
+  ImageContentSchema,
+  AudioContentSchema,
+  ResourceLinkContentSchema,
+  ResourceContentSchema,
+]);
+
 // Entity schemas
 const EntitySchema = z.object({
   name: z.string().min(1, 'Entity name cannot be empty'),
   entityType: z.string().min(1, 'Entity type cannot be empty'),
-  observations: z.array(z.string()).min(1, 'At least one observation is required'),
+  observations: z.array(RichContentSchema).min(1, 'At least one observation is required'),
 });
 
 const RelationSchema = z.object({
@@ -20,12 +62,12 @@ const RelationSchema = z.object({
 
 const ObservationUpdateSchema = z.object({
   entityName: z.string().min(1, 'Entity name cannot be empty'),
-  contents: z.array(z.string()).min(1, 'At least one observation is required'),
+  contents: z.array(RichContentSchema).min(1, 'At least one observation is required'),
 });
 
 const ObservationDeletionSchema = z.object({
   entityName: z.string().min(1, 'Entity name cannot be empty'),
-  observations: z.array(z.string()).min(1, 'At least one observation to delete is required'),
+  observations: z.array(RichContentSchema).min(1, 'At least one observation to delete is required'),
 });
 
 // Tool input schemas
@@ -34,77 +76,77 @@ export const toolSchemas = {
   set_context: z.object({
     context: z.string().min(1, 'Context name cannot be empty'),
   }),
-  
+
   get_context_info: z.object({}),
-  
+
   // Entity operations
   create_entities: z.object({
     entities: z.array(EntitySchema).min(1, 'At least one entity is required'),
     context: z.string().optional(),
   }),
-  
+
   search_nodes: z.object({
     query: z.string().min(1, 'Search query cannot be empty'),
     limit: z.number().int().positive().default(20).optional(),
     context: z.string().optional(),
     allContexts: z.boolean().default(false).optional(),
   }),
-  
+
   read_graph: z.object({
     limit: z.number().int().positive().optional(),
     offset: z.number().int().min(0).default(0).optional(),
     context: z.string().optional(),
   }),
-  
+
   open_nodes: z.object({
     names: z.array(z.string()).min(1, 'At least one entity name is required'),
     context: z.string().optional(),
   }),
-  
+
   // Relation operations
   create_relations: z.object({
     relations: z.array(RelationSchema).min(1, 'At least one relation is required'),
   }),
-  
+
   delete_relations: z.object({
     relations: z.array(RelationSchema).min(1, 'At least one relation is required'),
   }),
-  
+
   // Observation operations
   add_observations: z.object({
     observations: z.array(ObservationUpdateSchema).min(1, 'At least one observation update is required'),
   }),
-  
+
   delete_observations: z.object({
     deletions: z.array(ObservationDeletionSchema).min(1, 'At least one deletion is required'),
   }),
-  
+
   // Entity deletion
   delete_entities: z.object({
     entityNames: z.array(z.string()).min(1, 'At least one entity name is required'),
   }),
-  
+
   // Transaction management
   begin_transaction: z.object({
     name: z.string().optional().describe('Optional transaction name for debugging'),
   }),
-  
+
   commit_transaction: z.object({}),
-  
+
   rollback_transaction: z.object({}),
-  
+
   // Backup and restore
   create_backup: z.object({
     backupPath: z.string().optional().describe('Path for the backup file. If not provided, a timestamped backup will be created in the default backup directory'),
     context: z.string().optional().describe('Specific context to backup. If not provided, backs up current context'),
   }),
-  
+
   restore_backup: z.object({
     backupPath: z.string().describe('Path to the backup file to restore'),
     context: z.string().optional().describe('Context to restore to. If not provided, restores to current context'),
     confirmRestore: z.boolean().describe('Must be true to confirm the restore operation'),
   }),
-  
+
   // Graph traversal operations
   get_neighbors: z.object({
     entityName: z.string().min(1, 'Entity name is required'),
@@ -119,7 +161,7 @@ export const toolSchemas = {
     context: z.string().optional()
       .describe('Specific context to search in'),
   }),
-  
+
   find_shortest_path: z.object({
     from: z.string().min(1, 'Source entity name is required'),
     to: z.string().min(1, 'Target entity name is required'),
@@ -154,6 +196,16 @@ export type RestoreBackupInput = z.infer<typeof toolSchemas.restore_backup>;
 export type GetNeighborsInput = z.infer<typeof toolSchemas.get_neighbors>;
 export type FindShortestPathInput = z.infer<typeof toolSchemas.find_shortest_path>;
 
+// Export content schemas for validation
+export {
+  TextContentSchema,
+  ImageContentSchema,
+  AudioContentSchema,
+  ResourceLinkContentSchema,
+  ResourceContentSchema,
+  RichContentSchema,
+};
+
 // Helper to validate tool input
 export function validateToolInput<T extends keyof typeof toolSchemas>(
   toolName: T,
@@ -163,6 +215,6 @@ export function validateToolInput<T extends keyof typeof toolSchemas>(
   if (!schema) {
     throw new Error(`No schema defined for tool: ${toolName}`);
   }
-  
+
   return schema.parse(input);
 }

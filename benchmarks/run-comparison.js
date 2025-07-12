@@ -48,7 +48,7 @@ const config = {
   scenarios: scenarios,
   quick: quickMode,
   verbose: verboseMode,
-  iterations: quickMode ? 100 : undefined
+  iterations: quickMode ? 1000 : 10000  // Increased from 100 to meaningful values
 };
 
 console.log(`${colors.gray}Configuration:${colors.reset}`);
@@ -65,7 +65,8 @@ async function runBenchmarks() {
     ...process.env,
     SERVERS: config.servers,
     BENCHMARK_MODE: 'local',
-    NODE_ENV: 'production'
+    NODE_ENV: 'production',
+    DISABLE_RATE_LIMITING: 'true'  // Critical for accurate benchmarks
   };
 
   if (config.scenarios) {

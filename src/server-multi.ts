@@ -12,7 +12,7 @@ import {
 import { MultiDatabaseManager } from './multi-database.js';
 import { toolHandlers, ToolContext } from './tool-handlers.js';
 import { getAllToolDefinitions } from './tool-definitions.js';
-import { stringifyGeneric } from './utils/fast-json.js';
+import { stringifyGeneric, createTextContent } from './utils/fast-json.js';
 import { logger, logError, logInfo } from './utils/logger.js';
 import { config } from './config.js';
 import { CircuitBreaker } from './utils/circuit-breaker.js';
@@ -27,28 +27,28 @@ export async function main() {
 
   const manager = new MultiDatabaseManager(config);
   logInfo('MultiDatabaseManager initialized.');
-  
+
   // Create zero-delay write aggregator for minimal-overhead batching
   const writeAggregator = new ZeroDelayWriteAggregator(manager);
   logInfo('Zero-delay write aggregator initialized.');
-  
+
   // Create rate limiters (can be disabled for benchmarks)
   const rateLimitingEnabled = process.env.DISABLE_RATE_LIMITING !== 'true';
   const rateLimiters = rateLimitingEnabled ? createRateLimiters() : null;
   logInfo(rateLimitingEnabled ? 'Rate limiters initialized.' : 'Rate limiting disabled.');
-  
+
   // Create circuit breakers for each tool
   const circuitBreakers = new Map<string, CircuitBreaker>();
   const criticalTools = ['create_entities', 'add_observations', 'create_relations'];
   const writeTools = ['create_entities', 'add_observations', 'create_relations', 'delete_entities'];
   const readTools = ['search_nodes', 'read_graph', 'get_context_info'];
-  
+
   for (const toolName of Object.keys(toolHandlers)) {
     // More strict settings for critical write operations
-    const options = criticalTools.includes(toolName) 
+    const options = criticalTools.includes(toolName)
       ? { failureThreshold: 3, resetTimeout: 10000, halfOpenMaxAttempts: 2 }
       : { failureThreshold: 5, resetTimeout: 5000, halfOpenMaxAttempts: 3 };
-      
+
     circuitBreakers.set(toolName, new CircuitBreaker(options));
   }
 
@@ -73,43 +73,46 @@ export async function main() {
 
   // Call tool handler
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    // Remove verbose logging for performance
+    // logInfo('Raw request received:', { request: JSON.stringify(request) });
     const { name, arguments: args } = request.params;
+    // logInfo('Parsed tool request', { name, args: JSON.stringify(args) });
     const requestStartTime = process.hrtime.bigint();
-    
+
     // Extract correlation ID from request meta
-    const correlationId = String(request.params._meta?.progressToken || 
+    const correlationId = String(request.params._meta?.progressToken ||
                          `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
 
     let requestSuccess = false;
-    
+
     try {
       const handler = toolHandlers[name];
       if (!handler) {
         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
       }
-      
+
       // Apply rate limiting if enabled
       if (rateLimiters) {
         const limiterType = getRateLimiterForTool(name);
         await rateLimiters[limiterType].checkLimit(request);
       }
-      
+
       // Validate input size to prevent DoS
       validateToolInput(name, args);
-      
+
       // Validate destructive operations require confirmation
       validateDestructiveOperation(name, args);
-      
+
       const circuitBreaker = circuitBreakers.get(name);
       if (!circuitBreaker) {
         throw new McpError(ErrorCode.InternalError, `No circuit breaker for tool: ${name}`);
       }
-      
+
       // Time circuit breaker execution
       const circuitBreakerStartTime = process.hrtime.bigint();
-      
+
       let result: any;
-      
+
       // Use zero-delay aggregator for write operations
       if (writeTools.includes(name)) {
         result = await writeAggregator.scheduleWrite(name as any, args);
@@ -128,35 +131,35 @@ export async function main() {
       else {
         result = await circuitBreaker.execute(async () => {
         const dbCallStartTime = process.hrtime.bigint();
-        
+
         const context: ToolContext = {
           manager,
           startTime: performance.now(),
           toolName: name,
           correlationId,
         };
-        
+
         const dbResult = await handler(args, context);
-        
+
         const dbCallEndTime = process.hrtime.bigint();
         const dbCallTime = Number(dbCallEndTime - dbCallStartTime) / 1_000_000;
-        
+
         // Log timing for operations
         if (dbCallTime > 50) {
           logInfo(`DB timing for ${name}`, { dbCallTime_ms: dbCallTime });
         }
-        
+
         return dbResult;
       });
       }
-      
+
       const circuitBreakerEndTime = process.hrtime.bigint();
       const requestEndTime = process.hrtime.bigint();
-      
+
       // Calculate timings
       const totalRequestTime = Number(requestEndTime - requestStartTime) / 1_000_000;
       const circuitBreakerTime = Number(circuitBreakerEndTime - circuitBreakerStartTime) / 1_000_000;
-      
+
       // Log timing details for analysis
       if (totalRequestTime > 50) { // Log slow requests
         logInfo(`Request timing for ${name}`, {
@@ -165,40 +168,44 @@ export async function main() {
           overhead_ms: circuitBreakerTime - totalRequestTime
         });
       }
-      
+
       requestSuccess = true;
-      
+
+      // Extract content and structuredContent from the result
+      const { content, structuredContent } = result;
+
       return {
-        content: [{ type: 'text', text: stringifyGeneric(result, true) }],
+        content: content || [createTextContent(stringifyGeneric(result, true))],
+        structuredContent: structuredContent || result,
       };
     } catch (error) {
       if (error instanceof McpError) {
         throw error;
       }
-      
+
       // Handle circuit breaker open state
       if (error instanceof Error && error.message.includes('Circuit breaker is open')) {
         const breaker = circuitBreakers.get(name);
         const stats = breaker?.getStats();
         logError(`Circuit breaker open for ${name}`, error, { stats });
         throw new McpError(
-          ErrorCode.InternalError, 
+          ErrorCode.InternalError,
           `Service temporarily unavailable for ${name} - too many failures. Please retry in a few seconds.`
         );
       }
-      
+
       if (error && typeof error === 'object' && 'issues' in error) {
         const zodError = error as any;
         const issues = zodError.issues.map((issue: any) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
         throw new McpError(ErrorCode.InvalidParams, `Invalid parameters for ${name}: ${issues}`);
       }
-      
+
       // Use proper error mapping
       const mcpError = createMcpError(error);
-      logError(`Error executing tool: ${name}`, error as Error, { 
-        args, 
+      logError(`Error executing tool: ${name}`, error as Error, {
+        args,
         mcpError,
-        correlationId 
+        correlationId
       });
       throw new McpError(mcpError.code, mcpError.message, mcpError.data);
     } finally {
@@ -216,13 +223,13 @@ export async function main() {
     try {
       await server.close();
       logInfo('MCP server closed.');
-      
+
       // Stop rate limiters if enabled
       if (rateLimiters) {
         Object.values(rateLimiters).forEach(limiter => limiter.stop());
         logInfo('Rate limiters stopped.');
       }
-      
+
       manager.closeAll();
       logInfo('All databases closed.');
       process.exit(0);
@@ -234,7 +241,7 @@ export async function main() {
 
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
-  
+
   process.on('uncaughtException', (error) => {
     logError('Uncaught Exception', error);
     shutdown('uncaughtException').catch(console.error);

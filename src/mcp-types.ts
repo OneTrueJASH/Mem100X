@@ -3,6 +3,8 @@
  * Centralizes all MCP-related types for the Mem100x server
  */
 
+import { RichContent } from './types.js';
+
 /**
  * MCP Tool Definition
  * Structure for defining tools in the MCP protocol
@@ -20,19 +22,18 @@ export interface MCPToolDefinition {
 /**
  * MCP Tool Response
  * Standard response format for MCP tools
+ * Must include both content and structuredContent for full compatibility
  */
 export interface MCPToolResponse {
-  content: Array<{
-    type: 'text';
-    text: string;
-  }>;
+  content: RichContent[]; // Required field for MCP SDK validation
+  structuredContent?: any; // Optional field for richer responses
 }
 
 /**
  * MCP Tool Names
  * All available tools in the Mem100x server
  */
-export type MCPToolName = 
+export type MCPToolName =
   | 'set_context'
   | 'get_context_info'
   | 'create_entities'
@@ -43,7 +44,14 @@ export type MCPToolName =
   | 'delete_relations'
   | 'add_observations'
   | 'delete_observations'
-  | 'delete_entities';
+  | 'delete_entities'
+  | 'begin_transaction'
+  | 'commit_transaction'
+  | 'rollback_transaction'
+  | 'create_backup'
+  | 'restore_backup'
+  | 'get_neighbors'
+  | 'find_shortest_path';
 
 /**
  * MCP Server Configuration
@@ -61,6 +69,8 @@ export interface MCPServerConfig {
 export interface MCPServerCapabilities {
   capabilities: {
     tools: Record<string, never>;
+    resources?: Record<string, never>;
+    prompts?: Record<string, never>;
   };
 }
 
@@ -91,7 +101,14 @@ export type {
   DeleteRelationsInput,
   AddObservationsInput,
   DeleteObservationsInput,
-  DeleteEntitiesInput
+  DeleteEntitiesInput,
+  BeginTransactionInput,
+  CommitTransactionInput,
+  RollbackTransactionInput,
+  CreateBackupInput,
+  RestoreBackupInput,
+  GetNeighborsInput,
+  FindShortestPathInput
 } from './tool-schemas.js';
 
 /**
@@ -126,4 +143,40 @@ export interface ContextDetectionResponse {
   detectedContext: string;
   confidence: string;
   scores: Record<string, any>;
+}
+
+/**
+ * Helper function to create a proper MCP tool response
+ * Ensures both content and structuredContent are included
+ */
+export function createMCPToolResponse(
+  structuredContent: any,
+  textContent?: string
+): MCPToolResponse {
+  const content: RichContent[] = [];
+
+  if (textContent) {
+    content.push({ type: 'text', text: textContent });
+  } else if (structuredContent) {
+    // Convert structured content to text representation
+    const text = typeof structuredContent === 'string'
+      ? structuredContent
+      : JSON.stringify(structuredContent, null, 2);
+    content.push({ type: 'text', text });
+  }
+
+  // Always wrap structuredContent in an object if it's an array or primitive
+  let wrappedStructuredContent = structuredContent;
+  if (Array.isArray(structuredContent)) {
+    wrappedStructuredContent = { result: structuredContent };
+  } else if (
+    typeof structuredContent !== 'object' || structuredContent === null
+  ) {
+    wrappedStructuredContent = { value: structuredContent };
+  }
+
+  return {
+    content,
+    structuredContent: wrappedStructuredContent,
+  };
 }

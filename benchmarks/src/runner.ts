@@ -144,8 +144,12 @@ class BenchmarkRunner {
     // Warmup
     spinner.text = `${scenario.name} - Warming up...`;
     for (let i = 0; i < scenario.warmupIterations; i++) {
-      const operation = this.selectOperation(scenario.operations);
-      await adapter.executeOperation(this.prepareOperation(operation, i));
+      try {
+        const operation = this.selectOperation(scenario.operations);
+        await adapter.executeOperation(this.prepareOperation(operation, i));
+      } catch (error) {
+        console.error(`\n[Warmup Error] Operation ${i}:`, error instanceof Error ? error.message : error);
+      }
     }
 
     // Main benchmark
@@ -161,6 +165,11 @@ class BenchmarkRunner {
     for (let batch = 0; batch < batches; batch++) {
       const promises: Promise<void>[] = [];
       const batchSize = Math.min(concurrency, scenario.iterations - (batch * concurrency));
+      
+      // Log progress every 10 batches
+      if (batch % 10 === 0) {
+        spinner.text = `${scenario.name} - Progress: ${batch * concurrency}/${scenario.iterations} operations`;
+      }
       
       for (let j = 0; j < batchSize; j++) {
         const operationIndex = batch * concurrency + j;
@@ -189,6 +198,11 @@ class BenchmarkRunner {
       
       // Wait for all operations in this batch to complete
       await Promise.all(promises);
+      
+      // Add small delay between batches to avoid overwhelming the transport
+      if (batch < batches - 1) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
       
       // Update progress
       const completed = Math.min((batch + 1) * concurrency, scenario.iterations);

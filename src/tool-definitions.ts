@@ -21,7 +21,7 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
       required: ['context']
     }
   },
-  
+
   get_context_info: {
     name: 'get_context_info',
     description: 'Get information about available contexts and current state',
@@ -30,7 +30,7 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
       properties: {}
     }
   },
-  
+
   create_entities: {
     name: 'create_entities',
     description: 'Create multiple new entities in the knowledge graph. Performance: 59,780+ entities/sec',
@@ -53,9 +53,14 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
               observations: {
                 type: 'array',
                 items: {
-                  type: 'string'
+                  type: 'object',
+                  properties: {
+                    type: { type: 'string', enum: ['text'] },
+                    text: { type: 'string', description: 'The text content' }
+                  },
+                  required: ['type', 'text']
                 },
-                description: 'An array of observation contents associated with the entity'
+                description: 'An array of text observations associated with the entity'
               }
             },
             required: ['name', 'entityType', 'observations']
@@ -65,7 +70,7 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
       required: ['entities']
     }
   },
-  
+
   search_nodes: {
     name: 'search_nodes',
     description: 'Search for nodes in the knowledge graph based on a query. Uses FTS5 for 88x faster performance (8,829 searches/sec)',
@@ -88,7 +93,7 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
       required: ['query']
     }
   },
-  
+
   read_graph: {
     name: 'read_graph',
     description: 'Read the entire knowledge graph with pagination support',
@@ -110,7 +115,7 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
       }
     }
   },
-  
+
   open_nodes: {
     name: 'open_nodes',
     description: 'Open specific nodes in the knowledge graph by their names',
@@ -132,7 +137,7 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
       required: ['names']
     }
   },
-  
+
   create_relations: {
     name: 'create_relations',
     description: 'Create multiple new relations between entities in the knowledge graph. Performance: 261,455+ relations/sec',
@@ -164,7 +169,7 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
       required: ['relations']
     }
   },
-  
+
   delete_relations: {
     name: 'delete_relations',
     description: 'Delete multiple relations from the knowledge graph',
@@ -197,7 +202,7 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
       required: ['relations']
     }
   },
-  
+
   add_observations: {
     name: 'add_observations',
     description: 'Add new observations to existing entities in the knowledge graph. Batched for performance',
@@ -216,9 +221,14 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
               contents: {
                 type: 'array',
                 items: {
-                  type: 'string'
+                  type: 'object',
+                  properties: {
+                    type: { type: 'string', enum: ['text'] },
+                    text: { type: 'string', description: 'The text content' }
+                  },
+                  required: ['type', 'text']
                 },
-                description: 'An array of observation contents to add'
+                description: 'An array of text observations to add'
               }
             },
             required: ['entityName', 'contents']
@@ -228,7 +238,7 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
       required: ['observations']
     }
   },
-  
+
   delete_observations: {
     name: 'delete_observations',
     description: 'Delete specific observations from entities in the knowledge graph. Batched for performance',
@@ -247,9 +257,14 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
               observations: {
                 type: 'array',
                 items: {
-                  type: 'string'
+                  type: 'object',
+                  properties: {
+                    type: { type: 'string', enum: ['text'] },
+                    text: { type: 'string', description: 'The text content' }
+                  },
+                  required: ['type', 'text']
                 },
-                description: 'An array of observations to delete'
+                description: 'An array of text observations to delete'
               }
             },
             required: ['entityName', 'observations']
@@ -259,7 +274,7 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
       required: ['deletions']
     }
   },
-  
+
   delete_entities: {
     name: 'delete_entities',
     description: 'Delete multiple entities and their associated relations from the knowledge graph',
@@ -283,7 +298,7 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
  * Get all tool definitions as an array with safety info applied
  */
 export function getAllToolDefinitions(): MCPToolDefinition[] {
-  return Object.entries(TOOL_DEFINITIONS).map(([name, def]) => 
+  return Object.entries(TOOL_DEFINITIONS).map(([name, def]) =>
     addDestructiveSafetyInfo(def, name)
   );
 }
