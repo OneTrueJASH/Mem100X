@@ -93,14 +93,14 @@ export class MemoryDatabase {
     // Initialize read pool if enabled
     if (this.useReadPool && existsSync(this.dbPath)) {
       this.readPool = new ConnectionPool(this.dbPath, {
-        minConnections: 2,
-        maxConnections: 5,
+        minConnections: Math.max(2, Math.floor(config.performance.readPoolSize / 4)),
+        maxConnections: config.performance.readPoolSize,
         acquireTimeout: 5000,
         idleTimeout: 60000,
         readonly: true
       });
       logInfo('Read pool initialized', { 
-        minConnections: 2, 
+        minConnections: Math.max(2, Math.floor(config.performance.readPoolSize / 4)), 
         maxConnections: 5 
       });
     }

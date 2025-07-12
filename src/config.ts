@@ -7,7 +7,8 @@ import { z } from 'zod';
 import { join } from 'path';
 
 // Load environment variables
-loadEnv();
+// In production, we don't want dotenv output to break stdio communication
+loadEnv({ quiet: true });
 
 // Configuration schema
 const configSchema = z.object({
