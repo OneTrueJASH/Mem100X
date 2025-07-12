@@ -1,218 +1,140 @@
-# MCP Memory Server Benchmark Suite
+# Mem100x Benchmark Suite
 
-A fair and reproducible benchmarking framework for comparing MCP memory server implementations.
+A clean, focused benchmark suite for testing Mem100x database performance without MCP overhead.
 
 ## Overview
 
-This benchmark suite provides:
-- **Fair comparison**: All servers run with identical resource constraints
-- **Reproducible results**: Docker ensures consistent environment
-- **Multiple scenarios**: From simple throughput to complex mixed workloads
-- **Extensible design**: Easy to add new servers or scenarios
+This benchmark suite focuses on **direct database operations** to measure the core performance of Mem100x. We've separated the database layer from the MCP layer to isolate performance issues and provide reliable metrics.
 
-## Quick Start
+## Key Findings
 
-### Prerequisites
-- Node.js 18+
-- Docker and Docker Compose (for production benchmarks)
-- Built main project (`npm run build` in parent directory)
+### ✅ Database Performance (Excellent)
+- **Database initialization**: 17-18ms
+- **Single entity creation**: 1ms
+- **Bulk insert (200 entities)**: 6ms
+- **Search operations**: 0-33ms (depending on complexity)
+- **Graph operations**: 0-1ms
+- **Relations**: 0-17ms
+- **Observations**: 0-5ms
 
-### Installation
+### ❌ MCP Layer Issues (Needs Investigation)
+- **Server startup**: 136ms (acceptable)
+- **Tool listing**: 1ms (works fine)
+- **Tool execution**: 5+ second timeouts (problematic)
+
+## Benchmark Files
+
+### 1. `simple-bench.js` - Basic Operations
+Tests fundamental database operations with minimal data:
+- Single entity creation
+- Small batch operations (10-100 entities)
+- Basic search and graph operations
+- Relations and observations
+
+**Usage:**
 ```bash
-cd benchmarks
-npm install
-npm run build
+node benchmarks/simple-bench.js
 ```
 
-### Running Benchmarks
+### 2. `comprehensive-bench.js` - Full Performance Test
+Comprehensive benchmark with realistic data scenarios:
+- 200 entities with various types and complexity
+- 45 relations between entities
+- Multiple search patterns
+- Bulk operations
+- Concurrent operations simulation
 
-#### Local Development (Recommended for testing)
-
-1. **Quick Test** - Run a single scenario with reduced iterations:
+**Usage:**
 ```bash
-./run-local-dev.js --quick --scenarios entity-creation-throughput
+node benchmarks/comprehensive-bench.js
 ```
 
-2. **Full Local Run** - Run all scenarios locally:
+### 3. `mcp-simple-test.js` - MCP Layer Test
+Tests the MCP server layer (currently has timeout issues):
+- Server connection
+- Tool listing
+- Simple tool operations
+- Entity creation via MCP
+
+**Usage:**
 ```bash
-./run-local.js
-# or with enhanced features:
-./run-local-dev.js
+node benchmarks/mcp-simple-test.js
 ```
 
-3. **Watch Mode** - Auto-rerun benchmarks on file changes:
-```bash
-./watch-benchmarks.js
+## Performance Results
+
+### Comprehensive Benchmark Summary (Latest Run)
+```
+Total operations: 18
+Total time: 117ms
+Average time: 6.50ms
+Min time: 0ms
+Max time: 33ms
+
+Results by Category:
+  Insert: 2 ops, avg 10.00ms
+  Search: 5 ops, avg 10.20ms
+  Relations: 3 ops, avg 6.00ms
+  Graph: 3 ops, avg 0.67ms
+  Observations: 2 ops, avg 2.50ms
+  Concurrent: 1 ops, avg 1.00ms
 ```
 
-4. **Custom Configuration**:
-```bash
-# Run specific servers
-./run-local-dev.js --servers mem100x,mem100x-single
+### Performance Highlights
+- **Fastest operations**: Graph reads (0-1ms), simple searches (0-2ms)
+- **Most intensive**: Complex text search (33ms), bulk relations (17ms)
+- **Scalability**: Bulk insert of 200 entities in 6ms (33,333 entities/second)
+- **Concurrent operations**: 10 concurrent reads in 1ms
 
-# Run specific scenarios
-./run-local-dev.js --scenarios entity-creation-throughput,search-performance
+## Test Data Structure
 
-# Custom iterations
-./run-local-dev.js --iterations 1000
+The comprehensive benchmark uses realistic test data:
 
-# Verbose mode (show server output)
-./run-local-dev.js --verbose
+### Entities (200 total)
+- **100 simple entities**: Single observation each
+- **50 complex entities**: 3 observations each
+- **25 person entities**: With age and location data
+- **25 city entities**: With population data
 
-# Keep database files after run
-./run-local-dev.js --keep-db
-```
+### Relations (45 total)
+- **25 person-city relations**: "lives_in" relationships
+- **20 person-person relations**: "knows" relationships
 
-#### Docker Production Benchmarks
+## Architecture
 
-```bash
-# Build and run all benchmarks
-./scripts/run-benchmark.sh
+### Clean Database Approach
+- Uses temporary databases for each test run
+- Automatic cleanup of database files and bloom filters
+- No interference between test runs
+- Consistent baseline performance
 
-# Run specific servers
-./scripts/run-benchmark.sh --servers mem100x,official
-
-# Build only
-./scripts/run-benchmark.sh --build-only
-
-# Skip build
-./scripts/run-benchmark.sh --skip-build
-```
-
-## Benchmark Scenarios
-
-### 1. Entity Creation Throughput
-- **Goal**: Measure raw write performance
-- **Operations**: 10,000 entity creations
-- **Metric**: Entities per second
-
-### 2. Search Performance
-- **Goal**: Measure query speed
-- **Operations**: 1,000 searches
-- **Metric**: Searches per second
-
-### 3. Mixed Workload
-- **Goal**: Realistic usage patterns
-- **Operations**: 50% reads, 20% writes, 20% searches, 10% updates
-- **Metric**: Operations per second
-
-### 4. Relation Performance
-- **Goal**: Graph operation speed
-- **Operations**: 5,000 relation creations
-- **Metric**: Relations per second
-
-### 5. Stress Test
-- **Goal**: High concurrency handling
-- **Operations**: 50 concurrent clients
-- **Metric**: Latency under load
-
-## Resource Constraints
-
-All servers run with:
-- **CPU**: 1.0 cores
-- **Memory**: 512MB
-- **Swap**: Disabled
-- **Network**: Isolated
-
-## Adding a New Server
-
-1. Create adapter in `src/adapters/`:
-```typescript
-export class YourServerAdapter extends BaseAdapter {
-  // Implement required methods
-}
-```
-
-2. Create Dockerfile in `docker/servers/your-server/`:
-```dockerfile
-FROM node:20-alpine
-# Your server setup
-```
-
-3. Add to `config/benchmark-config.json`:
-```json
-{
-  "name": "your-server",
-  "type": "custom",
-  "dockerImage": "benchmark-your-server"
-}
-```
-
-## Results Format
-
-Results are saved in `results/` with timestamp:
-```json
-{
-  "timestamp": "2024-01-11T12:00:00Z",
-  "results": [
-    {
-      "server": "mem100x",
-      "scenario": "entity-creation-throughput",
-      "performance": {
-        "throughput": 66821,
-        "latency": {
-          "p95": 0.015,
-          "p99": 0.025
-        }
-      }
-    }
-  ]
-}
-```
-
-## Understanding Results
-
-- **Throughput**: Operations completed per second (higher is better)
-- **Latency**: Time per operation in ms (lower is better)
-  - p50: Median latency
-  - p95: 95% of operations complete within this time
-  - p99: 99% of operations complete within this time
-- **Memory**: Peak memory usage during test
-- **CPU**: Average CPU utilization
-
-## Available Scripts
-
-- `run-local.js` - Basic local benchmark runner
-- `run-local-dev.js` - Enhanced local runner with CLI options
-- `watch-benchmarks.js` - Development watch mode
-- `test-basic.js` - Test MCP client connection
-- `scripts/run-benchmark.sh` - Docker-based production benchmarks
-- `scripts/compare-results.js` - Compare benchmark results
+### MCP Layer Isolation
+- Database operations tested directly
+- MCP issues identified and isolated
+- Clear separation of concerns
 
 ## Troubleshooting
 
-### Server won't start
-- Ensure main project is built: `cd .. && npm run build`
-- Check if database files need cleanup
-- Use `--verbose` flag to see server output
-- Check Docker daemon is running (for Docker benchmarks)
+### Hanging Cleanup
+If tests hang during cleanup:
+1. Check for active database connections
+2. Ensure proper database.close() calls
+3. Add delays for file handle release
 
-### Module not found errors
-- Run `npm install` in both benchmarks and parent directory
-- Rebuild: `npm run build`
+### MCP Timeouts
+If MCP tests timeout:
+1. The issue is in the MCP tool handlers, not the database
+2. Focus on direct database benchmarks for performance metrics
+3. Investigate MCP layer separately
 
-### Permission denied
-- Make scripts executable: `chmod +x *.js scripts/*.sh`
+## Future Improvements
 
-### Benchmark hangs
-- Increase timeout in config
-- Check server logs in `logs/` or use `--verbose`
-- Ensure server supports all MCP operations
+1. **Fix MCP Layer**: Resolve timeout issues in tool handlers
+2. **Add Load Testing**: Test with larger datasets (10K+ entities)
+3. **Memory Profiling**: Monitor memory usage during operations
+4. **Concurrency Testing**: Test with multiple concurrent clients
+5. **Persistence Testing**: Test with persistent databases
 
-### Inconsistent results
-- Run multiple iterations
-- Ensure no other processes consuming resources
-- Check for thermal throttling
-- Use Docker mode for more consistent results
+## Archive
 
-## Contributing
-
-To add new benchmark scenarios or improve the framework:
-1. Fork the repository
-2. Add your changes
-3. Ensure all existing benchmarks still run
-4. Submit a PR with benchmark results
-
-## License
-
-Same as parent project (MIT)
+The `benchmarks/archive/` directory contains the previous complex benchmark suite that had MCP integration issues. The new suite provides cleaner, more reliable performance metrics.

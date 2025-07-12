@@ -59,8 +59,8 @@
               {
                 "entityName": "user-thought-{{timestamp}}-1",
                 "contents": [
-                  "Additional context added at {{timestamp}}",
-                  "Follow-up thought: {{randomThought}}"
+                  { "type": "text", "text": "Additional context added at {{timestamp}}" },
+                  { "type": "text", "text": "Follow-up thought: {{randomThought}}" }
                 ]
               }
             ]

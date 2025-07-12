@@ -1,0 +1,190 @@
+{
+  "servers": [
+    {
+      "name": "mem100x",
+      "type": "mem100x",
+      "dockerImage": "benchmark-mem100x",
+      "startupTime": 2000,
+      "connectionConfig": {
+        "transport": "stdio"
+      }
+    },
+    {
+      "name": "official-memory",
+      "type": "official",
+      "dockerImage": "benchmark-official",
+      "startupTime": 3000,
+      "connectionConfig": {
+        "transport": "stdio"
+      },
+      "description": "Official MCP memory server from modelcontextprotocol/servers"
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "entity-creation-throughput",
+      "description": "Measure raw entity creation speed",
+      "operations": [
+        {
+          "type": "create_entities",
+          "weight": 1.0,
+          "params": {
+            "entities": [
+              {
+                "name": "entity-{{timestamp}}-{{index}}",
+                "entityType": "benchmark",
+                "observations": [
+                  { "type": "text", "text": "Created at {{timestamp}}" }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "iterations": 10,
+      "warmupIterations": 2,
+      "concurrency": 1
+    },
+    {
+      "name": "batch-entity-creation",
+      "description": "Test batch entity creation performance",
+      "operations": [
+        {
+          "type": "create_entities",
+          "weight": 1.0,
+          "params": {
+            "entities": [
+              {
+                "name": "batch-{{index}}-1",
+                "entityType": "benchmark",
+                "observations": [ { "type": "text", "text": "Batch entity 1 created at {{timestamp}}" } ]
+              },
+              {
+                "name": "batch-{{index}}-2",
+                "entityType": "benchmark",
+                "observations": [ { "type": "text", "text": "Batch entity 2 created at {{timestamp}}" } ]
+              },
+              {
+                "name": "batch-{{index}}-3",
+                "entityType": "benchmark",
+                "observations": [ { "type": "text", "text": "Batch entity 3 created at {{timestamp}}" } ]
+              }
+            ]
+          }
+        }
+      ],
+      "iterations": 5,
+      "warmupIterations": 1,
+      "concurrency": 1
+    },
+    {
+      "name": "mixed-workload",
+      "description": "Mixed workload with various operations",
+      "operations": [
+        {
+          "type": "create_entities",
+          "weight": 0.3,
+          "params": {
+            "entities": [
+              {
+                "name": "mixed-{{timestamp}}-{{index}}",
+                "entityType": "benchmark",
+                "observations": [
+                  { "type": "text", "text": "Mixed workload test" }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "type": "add_observations",
+          "weight": 0.4,
+          "params": {
+            "entityName": "test-entity-{{index}}",
+            "contents": [
+              { "type": "text", "text": "Updated at {{timestamp}}" }
+            ]
+          }
+        },
+        {
+          "type": "get_entities",
+          "weight": 0.3,
+          "params": {
+            "entityName": "test-entity-{{index}}"
+          }
+        }
+      ],
+      "iterations": 8,
+      "warmupIterations": 2,
+      "concurrency": 1
+    },
+    {
+      "name": "entity-relations",
+      "description": "Test entity relation operations",
+      "operations": [
+        {
+          "type": "create_entities",
+          "weight": 0.5,
+          "params": {
+            "entities": [
+              {
+                "name": "relation-{{index}}-1",
+                "entityType": "benchmark",
+                "observations": [
+                  { "type": "text", "text": "Entity for relation test" }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "type": "add_observations",
+          "weight": 0.5,
+          "params": {
+            "entityName": "relation-{{index}}-1",
+            "contents": [
+              { "type": "text", "text": "Related to entity {{index}}-2" }
+            ]
+          }
+        }
+      ],
+      "iterations": 5,
+      "warmupIterations": 1,
+      "concurrency": 1
+    },
+    {
+      "name": "stress-test",
+      "description": "High-load stress test",
+      "operations": [
+        {
+          "type": "create_entities",
+          "weight": 0.6,
+          "params": {
+            "entities": [
+              {
+                "name": "stress-{{index}}",
+                "entityType": "benchmark",
+                "observations": [
+                  { "type": "text", "text": "Stress test entity {{index}}" }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "type": "add_observations",
+          "weight": 0.4,
+          "params": {
+            "entityName": "stress-{{index}}",
+            "contents": [
+              { "type": "text", "text": "Stress test observation {{timestamp}}" }
+            ]
+          }
+        }
+      ],
+      "iterations": 10,
+      "warmupIterations": 2,
+      "concurrency": 2
+    }
+  ]
+}

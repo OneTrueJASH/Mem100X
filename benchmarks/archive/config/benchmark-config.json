@@ -340,7 +340,7 @@
               {
                 "name": "mixed-{{index}}",
                 "entityType": "data",
-                "observations": ["Mixed workload test"]
+                "observations": [{ "type": "text", "text": "Mixed workload test" }]
               }
             ]
           }
@@ -364,7 +364,7 @@
             "observations": [
               {
                 "entityName": "mixed-1",
-                "contents": ["Updated at {{timestamp}}"]
+                "contents": [{ "type": "text", "text": "Updated at {{timestamp}}" }]
               }
             ]
           }
@@ -386,7 +386,7 @@
               {
                 "name": "relation-entity-{{index}}",
                 "entityType": "benchmark",
-                "observations": ["Entity for relation test"]
+                "observations": [{ "type": "text", "text": "Entity for relation test" }]
               }
             ]
           }
@@ -413,7 +413,7 @@
               {
                 "name": "stress-entity-{{index}}",
                 "entityType": "benchmark",
-                "observations": ["Stress test entity {{index}}"]
+                "observations": [{ "type": "text", "text": "Stress test entity {{index}}" }]
               }
             ]
           }
