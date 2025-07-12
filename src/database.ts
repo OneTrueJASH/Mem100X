@@ -34,6 +34,10 @@ import { stringifyObservations, parseObservations } from './utils/fast-json.js';
 import { config } from './config.js';
 import { ValidationError } from './errors.js';
 import { createCircuitBreaker } from './utils/circuit-breaker.js';
+import { Worker } from 'worker_threads';
+import { parseSearchQuery, buildFTSQuery, calculateRelevance, generateHighlights, determineMatchType, sortByRelevance, filterSearchResults } from './utils/search-optimizer.js';
+
+const LARGE_BATCH_THRESHOLD = 1000;
 
 export class MemoryDatabase {
   private db!: Database.Database;
@@ -450,6 +454,35 @@ export class MemoryDatabase {
     );
   }
 
+  // New: Asynchronous worker-based batch entity creation
+  async createEntitiesBatchAsync(entities: CreateEntityInput[]): Promise<number> {
+    if (entities.length <= LARGE_BATCH_THRESHOLD) {
+      this.createEntitiesBatch(entities);
+      return entities.length;
+    }
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(require.resolve('./workers/entity-bulk-insert-worker'), {
+        workerData: {
+          dbPath: this.dbPath,
+          entities,
+        },
+      });
+      worker.on('message', (msg) => {
+        if (msg.type === 'done') {
+          resolve(msg.inserted);
+        } else if (msg.type === 'error') {
+          reject(new Error(msg.error));
+        } else if (msg.type === 'progress') {
+          // Optionally: emit progress events or log
+        }
+      });
+      worker.on('error', reject);
+      worker.on('exit', (code) => {
+        if (code !== 0) reject(new Error(`Worker stopped with exit code ${code}`));
+      });
+    });
+  }
+
   // Calculate average entity size for dynamic batch sizing
   private calculateAverageEntitySize(entities: CreateEntityInput[]): number {
     if (entities.length === 0) return 1024; // Default 1KB
@@ -762,17 +795,27 @@ export class MemoryDatabase {
     const cached = this.searchCache.get(cacheKey);
     if (cached) return cached;
 
+    // Parse and optimize the search query
+    const searchQuery = parseSearchQuery(query);
+    const ftsQuery = buildFTSQuery(searchQuery);
+
     // Use read pool if available for better concurrency
     const executeSearch = async () => {
       if (this.readPool) {
         const conn = await this.readPool.acquire();
         try {
-          // Prepare statements on pooled connection
+          // Enhanced FTS search with ranking
           const searchStmt = conn.db.prepare(`
-            SELECT e.* FROM entities_fts fts
-            JOIN entities e ON e.name = fts.name
+            SELECT
+              e.*,
+              entities_fts.rank as fts_rank,
+              entities_fts.name as fts_name,
+              entities_fts.entity_type as fts_entity_type,
+              entities_fts.observations as fts_observations
+            FROM entities_fts
+            JOIN entities e ON e.name = entities_fts.name
             WHERE entities_fts MATCH ?
-            ORDER BY rank
+            ORDER BY entities_fts.rank
             LIMIT ?
           `);
 
@@ -782,19 +825,13 @@ export class MemoryDatabase {
             LIMIT ?
           `);
 
-          // FTS search first
-          const ftsQuery = query
-            .split(/\s+/)
-            .filter((term) => term.length > 0)
-            .map((term) => `"${term}"*`)
-            .join(' OR ');
-
-          let rows = searchStmt.all(ftsQuery, limit) as EntityRow[];
+          // Enhanced FTS search first
+          let rows = searchStmt.all(ftsQuery, limit * 2) as (EntityRow & { fts_rank?: number })[];
 
           // Fallback to LIKE search if no FTS results
           if (rows.length === 0) {
             const likePattern = `%${query}%`;
-            rows = likeStmt.all(likePattern, likePattern, likePattern, limit) as EntityRow[];
+            rows = likeStmt.all(likePattern, likePattern, likePattern, limit) as (EntityRow & { fts_rank?: number })[];
           }
 
           return rows;
@@ -802,14 +839,22 @@ export class MemoryDatabase {
           await this.readPool.release(conn);
         }
       } else {
-        // Fallback to main connection
-        const ftsQuery = query
-          .split(/\s+/)
-          .filter((term) => term.length > 0)
-          .map((term) => `"${term}"*`)
-          .join(' OR ');
+        // Fallback to main connection with enhanced search
+        const searchStmt = this.db.prepare(`
+          SELECT
+            e.*,
+            entities_fts.rank as fts_rank,
+            entities_fts.name as fts_name,
+            entities_fts.entity_type as fts_entity_type,
+            entities_fts.observations as fts_observations
+          FROM entities_fts
+          JOIN entities e ON e.name = entities_fts.name
+          WHERE entities_fts MATCH ?
+          ORDER BY entities_fts.rank
+          LIMIT ?
+        `);
 
-        let rows = this.statements.searchEntities!.all(ftsQuery, limit) as EntityRow[];
+        let rows = searchStmt.all(ftsQuery, limit * 2) as (EntityRow & { fts_rank: number })[];
 
         if (rows.length === 0) {
           const likePattern = `%${query}%`;
@@ -826,16 +871,25 @@ export class MemoryDatabase {
     };
 
     // Execute search (sync wrapper for now)
-    let rows: EntityRow[];
+    let rows: (EntityRow & { fts_rank?: number })[] = [];
+
     if (this.readPool) {
       // For now, fall back to sync until we convert to async
-      const ftsQuery = query
-        .split(/\s+/)
-        .filter((term) => term.length > 0)
-        .map((term) => `"${term}"*`)
-        .join(' OR ');
+      const searchStmt = this.db.prepare(`
+        SELECT
+          e.*,
+          entities_fts.rank as fts_rank,
+          entities_fts.name as fts_name,
+          entities_fts.entity_type as fts_entity_type,
+          entities_fts.observations as fts_observations
+        FROM entities_fts
+        JOIN entities e ON e.name = entities_fts.name
+        WHERE entities_fts MATCH ?
+        ORDER BY entities_fts.rank
+        LIMIT ?
+      `);
 
-      rows = this.statements.searchEntities!.all(ftsQuery, limit) as EntityRow[];
+      rows = searchStmt.all(ftsQuery, limit * 2) as (EntityRow & { fts_rank: number })[];
 
       if (rows.length === 0) {
         const likePattern = `%${query}%`;
@@ -847,13 +901,21 @@ export class MemoryDatabase {
         ) as EntityRow[];
       }
     } else {
-      const ftsQuery = query
-        .split(/\s+/)
-        .filter((term) => term.length > 0)
-        .map((term) => `"${term}"*`)
-        .join(' OR ');
+      const searchStmt = this.db.prepare(`
+        SELECT
+          e.*,
+          entities_fts.rank as fts_rank,
+          entities_fts.name as fts_name,
+          entities_fts.entity_type as fts_entity_type,
+          entities_fts.observations as fts_observations
+        FROM entities_fts
+        JOIN entities e ON e.name = entities_fts.name
+        WHERE entities_fts MATCH ?
+        ORDER BY entities_fts.rank
+        LIMIT ?
+      `);
 
-      rows = this.statements.searchEntities!.all(ftsQuery, limit) as EntityRow[];
+      rows = searchStmt.all(ftsQuery, limit * 2) as (EntityRow & { fts_rank: number })[];
 
       if (rows.length === 0) {
         const likePattern = `%${query}%`;
@@ -866,15 +928,38 @@ export class MemoryDatabase {
       }
     }
 
-    // Convert rows to entities
-    const entities: EntityResult[] = rows.map((row) => ({
-      type: 'entity',
-      name: row.name,
-      entityType: row.entity_type,
-      observations: this.compressionEnabled
-        ? CompressionUtils.decompressObservations(row.observations)
-        : parseObservations(row.observations),
-    }));
+    // Convert rows to entities with enhanced relevance scoring
+    const searchResults = rows.map((row) => {
+      const entity = {
+        type: 'entity' as const,
+        name: row.name,
+        entityType: row.entity_type,
+        observations: this.compressionEnabled
+          ? CompressionUtils.decompressObservations(row.observations)
+          : parseObservations(row.observations),
+      };
+
+      const relevance = calculateRelevance(row, searchQuery, row.fts_rank || 0);
+      const highlights = generateHighlights(row, searchQuery);
+      const matchType = determineMatchType(row, searchQuery);
+
+      return {
+        entity,
+        relevance,
+        highlights,
+        matchType,
+      };
+    });
+
+    // Sort by relevance and apply filters
+    const sortedResults = sortByRelevance(searchResults);
+    const filteredResults = filterSearchResults(sortedResults, {
+      maxResults: limit,
+      minRelevance: 0.1, // Minimum relevance threshold
+    });
+
+    // Extract entities for final result
+    const entities: EntityResult[] = filteredResults.map(result => result.entity);
 
     // Update entity cache
     entities.forEach((entity) => this.entityCache.set(entity.name.toLowerCase(), entity));

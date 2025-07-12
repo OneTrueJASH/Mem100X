@@ -29,7 +29,7 @@ export const TABLES = `
     created_at REAL DEFAULT (julianday('now')),
     updated_at REAL DEFAULT (julianday('now'))
   );
-  
+
   -- Relations table with efficient indexing
   CREATE TABLE IF NOT EXISTS relations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +48,7 @@ export const INDEXES = `
   CREATE INDEX IF NOT EXISTS idx_entity_type ON entities(entity_type);
   CREATE INDEX IF NOT EXISTS idx_entity_updated ON entities(updated_at DESC);
   CREATE INDEX IF NOT EXISTS idx_observations ON entities(observations);
-  
+
   -- Relation indexes for efficient queries
   CREATE INDEX IF NOT EXISTS idx_from_entity ON relations(from_entity);
   CREATE INDEX IF NOT EXISTS idx_to_entity ON relations(to_entity);
@@ -57,13 +57,19 @@ export const INDEXES = `
 `;
 
 export const FTS_SCHEMA = `
-  -- Create FTS5 virtual table for full-text search
+  -- Create FTS5 virtual table for full-text search with enhanced configuration
   CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
     name,
     entity_type,
     observations,
-    tokenize='unicode61'
+    tokenize='unicode61 remove_diacritics 2',
+    prefix='2,3,4',
+    content='entities',
+    content_rowid='rowid'
   );
+
+  -- Create auxiliary functions for ranking and highlighting
+  CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts_config USING fts5vocab(entities_fts, 'row');
 `;
 
 export const FTS_TRIGGERS = `
@@ -73,14 +79,14 @@ export const FTS_TRIGGERS = `
     INSERT INTO entities_fts(name, entity_type, observations)
     VALUES (new.name, new.entity_type, new.observations);
   END;
-  
+
   CREATE TRIGGER IF NOT EXISTS entities_fts_update AFTER UPDATE ON entities
   BEGIN
     DELETE FROM entities_fts WHERE name = old.name;
     INSERT INTO entities_fts(name, entity_type, observations)
     VALUES (new.name, new.entity_type, new.observations);
   END;
-  
+
   CREATE TRIGGER IF NOT EXISTS entities_fts_delete AFTER DELETE ON entities
   BEGIN
     DELETE FROM entities_fts WHERE name = old.name;
