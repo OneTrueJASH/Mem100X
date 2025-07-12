@@ -271,12 +271,23 @@ export class MemoryDatabase {
 
     // Fast path for single entity creation
     if (entities.length === 1) {
+      // Patch: ensure observations is always an array
+      if (!entities[0].observations) entities[0].observations = [];
       return this.createSingleEntityOptimized(entities[0], perf);
     }
 
     // Use batch method if enabled and above threshold
     if (config.performance.enableBulkOperations && entities.length >= config.performance.batchSize) {
+      // Patch: ensure observations is always an array for all entities
+      for (const entity of entities) {
+        if (!entity.observations) entity.observations = [];
+      }
       return this.createEntitiesBatch(entities);
+    }
+
+    // Patch: ensure observations is always an array for all entities
+    for (const entity of entities) {
+      if (!entity.observations) entity.observations = [];
     }
 
     const created = this.transaction(() => {
@@ -318,6 +329,8 @@ export class MemoryDatabase {
 
   // Optimized single entity creation with minimal overhead
   private createSingleEntityOptimized(entity: CreateEntityInput, perf: PerformanceTracker): EntityResult[] {
+    // Patch: ensure observations is always an array
+    if (!entity.observations) entity.observations = [];
     // Validate entity has required fields
     if (!entity.name) {
       throw new ValidationError('Entity name is required', 'name', entity);

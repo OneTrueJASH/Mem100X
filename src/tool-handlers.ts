@@ -56,22 +56,24 @@ export function handleGetContextInfo(args: any, ctx: ToolContext) {
 
 // Entity operation handlers
 export function handleCreateEntities(args: any, ctx: ToolContext) {
-  const validated = toolSchemas.create_entities.parse(args) as CreateEntitiesInput;
-  const created = ctx.manager.createEntities(validated.entities, validated.context);
+  // Map MCP-standard 'content' to internal 'observations'
+  const entities = args.entities.map((entity: any) => ({
+    ...entity,
+    observations: entity.content,
+  }));
+  const validated = toolSchemas.create_entities.parse({ ...args, entities });
+  ctx.manager.createEntities(entities);
   const duration = performance.now() - ctx.startTime;
-  const rate = Math.round(validated.entities.length / (duration / 1000));
 
   const result = {
-    created,
-    performance: {
-      duration: `${duration.toFixed(2)}ms`,
-      rate: `${rate} entities/sec`,
-    },
+    success: true,
+    entitiesCreated: validated.entities.length,
+    performance: { duration: `${duration.toFixed(2)}ms` },
   };
 
   return createMCPToolResponse(
     result,
-    `Created ${created.length} entities successfully`
+    `Created ${validated.entities.length} entities successfully`
   );
 }
 
@@ -173,30 +175,40 @@ export function handleDeleteRelations(args: any, ctx: ToolContext) {
 
 // Observation operation handlers
 export function handleAddObservations(args: any, ctx: ToolContext) {
-  const validated = toolSchemas.add_observations.parse(args) as AddObservationsInput;
-  ctx.manager.addObservations(validated.observations);
+  // Map MCP-standard 'content' to internal 'contents'
+  const updates = args.updates.map((update: any) => ({
+    ...update,
+    contents: update.content,
+  }));
+  const validated = toolSchemas.add_observations.parse({ updates });
+  ctx.manager.addObservations(updates);
   const duration = performance.now() - ctx.startTime;
 
   const result = {
     success: true,
-    observationsAdded: validated.observations.length,
+    observationsAdded: validated.updates.length,
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
 
   return createMCPToolResponse(
     result,
-    `Added observations to ${validated.observations.length} entities successfully`
+    `Added observations to ${validated.updates.length} entities successfully`
   );
 }
 
 export function handleDeleteObservations(args: any, ctx: ToolContext) {
-  const validated = toolSchemas.delete_observations.parse(args) as DeleteObservationsInput;
-  ctx.manager.deleteObservations(validated.deletions);
+  // Map MCP-standard 'content' to internal 'observations'
+  const deletions = args.deletions.map((del: any) => ({
+    ...del,
+    observations: del.content,
+  }));
+  const validated = toolSchemas.delete_observations.parse({ deletions });
+  ctx.manager.deleteObservations(deletions);
   const duration = performance.now() - ctx.startTime;
 
   const result = {
     success: true,
-    deletionsProcessed: validated.deletions.length,
+    deletions: validated.deletions.length,
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
 

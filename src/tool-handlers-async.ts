@@ -46,9 +46,14 @@ export function handleGetContextInfo(args: any, ctx: AsyncToolContext) {
 
 // Entity operation handlers (write operations remain sync for now)
 export function handleCreateEntities(args: any, ctx: AsyncToolContext) {
-  const validated = toolSchemas.create_entities.parse(args) as CreateEntitiesInput;
-  const created = ctx.manager.createEntities(validated.entities, validated.context);
-  return { created };
+  // Map MCP-standard 'content' to internal 'observations'
+  const entities = args.entities.map((entity: any) => ({
+    ...entity,
+    observations: entity.content,
+  }));
+  const validated = toolSchemas.create_entities.parse({ ...args, entities });
+  ctx.manager.createEntities(entities);
+  return { message: `Created ${validated.entities.length} entities` };
 }
 
 // Search operations (now async!)
@@ -74,22 +79,22 @@ export async function handleReadGraph(args: any, ctx: AsyncToolContext) {
 
 export async function handleOpenNodes(args: any, ctx: AsyncToolContext) {
   const validated = toolSchemas.open_nodes.parse(args) as OpenNodesInput;
-  
+
   // Use async getEntity for each node
   const entities = await Promise.all(
-    validated.names.map(name => 
+    validated.names.map(name =>
       ctx.manager.getEntityAsync(name, validated.context)
     )
   );
-  
+
   // Filter out undefined results
   const validEntities = entities.filter(e => e !== undefined);
-  
+
   // Get relations for found entities
   const entityNames = validEntities.map(e => e!.name);
   const db = ctx.manager.getDatabase(validated.context || ctx.manager.currentContext);
   const relations = db.getRelationsForEntities(entityNames);
-  
+
   return {
     entities: validEntities,
     relations,
@@ -113,14 +118,24 @@ export function handleDeleteRelations(args: any, ctx: AsyncToolContext) {
 
 // Observation operations (remain sync)
 export function handleAddObservations(args: any, ctx: AsyncToolContext) {
-  const validated = toolSchemas.add_observations.parse(args) as AddObservationsInput;
-  ctx.manager.addObservations(validated.observations);
-  return { message: `Added observations to ${validated.observations.length} entities` };
+  // Map MCP-standard 'content' to internal 'contents'
+  const updates = args.updates.map((update: any) => ({
+    ...update,
+    contents: update.content,
+  }));
+  const validated = toolSchemas.add_observations.parse({ updates });
+  ctx.manager.addObservations(updates);
+  return { message: `Added observations to ${validated.updates.length} entities` };
 }
 
 export function handleDeleteObservations(args: any, ctx: AsyncToolContext) {
-  const validated = toolSchemas.delete_observations.parse(args) as DeleteObservationsInput;
-  ctx.manager.deleteObservations(validated.deletions);
+  // Map MCP-standard 'content' to internal 'observations'
+  const deletions = args.deletions.map((del: any) => ({
+    ...del,
+    observations: del.content,
+  }));
+  const validated = toolSchemas.delete_observations.parse({ deletions });
+  ctx.manager.deleteObservations(deletions);
   return { message: `Deleted observations from ${validated.deletions.length} entities` };
 }
 
@@ -194,31 +209,31 @@ export const asyncToolHandlers: Record<string, (args: any, ctx: AsyncToolContext
   // Context management
   set_context: handleSetContext,
   get_context_info: handleGetContextInfo,
-  
+
   // Entity operations
   create_entities: handleCreateEntities,
   search_nodes: handleSearchNodes,
   read_graph: handleReadGraph,
   open_nodes: handleOpenNodes,
-  
+
   // Relation operations
   create_relations: handleCreateRelations,
   delete_relations: handleDeleteRelations,
-  
+
   // Observation operations
   add_observations: handleAddObservations,
   delete_observations: handleDeleteObservations,
   delete_entities: handleDeleteEntities,
-  
+
   // Transaction operations
   begin_transaction: handleBeginTransaction,
   commit_transaction: handleCommitTransaction,
   rollback_transaction: handleRollbackTransaction,
-  
+
   // Backup operations
   create_backup: handleCreateBackup,
   restore_backup: handleRestoreBackup,
-  
+
   // Advanced queries
   get_neighbors: handleGetNeighbors,
   find_shortest_path: handleFindShortestPath,

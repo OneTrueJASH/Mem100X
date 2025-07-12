@@ -172,11 +172,47 @@ export async function main() {
       requestSuccess = true;
 
       // Extract content and structuredContent from the result
-      const { content, structuredContent } = result;
+      // Handle case where result might be undefined
+      if (!result) {
+        return {
+          content: [createTextContent('Operation completed successfully')],
+          structuredContent: { success: true },
+        };
+      }
+
+      // Ensure result is properly formatted for MCP
+      let content, structuredContent;
+
+      // Check if result already has the MCP format
+      if (result && typeof result === 'object' && 'content' in result && 'structuredContent' in result) {
+        content = result.content;
+        structuredContent = result.structuredContent;
+      } else {
+        // Result is not in MCP format, wrap it properly
+        content = [createTextContent(stringifyGeneric(result, true))];
+
+        // Always ensure structuredContent is an object, not an array
+        if (Array.isArray(result)) {
+          structuredContent = { items: result };
+        } else if (typeof result === 'object' && result !== null) {
+          // Check if any properties are arrays and wrap them
+          const processed: any = {};
+          for (const [key, value] of Object.entries(result)) {
+            if (Array.isArray(value)) {
+              processed[key] = { items: value };
+            } else {
+              processed[key] = value;
+            }
+          }
+          structuredContent = processed;
+        } else {
+          structuredContent = { value: result };
+        }
+      }
 
       return {
-        content: content || [createTextContent(stringifyGeneric(result, true))],
-        structuredContent: structuredContent || result,
+        content: content || [createTextContent('Operation completed successfully')],
+        structuredContent: structuredContent || { success: true },
       };
     } catch (error) {
       if (error instanceof McpError) {

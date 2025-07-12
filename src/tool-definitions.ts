@@ -50,20 +50,25 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
                 type: 'string',
                 description: 'The type of the entity'
               },
-              observations: {
+              content: {
                 type: 'array',
                 items: {
                   type: 'object',
                   properties: {
-                    type: { type: 'string', enum: ['text'] },
-                    text: { type: 'string', description: 'The text content' }
+                    type: { type: 'string', enum: ['text', 'image', 'audio', 'resource_link', 'resource'] },
+                    text: { type: 'string', description: 'The text content' },
+                    data: { type: 'string', description: 'Binary or base64 data' },
+                    mimeType: { type: 'string', description: 'MIME type' },
+                    uri: { type: 'string', description: 'Resource URI' },
+                    title: { type: 'string', description: 'Title' },
+                    description: { type: 'string', description: 'Description' }
                   },
-                  required: ['type', 'text']
+                  required: ['type']
                 },
-                description: 'An array of text observations associated with the entity'
+                description: 'An array of content blocks associated with the entity'
               }
             },
-            required: ['name', 'entityType', 'observations']
+            required: ['name', 'entityType', 'content']
           }
         }
       },
@@ -209,7 +214,7 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
     inputSchema: {
       type: 'object',
       properties: {
-        observations: {
+        updates: {
           type: 'array',
           items: {
             type: 'object',
@@ -218,24 +223,29 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
                 type: 'string',
                 description: 'The name of the entity to add the observations to'
               },
-              contents: {
+              content: {
                 type: 'array',
                 items: {
                   type: 'object',
                   properties: {
-                    type: { type: 'string', enum: ['text'] },
-                    text: { type: 'string', description: 'The text content' }
+                    type: { type: 'string', enum: ['text', 'image', 'audio', 'resource_link', 'resource'] },
+                    text: { type: 'string', description: 'The text content' },
+                    data: { type: 'string', description: 'Binary or base64 data' },
+                    mimeType: { type: 'string', description: 'MIME type' },
+                    uri: { type: 'string', description: 'Resource URI' },
+                    title: { type: 'string', description: 'Title' },
+                    description: { type: 'string', description: 'Description' }
                   },
-                  required: ['type', 'text']
+                  required: ['type']
                 },
-                description: 'An array of text observations to add'
+                description: 'An array of content blocks to add'
               }
             },
-            required: ['entityName', 'contents']
+            required: ['entityName', 'content']
           }
         }
       },
-      required: ['observations']
+      required: ['updates']
     }
   },
 

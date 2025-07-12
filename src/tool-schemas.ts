@@ -51,7 +51,7 @@ const RichContentSchema = z.discriminatedUnion('type', [
 const EntitySchema = z.object({
   name: z.string().min(1, 'Entity name cannot be empty'),
   entityType: z.string().min(1, 'Entity type cannot be empty'),
-  observations: z.array(RichContentSchema).min(1, 'At least one observation is required'),
+  content: z.array(RichContentSchema).min(1, 'At least one content block is required'),
 });
 
 const RelationSchema = z.object({
@@ -62,12 +62,12 @@ const RelationSchema = z.object({
 
 const ObservationUpdateSchema = z.object({
   entityName: z.string().min(1, 'Entity name cannot be empty'),
-  contents: z.array(RichContentSchema).min(1, 'At least one observation is required'),
+  content: z.array(RichContentSchema).min(1, 'At least one content block is required'),
 });
 
 const ObservationDeletionSchema = z.object({
   entityName: z.string().min(1, 'Entity name cannot be empty'),
-  observations: z.array(RichContentSchema).min(1, 'At least one observation to delete is required'),
+  content: z.array(RichContentSchema).min(1, 'At least one content block to delete is required'),
 });
 
 // Tool input schemas
@@ -114,7 +114,7 @@ export const toolSchemas = {
 
   // Observation operations
   add_observations: z.object({
-    observations: z.array(ObservationUpdateSchema).min(1, 'At least one observation update is required'),
+    updates: z.array(ObservationUpdateSchema).min(1, 'At least one observation update is required'),
   }),
 
   delete_observations: z.object({

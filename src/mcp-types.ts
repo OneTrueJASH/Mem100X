@@ -165,9 +165,22 @@ export function createMCPToolResponse(
     content.push({ type: 'text', text });
   }
 
-  // Always wrap structuredContent in an object if it's an array or primitive
+  // Always ensure structuredContent is an object
   let wrappedStructuredContent = structuredContent;
-  if (Array.isArray(structuredContent)) {
+
+  // If it's already an object and not null, check if it contains arrays
+  if (typeof structuredContent === 'object' && structuredContent !== null) {
+    // Check if any top-level properties are arrays and wrap them
+    const processed: any = {};
+    for (const [key, value] of Object.entries(structuredContent)) {
+      if (Array.isArray(value)) {
+        processed[key] = { items: value };
+      } else {
+        processed[key] = value;
+      }
+    }
+    wrappedStructuredContent = processed;
+  } else if (Array.isArray(structuredContent)) {
     wrappedStructuredContent = { result: structuredContent };
   } else if (
     typeof structuredContent !== 'object' || structuredContent === null
