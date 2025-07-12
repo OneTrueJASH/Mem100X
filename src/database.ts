@@ -22,26 +22,18 @@ import {
   FindShortestPathOptions,
   ShortestPathResult,
   RichContent,
-  TextContent
+  TextContent,
 } from './types.js';
 import { ICache, createStringCache } from './utils/cache-interface.js';
 import { CountingBloomFilter } from './utils/counting-bloom-filter.js';
 import { CompressionUtils } from './utils/compression.js';
 import { ConnectionPool } from './utils/connection-pool.js';
 import { getCompleteSchema, getPragmas } from './database-schema.js';
-import {
-  logger,
-  logInfo,
-  logDebug,
-  logError,
-  PerformanceTracker
-} from './utils/logger.js';
-import {
-  stringifyObservations,
-  parseObservations
-} from './utils/fast-json.js';
+import { logger, logInfo, logDebug, logError, PerformanceTracker } from './utils/logger.js';
+import { stringifyObservations, parseObservations } from './utils/fast-json.js';
 import { config } from './config.js';
 import { ValidationError } from './errors.js';
+import { createCircuitBreaker } from './utils/circuit-breaker.js';
 
 export class MemoryDatabase {
   private db!: Database.Database;
@@ -60,6 +52,11 @@ export class MemoryDatabase {
   private transactionDepth: number = 0;
   private isInTransaction: boolean = false;
   private searchCacheClearPending: boolean = false;
+  private readonly bulkOperationCircuitBreaker = createCircuitBreaker({
+    failureThreshold: 3,
+    recoveryTimeout: 60000, // 1 minute
+    enableBulkOperations: config.performance.enableBulkOperations
+  });
 
   // Prepared statements for maximum performance
   private statements: {
@@ -99,11 +96,11 @@ export class MemoryDatabase {
         maxConnections: config.performance.readPoolSize,
         acquireTimeout: 5000,
         idleTimeout: 60000,
-        readonly: true
+        readonly: true,
       });
       logInfo('Read pool initialized', {
         minConnections: Math.max(2, Math.floor(config.performance.readPoolSize / 4)),
-        maxConnections: 5
+        maxConnections: 5,
       });
     }
 
@@ -153,9 +150,7 @@ export class MemoryDatabase {
       VALUES (?, ?, ?, julianday('now'), julianday('now'))
     `);
 
-    this.statements.getEntity = this.db.prepare(
-      'SELECT * FROM entities WHERE name = ?'
-    );
+    this.statements.getEntity = this.db.prepare('SELECT * FROM entities WHERE name = ?');
 
     this.statements.searchEntities = this.db.prepare(`
       SELECT e.* FROM entities e
@@ -174,16 +169,14 @@ export class MemoryDatabase {
       VALUES (?, ?, ?)
     `);
 
-    this.statements.deleteEntity = this.db.prepare(
-      'DELETE FROM entities WHERE name = ?'
-    );
+    this.statements.deleteEntity = this.db.prepare('DELETE FROM entities WHERE name = ?');
 
     this.statements.deleteRelation = this.db.prepare(
       'DELETE FROM relations WHERE from_entity = ? AND to_entity = ? AND relation_type = ?'
     );
 
     this.statements.updateObservations = this.db.prepare(
-      'UPDATE entities SET observations = ?, updated_at = julianday(\'now\') WHERE name = ?'
+      "UPDATE entities SET observations = ?, updated_at = julianday('now') WHERE name = ?"
     );
 
     this.statements.getRelationsByEntity = this.db.prepare(`
@@ -197,9 +190,7 @@ export class MemoryDatabase {
   }
 
   // Helper method to execute read queries through the pool if available
-  private async executeRead<T>(
-    callback: (db: Database.Database) => T
-  ): Promise<T> {
+  private async executeRead<T>(callback: (db: Database.Database) => T): Promise<T> {
     if (this.readPool) {
       const conn = await this.readPool.acquire();
       try {
@@ -212,9 +203,7 @@ export class MemoryDatabase {
   }
 
   // Synchronous wrapper for read operations
-  private executeReadSync<T>(
-    callback: (db: Database.Database) => T
-  ): T {
+  private executeReadSync<T>(callback: (db: Database.Database) => T): T {
     // For now, fall back to main connection for sync operations
     // TODO: Implement sync pool operations if needed
     return callback(this.db);
@@ -235,7 +224,7 @@ export class MemoryDatabase {
       this.entityBloom.initSync();
       logInfo('New Counting Bloom filter created', {
         expectedItems: config.bloomFilter.expectedItems,
-        falsePositiveRate: config.bloomFilter.falsePositiveRate
+        falsePositiveRate: config.bloomFilter.falsePositiveRate,
       });
       this.populateBloomFilter();
       this.saveBloomFilter();
@@ -277,7 +266,10 @@ export class MemoryDatabase {
     }
 
     // Use batch method if enabled and above threshold
-    if (config.performance.enableBulkOperations && entities.length >= config.performance.batchSize) {
+    if (
+      config.performance.enableBulkOperations &&
+      entities.length >= config.performance.batchSize
+    ) {
       // Patch: ensure observations is always an array for all entities
       for (const entity of entities) {
         if (!entity.observations) entity.observations = [];
@@ -309,7 +301,7 @@ export class MemoryDatabase {
           type: 'entity',
           name: entity.name,
           entityType: entity.entityType,
-          observations: entity.observations
+          observations: entity.observations,
         };
         results.push(result);
 
@@ -328,7 +320,10 @@ export class MemoryDatabase {
   }
 
   // Optimized single entity creation with minimal overhead
-  private createSingleEntityOptimized(entity: CreateEntityInput, perf: PerformanceTracker): EntityResult[] {
+  private createSingleEntityOptimized(
+    entity: CreateEntityInput,
+    perf: PerformanceTracker
+  ): EntityResult[] {
     // Patch: ensure observations is always an array
     if (!entity.observations) entity.observations = [];
     // Validate entity has required fields
@@ -355,7 +350,7 @@ export class MemoryDatabase {
           type: 'entity',
           name: entity.name,
           entityType: entity.entityType,
-          observations: entity.observations
+          observations: entity.observations,
         };
 
         // Update caches
@@ -384,7 +379,7 @@ export class MemoryDatabase {
         type: 'entity',
         name: entity.name,
         entityType: entity.entityType,
-        observations: entity.observations
+        observations: entity.observations,
       };
 
       // Update caches after commit
@@ -408,7 +403,7 @@ export class MemoryDatabase {
     }
   }
 
-  // Optimized batch entity creation for better performance
+    // Optimized batch entity creation for better performance
   createEntitiesBatch(entities: CreateEntityInput[]): EntityResult[] {
     if (entities.length === 0) return [];
 
@@ -417,40 +412,104 @@ export class MemoryDatabase {
       return this.createEntities(entities);
     }
 
-    const perf = new PerformanceTracker('createEntitiesBatch', { count: entities.length });
+    const perf = new PerformanceTracker('createEntitiesBatch', {
+      count: entities.length,
+      ftsOptimization: true,
+      batchSize: entities.length
+    });
+
+    // Use circuit breaker for bulk operations
+    return this.bulkOperationCircuitBreaker.executeSync(
+      () => this.executeBulkEntityCreation(entities, perf),
+      'createEntitiesBatch'
+    );
+  }
+
+  private executeBulkEntityCreation(entities: CreateEntityInput[], perf: PerformanceTracker): EntityResult[] {
+    // Monitor memory usage during bulk operations (MCP Section 8.3)
+    const memoryBefore = process.memoryUsage();
+    logDebug('Bulk operation memory baseline', {
+      rss: Math.round(memoryBefore.rss / 1024 / 1024),
+      heapUsed: Math.round(memoryBefore.heapUsed / 1024 / 1024),
+      heapTotal: Math.round(memoryBefore.heapTotal / 1024 / 1024),
+      external: Math.round(memoryBefore.external / 1024 / 1024)
+    });
 
     const created = this.transaction(() => {
+      const triggerDisableStart = Date.now();
+
       // Temporarily disable FTS triggers for bulk insert
       this.db.exec('DROP TRIGGER IF EXISTS entities_fts_insert');
 
+      const triggerDisableTime = Date.now() - triggerDisableStart;
+      logDebug('FTS trigger disabled', {
+        duration: triggerDisableTime,
+        optimization: 'enabled'
+      });
+
       try {
+        const compressionStart = Date.now();
+
         // Pre-compress all observations
-        const preparedData = entities.map(e => ({
+        const preparedData = entities.map((e) => ({
           name: e.name,
           entityType: e.entityType,
           observations: e.observations,
           observationsData: this.compressionEnabled
             ? CompressionUtils.compressObservations(e.observations)
-            : stringifyObservations(e.observations)
+            : stringifyObservations(e.observations),
         }));
 
+        const compressionTime = Date.now() - compressionStart;
+        logDebug('Observations prepared', {
+          count: entities.length,
+          compressionTime,
+          compressionEnabled: this.compressionEnabled
+        });
+
+        const insertStart = Date.now();
+
         // Build bulk insert query
-        const placeholders = entities.map(() => "(?, ?, ?, julianday('now'), julianday('now'))").join(',');
-        const values = preparedData.flatMap(e => [e.name, e.entityType, e.observationsData]);
+        const placeholders = entities
+          .map(() => "(?, ?, ?, julianday('now'), julianday('now'))")
+          .join(',');
+        const values = preparedData.flatMap((e) => [e.name, e.entityType, e.observationsData]);
 
         // Execute bulk insert
-        this.db.prepare(
-          `INSERT OR IGNORE INTO entities (name, entity_type, observations, created_at, updated_at)
+        this.db
+          .prepare(
+            `INSERT OR IGNORE INTO entities (name, entity_type, observations, created_at, updated_at)
            VALUES ${placeholders}`
-        ).run(...values);
+          )
+          .run(...values);
 
-        // Bulk update FTS
+        const insertTime = Date.now() - insertStart;
+        logDebug('Bulk insert completed', {
+          entities: entities.length,
+          insertTime,
+          avgPerEntity: Math.round(insertTime / entities.length)
+        });
+
+        const ftsStart = Date.now();
+
+        // Bulk update FTS (much faster than individual triggers)
         const ftsPlaceholders = entities.map(() => '?').join(',');
-        this.db.prepare(
-          `INSERT INTO entities_fts (name, entity_type, observations)
+        this.db
+          .prepare(
+            `INSERT INTO entities_fts (name, entity_type, observations)
            SELECT name, entity_type, observations FROM entities
            WHERE name IN (${ftsPlaceholders})`
-        ).run(...entities.map(e => e.name));
+          )
+          .run(...entities.map((e) => e.name));
+
+        const ftsTime = Date.now() - ftsStart;
+        logDebug('FTS bulk update completed', {
+          entities: entities.length,
+          ftsTime,
+          avgPerEntity: Math.round(ftsTime / entities.length)
+        });
+
+        const cacheStart = Date.now();
 
         // Build results and update caches in batch
         const results: EntityResult[] = [];
@@ -461,7 +520,7 @@ export class MemoryDatabase {
             type: 'entity',
             name: data.name,
             entityType: data.entityType,
-            observations: data.observations
+            observations: data.observations,
           };
           results.push(result);
           cacheUpdates.push([data.name.toLowerCase(), result]);
@@ -473,9 +532,25 @@ export class MemoryDatabase {
           this.entityCache.set(key, value);
         }
 
+        const cacheTime = Date.now() - cacheStart;
+        logDebug('Cache updates completed', {
+          entities: entities.length,
+          cacheTime,
+          bloomFilterUpdates: entities.length
+        });
+
         return results;
+                  } catch (error) {
+        const errorObj = error instanceof Error ? error : new Error(String(error));
+        logError('Bulk entity creation failed', errorObj, {
+          entities: entities.length,
+          stage: 'bulk_operation'
+        });
+        throw error;
       } finally {
-        // Re-enable FTS trigger
+        const triggerRestoreStart = Date.now();
+
+        // Re-enable FTS trigger (ALWAYS executes, even on error)
         this.db.exec(`
           CREATE TRIGGER IF NOT EXISTS entities_fts_insert AFTER INSERT ON entities
           BEGIN
@@ -483,18 +558,55 @@ export class MemoryDatabase {
             VALUES (new.name, new.entity_type, new.observations);
           END;
         `);
+
+        const triggerRestoreTime = Date.now() - triggerRestoreStart;
+        logDebug('FTS trigger restored', {
+          duration: triggerRestoreTime,
+          optimization: 'completed'
+        });
       }
     });
 
     // Clear search cache as new entities were added
     this.searchCache.clear();
-    perf.end({ created: created.length });
+
+        // Enhanced performance logging
+    perf.end({
+      created: created.length,
+      ftsOptimization: true,
+      batchOperation: true,
+      cacheCleared: true
+    });
+
+    // Monitor memory usage after bulk operations
+    const memoryAfter = process.memoryUsage();
+    const memoryDelta = {
+      rss: Math.round((memoryAfter.rss - memoryBefore.rss) / 1024 / 1024),
+      heapUsed: Math.round((memoryAfter.heapUsed - memoryBefore.heapUsed) / 1024 / 1024),
+      heapTotal: Math.round((memoryAfter.heapTotal - memoryBefore.heapTotal) / 1024 / 1024),
+      external: Math.round((memoryAfter.external - memoryBefore.external) / 1024 / 1024)
+    };
+
+    logDebug('Bulk operation memory impact', {
+      entities: entities.length,
+      memoryDelta,
+      memoryAfter: {
+        rss: Math.round(memoryAfter.rss / 1024 / 1024),
+        heapUsed: Math.round(memoryAfter.heapUsed / 1024 / 1024),
+        heapTotal: Math.round(memoryAfter.heapTotal / 1024 / 1024),
+        external: Math.round(memoryAfter.external / 1024 / 1024)
+      }
+    });
+
     return created;
   }
 
   createRelations(relations: CreateRelationInput[]): RelationResult[] {
     // Use batch method if enabled and above threshold
-    if (config.performance.enableBulkOperations && relations.length >= config.performance.batchSize) {
+    if (
+      config.performance.enableBulkOperations &&
+      relations.length >= config.performance.batchSize
+    ) {
       return this.createRelationsBatch(relations);
     }
 
@@ -513,7 +625,7 @@ export class MemoryDatabase {
             type: 'relation',
             from: relation.from,
             to: relation.to,
-            relationType: relation.relationType
+            relationType: relation.relationType,
           });
         }
       }
@@ -541,22 +653,22 @@ export class MemoryDatabase {
       `;
 
       // Flatten parameters
-      const params = relations.flatMap(relation => [
+      const params = relations.flatMap((relation) => [
         relation.from,
         relation.to,
-        relation.relationType
+        relation.relationType,
       ]);
 
       // Execute bulk insert
       const result = this.db.prepare(bulkQuery).run(...params);
 
       // Build results (all relations are considered created due to OR IGNORE)
-      relations.forEach(relation => {
+      relations.forEach((relation) => {
         created.push({
           type: 'relation',
           from: relation.from,
           to: relation.to,
-          relationType: relation.relationType
+          relationType: relation.relationType,
         });
       });
     });
@@ -585,7 +697,7 @@ export class MemoryDatabase {
       entityType: row.entity_type,
       observations: this.compressionEnabled
         ? CompressionUtils.decompressObservations(row.observations)
-        : parseObservations(row.observations)
+        : parseObservations(row.observations),
     };
 
     // Cache the result
@@ -622,9 +734,10 @@ export class MemoryDatabase {
           `);
 
           // FTS search first
-          const ftsQuery = query.split(/\s+/)
-            .filter(term => term.length > 0)
-            .map(term => `"${term}"*`)
+          const ftsQuery = query
+            .split(/\s+/)
+            .filter((term) => term.length > 0)
+            .map((term) => `"${term}"*`)
             .join(' OR ');
 
           let rows = searchStmt.all(ftsQuery, limit) as EntityRow[];
@@ -641,9 +754,10 @@ export class MemoryDatabase {
         }
       } else {
         // Fallback to main connection
-        const ftsQuery = query.split(/\s+/)
-          .filter(term => term.length > 0)
-          .map(term => `"${term}"*`)
+        const ftsQuery = query
+          .split(/\s+/)
+          .filter((term) => term.length > 0)
+          .map((term) => `"${term}"*`)
           .join(' OR ');
 
         let rows = this.statements.searchEntities!.all(ftsQuery, limit) as EntityRow[];
@@ -651,7 +765,10 @@ export class MemoryDatabase {
         if (rows.length === 0) {
           const likePattern = `%${query}%`;
           rows = this.statements.searchEntitiesLike!.all(
-            likePattern, likePattern, likePattern, limit
+            likePattern,
+            likePattern,
+            likePattern,
+            limit
           ) as EntityRow[];
         }
 
@@ -663,9 +780,10 @@ export class MemoryDatabase {
     let rows: EntityRow[];
     if (this.readPool) {
       // For now, fall back to sync until we convert to async
-      const ftsQuery = query.split(/\s+/)
-        .filter(term => term.length > 0)
-        .map(term => `"${term}"*`)
+      const ftsQuery = query
+        .split(/\s+/)
+        .filter((term) => term.length > 0)
+        .map((term) => `"${term}"*`)
         .join(' OR ');
 
       rows = this.statements.searchEntities!.all(ftsQuery, limit) as EntityRow[];
@@ -673,13 +791,17 @@ export class MemoryDatabase {
       if (rows.length === 0) {
         const likePattern = `%${query}%`;
         rows = this.statements.searchEntitiesLike!.all(
-          likePattern, likePattern, likePattern, limit
+          likePattern,
+          likePattern,
+          likePattern,
+          limit
         ) as EntityRow[];
       }
     } else {
-      const ftsQuery = query.split(/\s+/)
-        .filter(term => term.length > 0)
-        .map(term => `"${term}"*`)
+      const ftsQuery = query
+        .split(/\s+/)
+        .filter((term) => term.length > 0)
+        .map((term) => `"${term}"*`)
         .join(' OR ');
 
       rows = this.statements.searchEntities!.all(ftsQuery, limit) as EntityRow[];
@@ -687,31 +809,30 @@ export class MemoryDatabase {
       if (rows.length === 0) {
         const likePattern = `%${query}%`;
         rows = this.statements.searchEntitiesLike!.all(
-          likePattern, likePattern, likePattern, limit
+          likePattern,
+          likePattern,
+          likePattern,
+          limit
         ) as EntityRow[];
       }
     }
 
     // Convert rows to entities
-    const entities: EntityResult[] = rows.map(row => ({
+    const entities: EntityResult[] = rows.map((row) => ({
       type: 'entity',
       name: row.name,
       entityType: row.entity_type,
       observations: this.compressionEnabled
         ? CompressionUtils.decompressObservations(row.observations)
-        : parseObservations(row.observations)
+        : parseObservations(row.observations),
     }));
 
     // Update entity cache
-    entities.forEach(entity =>
-      this.entityCache.set(entity.name.toLowerCase(), entity)
-    );
+    entities.forEach((entity) => this.entityCache.set(entity.name.toLowerCase(), entity));
 
     // Get relations for found entities
-    const entityNames = entities.map(e => e.name);
-    const relations = entityNames.length > 0
-      ? this.getRelationsForEntities(entityNames)
-      : [];
+    const entityNames = entities.map((e) => e.name);
+    const relations = entityNames.length > 0 ? this.getRelationsForEntities(entityNames) : [];
 
     const result = { entities, relations };
     this.searchCache.set(cacheKey, result);
@@ -719,8 +840,10 @@ export class MemoryDatabase {
   }
 
   readGraph(limit?: number, offset: number = 0): GraphResult {
-    const totalEntities = (this.db.prepare('SELECT COUNT(*) as count FROM entities').get() as any).count;
-    const totalRelations = (this.db.prepare('SELECT COUNT(*) as count FROM relations').get() as any).count;
+    const totalEntities = (this.db.prepare('SELECT COUNT(*) as count FROM entities').get() as any)
+      .count;
+    const totalRelations = (this.db.prepare('SELECT COUNT(*) as count FROM relations').get() as any)
+      .count;
 
     const entityQuery = limit
       ? `SELECT * FROM entities ORDER BY updated_at DESC LIMIT ${limit} OFFSET ${offset}`
@@ -728,29 +851,30 @@ export class MemoryDatabase {
 
     const entityRows = this.db.prepare(entityQuery).all() as EntityRow[];
 
-    const entities: EntityResult[] = entityRows.map(row => ({
+    const entities: EntityResult[] = entityRows.map((row) => ({
       type: 'entity',
       name: row.name,
       entityType: row.entity_type,
       observations: this.compressionEnabled
         ? CompressionUtils.decompressObservations(row.observations)
-        : parseObservations(row.observations)
+        : parseObservations(row.observations),
     }));
 
-    const relations = entities.length > 0
-      ? this.getRelationsForEntities(entities.map(e => e.name))
-      : [];
+    const relations =
+      entities.length > 0 ? this.getRelationsForEntities(entities.map((e) => e.name)) : [];
 
     return {
       entities,
       relations,
-      pagination: limit ? {
-        totalEntities,
-        totalRelations,
-        offset,
-        limit,
-        hasMore: offset + entities.length < totalEntities
-      } : undefined
+      pagination: limit
+        ? {
+            totalEntities,
+            totalRelations,
+            offset,
+            limit,
+            hasMore: offset + entities.length < totalEntities,
+          }
+        : undefined,
     };
   }
 
@@ -769,37 +893,45 @@ export class MemoryDatabase {
         }
 
         // Query using temp table
-        const rows = this.db.prepare(`
+        const rows = this.db
+          .prepare(
+            `
           SELECT DISTINCT r.* FROM relations r
           WHERE r.from_entity IN (SELECT name FROM temp_entities)
              OR r.to_entity IN (SELECT name FROM temp_entities)
-        `).all() as RelationRow[];
+        `
+          )
+          .all() as RelationRow[];
 
         // Clean up
         this.db.exec('DROP TABLE temp_entities');
 
-        return rows.map(row => ({
+        return rows.map((row) => ({
           type: 'relation',
           from: row.from_entity,
           to: row.to_entity,
-          relationType: row.relation_type
+          relationType: row.relation_type,
         }));
       });
     }
 
     // Use IN clause for small queries
     const placeholders = entityNames.map(() => '?').join(',');
-    const rows = this.db.prepare(`
+    const rows = this.db
+      .prepare(
+        `
       SELECT * FROM relations
       WHERE from_entity IN (${placeholders})
          OR to_entity IN (${placeholders})
-    `).all(...entityNames, ...entityNames) as RelationRow[];
+    `
+      )
+      .all(...entityNames, ...entityNames) as RelationRow[];
 
-    return rows.map(row => ({
+    return rows.map((row) => ({
       type: 'relation',
       from: row.from_entity,
       to: row.to_entity,
-      relationType: row.relation_type
+      relationType: row.relation_type,
     }));
   }
 
@@ -836,12 +968,15 @@ export class MemoryDatabase {
   }
 
   // Helper method to merge observations and avoid duplicates
-  private mergeObservations(existing: RichContent[], newObservations: RichContent[]): RichContent[] {
+  private mergeObservations(
+    existing: RichContent[],
+    newObservations: RichContent[]
+  ): RichContent[] {
     const combined = [...existing];
 
     for (const newObs of newObservations) {
       // Check if this observation already exists (by type and content)
-      const exists = combined.some(existingObs => {
+      const exists = combined.some((existingObs) => {
         if (existingObs.type !== newObs.type) return false;
 
         // Compare based on content type
@@ -849,20 +984,25 @@ export class MemoryDatabase {
           case 'text':
             return existingObs.type === 'text' && existingObs.text === newObs.text;
           case 'image':
-            return existingObs.type === 'image' &&
-                   existingObs.data === newObs.data &&
-                   existingObs.mimeType === newObs.mimeType;
+            return (
+              existingObs.type === 'image' &&
+              existingObs.data === newObs.data &&
+              existingObs.mimeType === newObs.mimeType
+            );
           case 'audio':
-            return existingObs.type === 'audio' &&
-                   existingObs.data === newObs.data &&
-                   existingObs.mimeType === newObs.mimeType;
+            return (
+              existingObs.type === 'audio' &&
+              existingObs.data === newObs.data &&
+              existingObs.mimeType === newObs.mimeType
+            );
           case 'resource_link':
-            return existingObs.type === 'resource_link' &&
-                   existingObs.uri === newObs.uri;
+            return existingObs.type === 'resource_link' && existingObs.uri === newObs.uri;
           case 'resource':
-            return existingObs.type === 'resource' &&
-                   existingObs.data === newObs.data &&
-                   existingObs.mimeType === newObs.mimeType;
+            return (
+              existingObs.type === 'resource' &&
+              existingObs.data === newObs.data &&
+              existingObs.mimeType === newObs.mimeType
+            );
           default:
             return false;
         }
@@ -881,13 +1021,13 @@ export class MemoryDatabase {
 
     this.transaction(() => {
       // Prepare batch statement for fetching all entities at once
-      const entityNames = updates.map(u => u.entityName);
+      const entityNames = updates.map((u) => u.entityName);
       const placeholders = entityNames.map(() => '?').join(',');
 
       // Fetch all entities in one query
-      const entities = this.db.prepare(
-        `SELECT name, observations FROM entities WHERE name IN (${placeholders})`
-      ).all(...entityNames) as EntityRow[];
+      const entities = this.db
+        .prepare(`SELECT name, observations FROM entities WHERE name IN (${placeholders})`)
+        .all(...entityNames) as EntityRow[];
 
       // Create a map for quick lookup
       const entityMap = new Map<string, EntityRow>();
@@ -897,7 +1037,7 @@ export class MemoryDatabase {
 
       // Prepare update statement outside the loop
       const updateStmt = this.db.prepare(
-        'UPDATE entities SET observations = ?, updated_at = julianday(\'now\') WHERE name = ?'
+        "UPDATE entities SET observations = ?, updated_at = julianday('now') WHERE name = ?"
       );
 
       // Process updates
@@ -948,33 +1088,39 @@ export class MemoryDatabase {
             : parseObservations(row.observations);
 
           // Remove observations that match by type and content
-          const updated = existing.filter(existingObs =>
-            !deletion.observations.some(toRemove => {
-              if (toRemove.type !== existingObs.type) return false;
+          const updated = existing.filter(
+            (existingObs) =>
+              !deletion.observations.some((toRemove) => {
+                if (toRemove.type !== existingObs.type) return false;
 
-              // Compare based on content type
-              switch (toRemove.type) {
-                case 'text':
-                  return existingObs.type === 'text' && existingObs.text === toRemove.text;
-                case 'image':
-                  return existingObs.type === 'image' &&
-                         existingObs.data === toRemove.data &&
-                         existingObs.mimeType === toRemove.mimeType;
-                case 'audio':
-                  return existingObs.type === 'audio' &&
-                         existingObs.data === toRemove.data &&
-                         existingObs.mimeType === toRemove.mimeType;
-                case 'resource_link':
-                  return existingObs.type === 'resource_link' &&
-                         existingObs.uri === toRemove.uri;
-                case 'resource':
-                  return existingObs.type === 'resource' &&
-                         existingObs.data === toRemove.data &&
-                         existingObs.mimeType === toRemove.mimeType;
-                default:
-                  return false;
-              }
-            })
+                // Compare based on content type
+                switch (toRemove.type) {
+                  case 'text':
+                    return existingObs.type === 'text' && existingObs.text === toRemove.text;
+                  case 'image':
+                    return (
+                      existingObs.type === 'image' &&
+                      existingObs.data === toRemove.data &&
+                      existingObs.mimeType === toRemove.mimeType
+                    );
+                  case 'audio':
+                    return (
+                      existingObs.type === 'audio' &&
+                      existingObs.data === toRemove.data &&
+                      existingObs.mimeType === toRemove.mimeType
+                    );
+                  case 'resource_link':
+                    return existingObs.type === 'resource_link' && existingObs.uri === toRemove.uri;
+                  case 'resource':
+                    return (
+                      existingObs.type === 'resource' &&
+                      existingObs.data === toRemove.data &&
+                      existingObs.mimeType === toRemove.mimeType
+                    );
+                  default:
+                    return false;
+                }
+              })
           );
 
           const observationsJson = this.compressionEnabled
@@ -993,11 +1139,7 @@ export class MemoryDatabase {
   deleteRelations(relations: CreateRelationInput[]): void {
     this.transaction(() => {
       for (const relation of relations) {
-        this.statements.deleteRelation!.run(
-          relation.from,
-          relation.to,
-          relation.relationType
-        );
+        this.statements.deleteRelation!.run(relation.from, relation.to, relation.relationType);
       }
     });
   }
@@ -1024,9 +1166,9 @@ export class MemoryDatabase {
     // Query remaining entities
     if (namesToQuery.length > 0) {
       const placeholders = namesToQuery.map(() => '?').join(',');
-      const entityRows = this.db.prepare(
-        `SELECT * FROM entities WHERE name IN (${placeholders})`
-      ).all(...namesToQuery) as EntityRow[];
+      const entityRows = this.db
+        .prepare(`SELECT * FROM entities WHERE name IN (${placeholders})`)
+        .all(...namesToQuery) as EntityRow[];
 
       for (const row of entityRows) {
         const entity: EntityResult = {
@@ -1035,32 +1177,39 @@ export class MemoryDatabase {
           entityType: row.entity_type,
           observations: this.compressionEnabled
             ? CompressionUtils.decompressObservations(row.observations)
-            : parseObservations(row.observations)
+            : parseObservations(row.observations),
         };
         entities.push(entity);
         this.entityCache.set(row.name.toLowerCase(), entity);
       }
     }
 
-    const foundNames = entities.map(e => e.name);
-    const relations = foundNames.length > 0
-      ? this.getRelationsForEntities(foundNames)
-      : [];
+    const foundNames = entities.map((e) => e.name);
+    const relations = foundNames.length > 0 ? this.getRelationsForEntities(foundNames) : [];
 
     return { entities, relations };
   }
 
   getStats(): DatabaseStats {
-    const entityCount = (this.db.prepare('SELECT COUNT(*) as count FROM entities').get() as any).count;
-    const relationCount = (this.db.prepare('SELECT COUNT(*) as count FROM relations').get() as any).count;
+    const entityCount = (this.db.prepare('SELECT COUNT(*) as count FROM entities').get() as any)
+      .count;
+    const relationCount = (this.db.prepare('SELECT COUNT(*) as count FROM relations').get() as any)
+      .count;
 
-    const typeRows = this.statements.getEntityStats!.all() as Array<{ entity_type: string; count: number }>;
-    const entityTypes = typeRows.reduce((acc, row) => {
-      acc[row.entity_type] = row.count;
-      return acc;
-    }, {} as Record<string, number>);
+    const typeRows = this.statements.getEntityStats!.all() as Array<{
+      entity_type: string;
+      count: number;
+    }>;
+    const entityTypes = typeRows.reduce(
+      (acc, row) => {
+        acc[row.entity_type] = row.count;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     const dbFileSize = statSync(this.dbPath).size;
+    const circuitBreakerStats = this.bulkOperationCircuitBreaker.getStatus();
 
     return {
       totalEntities: entityCount,
@@ -1069,9 +1218,17 @@ export class MemoryDatabase {
       databaseSizeKb: Math.round(dbFileSize / 1024),
       cacheStats: {
         entity: this.entityCache.getStats(),
-        search: this.searchCache.getStats()
+        search: this.searchCache.getStats(),
       },
-      bloomStats: this.entityBloom.getStats()
+      bloomStats: this.entityBloom.getStats(),
+      circuitBreaker: {
+        state: circuitBreakerStats.state,
+        failureCount: circuitBreakerStats.failureCount,
+        successCount: circuitBreakerStats.successCount,
+        totalRequests: circuitBreakerStats.totalRequests,
+        failureRate: circuitBreakerStats.failureRate,
+        bulkOperationsEnabled: circuitBreakerStats.options.enableBulkOperations
+      },
     };
   }
 
@@ -1149,7 +1306,7 @@ export class MemoryDatabase {
 
     // Close read pool if it exists
     if (this.readPool) {
-      this.readPool.close().catch(err => {
+      this.readPool.close().catch((err) => {
         logError('Error closing read pool', err as Error);
       });
     }

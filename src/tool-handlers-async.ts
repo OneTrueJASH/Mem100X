@@ -62,7 +62,7 @@ export async function handleSearchNodes(args: any, ctx: AsyncToolContext) {
   const result = await ctx.manager.searchNodesAsync({
     query: validated.query,
     limit: validated.limit,
-    context: validated.context
+    context: validated.context,
   });
   return result;
 }
@@ -72,7 +72,7 @@ export async function handleReadGraph(args: any, ctx: AsyncToolContext) {
   const result = await ctx.manager.readGraphAsync({
     limit: validated.limit,
     offset: validated.offset,
-    context: validated.context
+    context: validated.context,
   });
   return result;
 }
@@ -82,16 +82,14 @@ export async function handleOpenNodes(args: any, ctx: AsyncToolContext) {
 
   // Use async getEntity for each node
   const entities = await Promise.all(
-    validated.names.map(name =>
-      ctx.manager.getEntityAsync(name, validated.context)
-    )
+    validated.names.map((name) => ctx.manager.getEntityAsync(name, validated.context))
   );
 
   // Filter out undefined results
-  const validEntities = entities.filter(e => e !== undefined);
+  const validEntities = entities.filter((e) => e !== undefined);
 
   // Get relations for found entities
-  const entityNames = validEntities.map(e => e!.name);
+  const entityNames = validEntities.map((e) => e!.name);
   const db = ctx.manager.getDatabase(validated.context || ctx.manager.currentContext);
   const relations = db.getRelationsForEntities(entityNames);
 
@@ -99,7 +97,7 @@ export async function handleOpenNodes(args: any, ctx: AsyncToolContext) {
     entities: validEntities,
     relations,
     totalEntities: validEntities.length,
-    totalRelations: relations.length
+    totalRelations: relations.length,
   };
 }
 
@@ -186,7 +184,7 @@ export async function handleGetNeighbors(args: any, ctx: AsyncToolContext) {
     relationType: validated.relationType,
     depth: validated.depth || 1,
     includeRelations: validated.includeRelations !== false,
-    context: validated.context
+    context: validated.context,
   });
   return result;
 }
@@ -199,13 +197,16 @@ export async function handleFindShortestPath(args: any, ctx: AsyncToolContext) {
     bidirectional: validated.bidirectional !== false,
     relationType: validated.relationType,
     maxDepth: validated.maxDepth || 6,
-    context: validated.context
+    context: validated.context,
   });
   return result;
 }
 
 // Export handlers map with proper async types
-export const asyncToolHandlers: Record<string, (args: any, ctx: AsyncToolContext) => any | Promise<any>> = {
+export const asyncToolHandlers: Record<
+  string,
+  (args: any, ctx: AsyncToolContext) => any | Promise<any>
+> = {
   // Context management
   set_context: handleSetContext,
   get_context_info: handleGetContextInfo,

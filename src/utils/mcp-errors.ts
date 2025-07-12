@@ -19,7 +19,7 @@ import {
 
 /**
  * Maps Mem100x errors to MCP/JSON-RPC error codes
- * 
+ *
  * Standard JSON-RPC error codes:
  * -32700: Parse error
  * -32600: Invalid Request
@@ -30,27 +30,31 @@ import {
  */
 export function mapErrorToMcpCode(error: unknown): ErrorCode {
   // Validation and input errors map to Invalid Params
-  if (error instanceof EntityNotFoundError ||
-      error instanceof InvalidContextError ||
-      error instanceof ValidationError ||
-      error instanceof InvalidInputError) {
+  if (
+    error instanceof EntityNotFoundError ||
+    error instanceof InvalidContextError ||
+    error instanceof ValidationError ||
+    error instanceof InvalidInputError
+  ) {
     return ErrorCode.InvalidParams;
   }
-  
+
   // Tool errors
   if (error instanceof ToolNotFoundError) {
     return ErrorCode.MethodNotFound;
   }
-  
+
   // Internal errors
-  if (error instanceof TransactionError ||
-      error instanceof ToolExecutionError ||
-      error instanceof CacheCapacityError ||
-      error instanceof ConfigurationError ||
-      error instanceof Mem100xError) {
+  if (
+    error instanceof TransactionError ||
+    error instanceof ToolExecutionError ||
+    error instanceof CacheCapacityError ||
+    error instanceof ConfigurationError ||
+    error instanceof Mem100xError
+  ) {
     return ErrorCode.InternalError;
   }
-  
+
   // Default to internal error for unknown errors
   return ErrorCode.InternalError;
 }
@@ -64,7 +68,7 @@ export function createMcpError(error: unknown): {
   data?: any;
 } {
   const code = mapErrorToMcpCode(error);
-  
+
   if (error instanceof Mem100xError) {
     return {
       code,
@@ -72,25 +76,25 @@ export function createMcpError(error: unknown): {
       data: {
         type: error.constructor.name,
         context: error.context,
-        timestamp: error.timestamp
-      }
+        timestamp: error.timestamp,
+      },
     };
   }
-  
+
   if (error instanceof Error) {
     return {
       code,
       message: error.message,
       data: {
         type: error.constructor.name,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      }
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      },
     };
   }
-  
+
   return {
     code,
     message: String(error),
-    data: { type: 'UnknownError' }
+    data: { type: 'UnknownError' },
   };
 }

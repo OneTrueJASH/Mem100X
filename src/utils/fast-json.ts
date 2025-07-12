@@ -3,7 +3,14 @@
  * Uses native JSON with additional validation and error handling
  */
 
-import { RichContent, TextContent, ImageContent, AudioContent, ResourceLinkContent, ResourceContent } from '../types.js';
+import {
+  RichContent,
+  TextContent,
+  ImageContent,
+  AudioContent,
+  ResourceLinkContent,
+  ResourceContent,
+} from '../types.js';
 import { RichContentSchema } from '../tool-schemas.js';
 
 // Optimized stringify for observation arrays with validation
@@ -23,29 +30,31 @@ export function parseObservations(json: string): RichContent[] {
     }
 
     // Validate each item against the content block union schema
-    return parsed.map(item => {
-      if (typeof item === 'string') {
-        // Backward compatibility: convert string to RichContent
-        return { type: 'text', text: item } as TextContent;
-      }
-
-      if (item && typeof item === 'object' && item.type) {
-        // Validate against the complete content block union
-        try {
-          return RichContentSchema.parse(item);
-        } catch {
-          // If validation fails, try to convert to text content
-          if (item.text) {
-            return { type: 'text', text: String(item.text) } as TextContent;
-          }
-          // Invalid item, skip it
-          return null;
+    return parsed
+      .map((item) => {
+        if (typeof item === 'string') {
+          // Backward compatibility: convert string to RichContent
+          return { type: 'text', text: item } as TextContent;
         }
-      }
 
-      // Invalid item, skip it
-      return null;
-    }).filter(Boolean) as RichContent[];
+        if (item && typeof item === 'object' && item.type) {
+          // Validate against the complete content block union
+          try {
+            return RichContentSchema.parse(item);
+          } catch {
+            // If validation fails, try to convert to text content
+            if (item.text) {
+              return { type: 'text', text: String(item.text) } as TextContent;
+            }
+            // Invalid item, skip it
+            return null;
+          }
+        }
+
+        // Invalid item, skip it
+        return null;
+      })
+      .filter(Boolean) as RichContent[];
   } catch {
     return [];
   }
@@ -53,12 +62,12 @@ export function parseObservations(json: string): RichContent[] {
 
 // Helper function to convert string observations to RichContent (for backward compatibility)
 export function stringToRichContent(observations: string[]): RichContent[] {
-  return observations.map(text => ({ type: 'text', text } as TextContent));
+  return observations.map((text) => ({ type: 'text', text }) as TextContent);
 }
 
 // Helper function to extract text from RichContent observations
 export function richContentToText(observations: RichContent[]): string[] {
-  return observations.map(obs => {
+  return observations.map((obs) => {
     switch (obs.type) {
       case 'text':
         return obs.text;
@@ -102,12 +111,21 @@ export function createAudioContent(data: string, mimeType: string): AudioContent
 }
 
 // Helper function to create resource link content
-export function createResourceLinkContent(uri: string, title?: string, description?: string): ResourceLinkContent {
+export function createResourceLinkContent(
+  uri: string,
+  title?: string,
+  description?: string
+): ResourceLinkContent {
   return { type: 'resource_link', uri, title, description };
 }
 
 // Helper function to create resource content
-export function createResourceContent(data: string, mimeType: string, title?: string, description?: string): ResourceContent {
+export function createResourceContent(
+  data: string,
+  mimeType: string,
+  title?: string,
+  description?: string
+): ResourceContent {
   return { type: 'resource', data, mimeType, title, description };
 }
 
@@ -156,26 +174,28 @@ export function parseEntityResult(json: string): EntityResult | null {
       parsed.observations = [];
     } else {
       // Validate each observation
-      parsed.observations = parsed.observations.map((obs: any) => {
-        if (validateContentBlock(obs)) {
-          return obs;
-        }
-        // Convert invalid observations to text
-        if (typeof obs === 'string') {
-          return createTextContent(obs);
-        }
-        if (obs && typeof obs === 'object' && obs.text) {
-          return createTextContent(String(obs.text));
-        }
-        return null;
-      }).filter(Boolean);
+      parsed.observations = parsed.observations
+        .map((obs: any) => {
+          if (validateContentBlock(obs)) {
+            return obs;
+          }
+          // Convert invalid observations to text
+          if (typeof obs === 'string') {
+            return createTextContent(obs);
+          }
+          if (obs && typeof obs === 'object' && obs.text) {
+            return createTextContent(String(obs.text));
+          }
+          return null;
+        })
+        .filter(Boolean);
     }
 
     return {
       type: 'entity',
       name: parsed.name,
       entityType: parsed.entityType,
-      observations: parsed.observations
+      observations: parsed.observations,
     };
   } catch {
     return null;

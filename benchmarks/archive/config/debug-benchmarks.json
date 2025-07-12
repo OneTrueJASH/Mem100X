@@ -33,9 +33,7 @@
               {
                 "name": "entity-{{timestamp}}-{{index}}",
                 "entityType": "benchmark",
-                "observations": [
-                  { "type": "text", "text": "Created at {{timestamp}}" }
-                ]
+                "observations": [{ "type": "text", "text": "Created at {{timestamp}}" }]
               }
             ]
           }
@@ -57,17 +55,23 @@
               {
                 "name": "batch-{{index}}-1",
                 "entityType": "benchmark",
-                "observations": [ { "type": "text", "text": "Batch entity 1 created at {{timestamp}}" } ]
+                "observations": [
+                  { "type": "text", "text": "Batch entity 1 created at {{timestamp}}" }
+                ]
               },
               {
                 "name": "batch-{{index}}-2",
                 "entityType": "benchmark",
-                "observations": [ { "type": "text", "text": "Batch entity 2 created at {{timestamp}}" } ]
+                "observations": [
+                  { "type": "text", "text": "Batch entity 2 created at {{timestamp}}" }
+                ]
               },
               {
                 "name": "batch-{{index}}-3",
                 "entityType": "benchmark",
-                "observations": [ { "type": "text", "text": "Batch entity 3 created at {{timestamp}}" } ]
+                "observations": [
+                  { "type": "text", "text": "Batch entity 3 created at {{timestamp}}" }
+                ]
               }
             ]
           }
@@ -89,9 +93,7 @@
               {
                 "name": "mixed-{{timestamp}}-{{index}}",
                 "entityType": "benchmark",
-                "observations": [
-                  { "type": "text", "text": "Mixed workload test" }
-                ]
+                "observations": [{ "type": "text", "text": "Mixed workload test" }]
               }
             ]
           }
@@ -101,9 +103,7 @@
           "weight": 0.4,
           "params": {
             "entityName": "test-entity-{{index}}",
-            "contents": [
-              { "type": "text", "text": "Updated at {{timestamp}}" }
-            ]
+            "contents": [{ "type": "text", "text": "Updated at {{timestamp}}" }]
           }
         },
         {
@@ -130,9 +130,7 @@
               {
                 "name": "relation-{{index}}-1",
                 "entityType": "benchmark",
-                "observations": [
-                  { "type": "text", "text": "Entity for relation test" }
-                ]
+                "observations": [{ "type": "text", "text": "Entity for relation test" }]
               }
             ]
           }
@@ -142,9 +140,7 @@
           "weight": 0.5,
           "params": {
             "entityName": "relation-{{index}}-1",
-            "contents": [
-              { "type": "text", "text": "Related to entity {{index}}-2" }
-            ]
+            "contents": [{ "type": "text", "text": "Related to entity {{index}}-2" }]
           }
         }
       ],
@@ -164,9 +160,7 @@
               {
                 "name": "stress-{{index}}",
                 "entityType": "benchmark",
-                "observations": [
-                  { "type": "text", "text": "Stress test entity {{index}}" }
-                ]
+                "observations": [{ "type": "text", "text": "Stress test entity {{index}}" }]
               }
             ]
           }
@@ -176,9 +170,7 @@
           "weight": 0.4,
           "params": {
             "entityName": "stress-{{index}}",
-            "contents": [
-              { "type": "text", "text": "Stress test observation {{timestamp}}" }
-            ]
+            "contents": [{ "type": "text", "text": "Stress test observation {{timestamp}}" }]
           }
         }
       ],

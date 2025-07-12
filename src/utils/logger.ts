@@ -12,9 +12,9 @@ const customLevels = {
     error: 0,
     warn: 1,
     info: 2,
-    perf: 3,    // Performance metrics
+    perf: 3, // Performance metrics
     debug: 4,
-    trace: 5    // Detailed trace logs
+    trace: 5, // Detailed trace logs
   },
   colors: {
     error: 'red',
@@ -22,14 +22,14 @@ const customLevels = {
     info: 'green',
     perf: 'cyan',
     debug: 'blue',
-    trace: 'magenta'
-  }
+    trace: 'magenta',
+  },
 };
 
 // Create custom format for structured logging
 const structuredFormat = winston.format.combine(
   winston.format.timestamp({
-    format: 'YYYY-MM-DD HH:mm:ss.SSS'
+    format: 'YYYY-MM-DD HH:mm:ss.SSS',
   }),
   winston.format.errors({ stack: true }),
   winston.format.json()
@@ -38,7 +38,7 @@ const structuredFormat = winston.format.combine(
 // Stderr format for MCP compliance
 const stderrFormat = winston.format.combine(
   winston.format.timestamp({
-    format: 'YYYY-MM-DD HH:mm:ss.SSS'
+    format: 'YYYY-MM-DD HH:mm:ss.SSS',
   }),
   winston.format.errors({ stack: true }),
   winston.format.printf(({ timestamp, level, message, ...meta }) => {
@@ -47,7 +47,7 @@ const stderrFormat = winston.format.combine(
       timestamp,
       level,
       message,
-      ...meta
+      ...meta,
     };
     return JSON.stringify(logObj);
   })
@@ -58,17 +58,17 @@ const logger = winston.createLogger({
   levels: customLevels.levels,
   level: config.logging.level,
   format: stderrFormat,
-  defaultMeta: { 
+  defaultMeta: {
     service: 'mem100x',
-    pid: process.pid
+    pid: process.pid,
   },
   transports: [
     // MCP servers MUST log to stderr only
     new winston.transports.Stream({
       stream: process.stderr,
-      format: stderrFormat
-    })
-  ]
+      format: stderrFormat,
+    }),
+  ],
 });
 
 // Add colors
@@ -79,13 +79,13 @@ export class PerformanceTracker {
   private startTime: number;
   private operation: string;
   private metadata: Record<string, any>;
-  
+
   constructor(operation: string, metadata: Record<string, any> = {}) {
     this.startTime = performance.now();
     this.operation = operation;
     this.metadata = metadata;
   }
-  
+
   end(additionalMetadata: Record<string, any> = {}): void {
     const duration = performance.now() - this.startTime;
     logger.log('perf', `${this.operation} completed`, {
@@ -93,7 +93,7 @@ export class PerformanceTracker {
       duration: duration.toFixed(3),
       durationMs: duration,
       ...this.metadata,
-      ...additionalMetadata
+      ...additionalMetadata,
     });
   }
 }
@@ -106,7 +106,7 @@ export const logError = (message: string, error: Error, metadata?: Record<string
   logger.error(message, {
     error: error.message,
     stack: error.stack,
-    ...metadata
+    ...metadata,
   });
 };
 
@@ -116,18 +116,23 @@ export const logPerf = (operation: string, duration: number, metadata?: Record<s
     duration: duration.toFixed(3),
     durationMs: duration,
     opsPerSec: Math.round(1000 / duration),
-    ...metadata
+    ...metadata,
   });
 };
 
-export const logQuery = (query: string, duration: number, rowCount: number, metadata?: Record<string, any>) => {
+export const logQuery = (
+  query: string,
+  duration: number,
+  rowCount: number,
+  metadata?: Record<string, any>
+) => {
   logger.log('perf', 'Database query', {
     query: query.substring(0, 100), // Truncate long queries
     duration: duration.toFixed(3),
     durationMs: duration,
     rowCount,
     rowsPerSec: Math.round(rowCount / (duration / 1000)),
-    ...metadata
+    ...metadata,
   });
 };
 
@@ -136,7 +141,7 @@ export const logCacheHit = (cache: string, key: string, hit: boolean) => {
     cache,
     key,
     hit,
-    result: hit ? 'HIT' : 'MISS'
+    result: hit ? 'HIT' : 'MISS',
   });
 };
 

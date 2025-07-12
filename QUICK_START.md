@@ -41,6 +41,7 @@ Add to your Claude Desktop configuration file:
 ### 3. Test it out!
 
 Restart Claude Desktop and try:
+
 - "Store information about my project meeting tomorrow at 2pm"
 - "What do you remember about my meeting?"
 - "Show me everything you remember"
@@ -61,6 +62,7 @@ For simpler use cases without context separation:
 ```
 
 The server will automatically detect context from your content:
+
 - **Personal**: family, vacation, hobbies, friends
 - **Work**: projects, meetings, deadlines, colleagues
 
@@ -79,27 +81,31 @@ Mem100x is blazing fast out of the box:
 Mem100x is fully compatible with the latest MCP SDK and supports all content block types:
 
 ### Supported Content Types
+
 - **Text**: Plain text content
 - **Image**: Image files with URIs
-- **Audio**: Audio files with URIs  
+- **Audio**: Audio files with URIs
 - **Resource Link**: Links to external resources
 - **Resource**: Binary resources with MIME types
 
 ### Example Usage
+
 ```typescript
 // Create entities with rich content
 await client.callTool({
-  name: "create_entities",
+  name: 'create_entities',
   arguments: {
-    entities: [{
-      name: "Project Documentation",
-      entityType: "document",
-      content: [
-        { type: "text", text: "API documentation for the new service" },
-        { type: "resource_link", resourceLink: { uri: "https://docs.example.com/api" } }
-      ]
-    }]
-  }
+    entities: [
+      {
+        name: 'Project Documentation',
+        entityType: 'document',
+        content: [
+          { type: 'text', text: 'API documentation for the new service' },
+          { type: 'resource_link', resourceLink: { uri: 'https://docs.example.com/api' } },
+        ],
+      },
+    ],
+  },
 });
 ```
 
@@ -108,12 +114,14 @@ await client.callTool({
 All MCP tools are ready to use with full SDK compatibility:
 
 ### Memory Operations
+
 - `create_entities` - Store new information with MCP content blocks
 - `search_nodes` - Lightning-fast search
 - `read_graph` - Retrieve stored data
 - `open_nodes` - Access specific items
 
 ### Advanced Features
+
 - `create_relations` - Link related information
 - `add_observations` - Add notes to existing items with MCP content blocks
 - `set_context` - Switch between personal/work
@@ -147,14 +155,17 @@ All benchmarks use the MCP server interface for accurate measurements.
 ## Troubleshooting
 
 ### Server won't start?
+
 - Check the path in your Claude config is absolute
 - Ensure you ran `npm run build` first
 
 ### Not seeing the tools?
+
 - Restart Claude Desktop after config changes
 - Check logs: `cat ~/Library/Logs/Claude/mcp*.log`
 
 ### Want more control?
+
 - Set `MEMORY_DB=/custom/path/memory.db` for custom database location
 - Set `DEBUG=1` for detailed logging
 

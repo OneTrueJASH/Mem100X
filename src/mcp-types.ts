@@ -108,7 +108,7 @@ export type {
   CreateBackupInput,
   RestoreBackupInput,
   GetNeighborsInput,
-  FindShortestPathInput
+  FindShortestPathInput,
 } from './tool-schemas.js';
 
 /**
@@ -159,9 +159,10 @@ export function createMCPToolResponse(
     content.push({ type: 'text', text: textContent });
   } else if (structuredContent) {
     // Convert structured content to text representation
-    const text = typeof structuredContent === 'string'
-      ? structuredContent
-      : JSON.stringify(structuredContent, null, 2);
+    const text =
+      typeof structuredContent === 'string'
+        ? structuredContent
+        : JSON.stringify(structuredContent, null, 2);
     content.push({ type: 'text', text });
   }
 
@@ -182,9 +183,7 @@ export function createMCPToolResponse(
     wrappedStructuredContent = processed;
   } else if (Array.isArray(structuredContent)) {
     wrappedStructuredContent = { result: structuredContent };
-  } else if (
-    typeof structuredContent !== 'object' || structuredContent === null
-  ) {
+  } else if (typeof structuredContent !== 'object' || structuredContent === null) {
     wrappedStructuredContent = { value: structuredContent };
   }
 

@@ -5,19 +5,19 @@
 
 import { MemoryDatabase } from './database.js';
 import { ContextConfidenceScorer } from './context-confidence.js';
-import { 
-  MemoryConfig, 
-  GraphResult, 
-  EntityResult, 
-  RelationResult, 
-  CreateEntityInput, 
-  CreateRelationInput, 
-  ObservationUpdate, 
-  ObservationDeletion, 
-  SearchOptions, 
-  GetNeighborsOptions, 
-  FindShortestPathOptions, 
-  ShortestPathResult 
+import {
+  MemoryConfig,
+  GraphResult,
+  EntityResult,
+  RelationResult,
+  CreateEntityInput,
+  CreateRelationInput,
+  ObservationUpdate,
+  ObservationDeletion,
+  SearchOptions,
+  GetNeighborsOptions,
+  FindShortestPathOptions,
+  ShortestPathResult,
 } from './types.js';
 import { existsSync, mkdirSync, copyFileSync, statSync } from 'fs';
 import { join, dirname } from 'path';
@@ -44,7 +44,7 @@ export class MultiDatabaseManager {
     this.config = this.loadConfig(config);
     this.initializeDatabases();
     this.loadEntityMappings();
-    
+
     // Convert database configs to the format expected by ContextConfidenceScorer
     const scorerConfigs: Record<string, any> = {};
     for (const [context, dbConfig] of Object.entries(this.config.databases)) {
@@ -53,14 +53,11 @@ export class MultiDatabaseManager {
         dbPath: dbConfig.path,
         patterns: dbConfig.patterns,
         entityTypes: dbConfig.entityTypes,
-        autoDetect: this.config.autoDetect
+        autoDetect: this.config.autoDetect,
       };
     }
-    
-    this.confidenceScorer = new ContextConfidenceScorer(
-      scorerConfigs,
-      this.entityContextMap
-    );
+
+    this.confidenceScorer = new ContextConfidenceScorer(scorerConfigs, this.entityContextMap);
   }
 
   private loadConfig(config: typeof appConfig): MemoryConfig {
@@ -69,13 +66,13 @@ export class MultiDatabaseManager {
         personal: {
           path: config.multiContext.personalDbPath,
           patterns: ['personal', 'family', 'health', 'hobby'],
-          entityTypes: ['person', 'family_member', 'friend']
+          entityTypes: ['person', 'family_member', 'friend'],
         },
         work: {
           path: config.multiContext.workDbPath,
           patterns: ['work', 'project', 'colleague', 'meeting'],
-          entityTypes: ['project', 'company', 'colleague']
-        }
+          entityTypes: ['project', 'company', 'colleague'],
+        },
       },
       defaultContext: config.multiContext.defaultContext,
       autoDetect: true,
@@ -84,8 +81,8 @@ export class MultiDatabaseManager {
         typeWeight: 0.25,
         patternWeight: 0.15,
         relationWeight: 0.1,
-        existingEntityWeight: 0.1
-      }
+        existingEntityWeight: 0.1,
+      },
     };
   }
 
@@ -148,19 +145,22 @@ export class MultiDatabaseManager {
   }
 
   public createEntities(entities: CreateEntityInput[], context?: string): EntityResult[] {
-    const targetContext = (context ? { context, confidence: 1.0 } : this.detectContext({ entities })).context;
+    const targetContext = (
+      context ? { context, confidence: 1.0 } : this.detectContext({ entities })
+    ).context;
     const db = this.databases.get(targetContext);
     if (!db) throw new Error(`Invalid context: ${targetContext}`);
-    
+
     // Use batch creation for larger sets
-    const created = entities.length >= 10 && db.createEntitiesBatch
-      ? db.createEntitiesBatch(entities)
-      : db.createEntities(entities);
-      
+    const created =
+      entities.length >= 10 && db.createEntitiesBatch
+        ? db.createEntitiesBatch(entities)
+        : db.createEntities(entities);
+
     for (const entity of created) {
       this.entityContextMap.set(entity.name.toLowerCase(), targetContext);
     }
-    return created.map(e => ({ ...e, _context: targetContext }));
+    return created.map((e) => ({ ...e, _context: targetContext }));
   }
 
   public createRelations(relations: CreateRelationInput[], context?: string): RelationResult[] {
@@ -168,9 +168,9 @@ export class MultiDatabaseManager {
     const targetContext = detection.context;
     const db = this.databases.get(targetContext);
     if (!db) throw new Error(`Invalid context: ${targetContext}`);
-    
+
     const created = db.createRelations(relations);
-    return created.map(r => ({ ...r, _context: targetContext }));
+    return created.map((r) => ({ ...r, _context: targetContext }));
   }
 
   public searchNodes(options: SearchOptions): GraphResult {
@@ -179,21 +179,21 @@ export class MultiDatabaseManager {
       if (!db) throw new Error(`Invalid context: ${options.context}`);
       const results = db.searchNodes(options);
       return {
-        entities: results.entities.map(e => ({ ...e, _context: options.context })),
-        relations: results.relations.map(r => ({ ...r, _context: options.context }))
+        entities: results.entities.map((e) => ({ ...e, _context: options.context })),
+        relations: results.relations.map((r) => ({ ...r, _context: options.context })),
       };
     }
-    
+
     // Search across all contexts
     const allEntities: EntityResult[] = [];
     const allRelations: RelationResult[] = [];
-    
+
     for (const [context, db] of this.databases) {
       const results = db.searchNodes(options);
-      allEntities.push(...results.entities.map(e => ({ ...e, _context: context })));
-      allRelations.push(...results.relations.map(r => ({ ...r, _context: context })));
+      allEntities.push(...results.entities.map((e) => ({ ...e, _context: context })));
+      allRelations.push(...results.relations.map((r) => ({ ...r, _context: context })));
     }
-    
+
     return { entities: allEntities, relations: allRelations };
   }
 
@@ -203,20 +203,20 @@ export class MultiDatabaseManager {
       if (!db) throw new Error(`Invalid context: ${context}`);
       const graph = db.readGraph(limit, offset);
       return {
-        entities: graph.entities.map(e => ({ ...e, _context: context })),
-        relations: graph.relations.map(r => ({ ...r, _context: context })),
-        pagination: graph.pagination
+        entities: graph.entities.map((e) => ({ ...e, _context: context })),
+        relations: graph.relations.map((r) => ({ ...r, _context: context })),
+        pagination: graph.pagination,
       };
     }
-    
+
     // Read from current context
     const db = this.databases.get(this._currentContext);
     if (!db) throw new Error(`Invalid current context: ${this._currentContext}`);
     const graph = db.readGraph(limit, offset);
     return {
-      entities: graph.entities.map(e => ({ ...e, _context: this._currentContext })),
-      relations: graph.relations.map(r => ({ ...r, _context: this._currentContext })),
-      pagination: graph.pagination
+      entities: graph.entities.map((e) => ({ ...e, _context: this._currentContext })),
+      relations: graph.relations.map((r) => ({ ...r, _context: this._currentContext })),
+      pagination: graph.pagination,
     };
   }
 
@@ -226,37 +226,37 @@ export class MultiDatabaseManager {
       if (!db) throw new Error(`Invalid context: ${context}`);
       const results = db.openNodes(names);
       return {
-        entities: results.entities.map(e => ({ ...e, _context: context })),
-        relations: results.relations.map(r => ({ ...r, _context: context }))
+        entities: results.entities.map((e) => ({ ...e, _context: context })),
+        relations: results.relations.map((r) => ({ ...r, _context: context })),
       };
     }
-    
+
     // Search all contexts for requested nodes
     const allEntities: EntityResult[] = [];
     const entityNamesFound = new Set<string>();
-    
+
     for (const [ctx, db] of this.databases) {
-      const remaining = names.filter(name => !entityNamesFound.has(name.toLowerCase()));
+      const remaining = names.filter((name) => !entityNamesFound.has(name.toLowerCase()));
       if (remaining.length === 0) break;
-      
+
       const results = db.openNodes(remaining);
       for (const entity of results.entities) {
         allEntities.push({ ...entity, _context: ctx });
         entityNamesFound.add(entity.name.toLowerCase());
       }
     }
-    
+
     // Get relations for found entities
-    const foundNames = allEntities.map(e => e.name);
+    const foundNames = allEntities.map((e) => e.name);
     const allRelations: RelationResult[] = [];
-    
+
     if (foundNames.length > 0) {
       for (const [ctx, db] of this.databases) {
         const relations = db.getRelationsForEntities(foundNames);
-        allRelations.push(...relations.map(r => ({ ...r, _context: ctx })));
+        allRelations.push(...relations.map((r) => ({ ...r, _context: ctx })));
       }
     }
-    
+
     return { entities: allEntities, relations: allRelations };
   }
 
@@ -267,18 +267,19 @@ export class MultiDatabaseManager {
       db.addObservations(updates);
       return;
     }
-    
+
     // Group updates by entity context
     const updatesByContext = new Map<string, ObservationUpdate[]>();
-    
+
     for (const update of updates) {
-      const entityContext = this.entityContextMap.get(update.entityName.toLowerCase()) || this._currentContext;
+      const entityContext =
+        this.entityContextMap.get(update.entityName.toLowerCase()) || this._currentContext;
       if (!updatesByContext.has(entityContext)) {
         updatesByContext.set(entityContext, []);
       }
       updatesByContext.get(entityContext)!.push(update);
     }
-    
+
     // Apply updates to respective databases
     for (const [ctx, contextUpdates] of updatesByContext) {
       const db = this.databases.get(ctx);
@@ -295,18 +296,19 @@ export class MultiDatabaseManager {
       db.deleteObservations(deletions);
       return;
     }
-    
+
     // Group deletions by entity context
     const deletionsByContext = new Map<string, ObservationDeletion[]>();
-    
+
     for (const deletion of deletions) {
-      const entityContext = this.entityContextMap.get(deletion.entityName.toLowerCase()) || this._currentContext;
+      const entityContext =
+        this.entityContextMap.get(deletion.entityName.toLowerCase()) || this._currentContext;
       if (!deletionsByContext.has(entityContext)) {
         deletionsByContext.set(entityContext, []);
       }
       deletionsByContext.get(entityContext)!.push(deletion);
     }
-    
+
     // Apply deletions to respective databases
     for (const [ctx, contextDeletions] of deletionsByContext) {
       const db = this.databases.get(ctx);
@@ -326,10 +328,10 @@ export class MultiDatabaseManager {
       }
       return;
     }
-    
+
     // Delete from appropriate contexts
     const entitiesByContext = new Map<string, string[]>();
-    
+
     for (const name of entityNames) {
       const entityContext = this.entityContextMap.get(name.toLowerCase()) || this._currentContext;
       if (!entitiesByContext.has(entityContext)) {
@@ -337,7 +339,7 @@ export class MultiDatabaseManager {
       }
       entitiesByContext.get(entityContext)!.push(name);
     }
-    
+
     for (const [ctx, names] of entitiesByContext) {
       const db = this.databases.get(ctx);
       if (db) {
@@ -353,7 +355,7 @@ export class MultiDatabaseManager {
     const targetContext = context || this.detectContext({ relations }).context;
     const db = this.databases.get(targetContext);
     if (!db) throw new Error(`Invalid context: ${targetContext}`);
-    
+
     db.deleteRelations(relations);
   }
 
@@ -363,21 +365,21 @@ export class MultiDatabaseManager {
       if (!db) throw new Error(`Invalid context: ${context}`);
       return db.getStats();
     }
-    
+
     // Aggregate stats from all contexts
     const allStats: any = {
       totalEntities: 0,
       totalRelations: 0,
-      contexts: {}
+      contexts: {},
     };
-    
+
     for (const [ctx, db] of this.databases) {
       const stats = db.getStats();
       allStats.totalEntities += stats.totalEntities;
       allStats.totalRelations += stats.totalRelations;
       allStats.contexts[ctx] = stats;
     }
-    
+
     return allStats;
   }
 
@@ -402,20 +404,20 @@ export class MultiDatabaseManager {
     const targetContext = context || this._currentContext;
     const db = this.databases.get(targetContext);
     if (!db) throw new Error(`Invalid context: ${targetContext}`);
-    
+
     const actualBackupPath = backupPath || `./backups/backup-${targetContext}-${Date.now()}.db`;
     const dir = dirname(actualBackupPath);
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true });
     }
-    
+
     db.backup(actualBackupPath);
-    
+
     return {
       path: actualBackupPath,
       size: statSync(actualBackupPath).size,
       context: targetContext,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -424,15 +426,15 @@ export class MultiDatabaseManager {
     if (!existsSync(backupPath)) {
       throw new Error('Backup file not found');
     }
-    
+
     // Check if there's an active transaction
     if (this.isInTransaction && this.isInTransaction()) {
       this.rollbackTransaction();
     }
-    
+
     const dbConfig = this.config.databases[targetContext];
     if (!dbConfig) throw new Error(`Invalid context: ${targetContext}`);
-    
+
     // Create safety backup before restore
     const safetyBackupPath = `${dbConfig.path}.safety-${Date.now()}`;
     const db = this.databases.get(targetContext);
@@ -445,37 +447,37 @@ export class MultiDatabaseManager {
         logInfo('Failed to create safety backup', { error });
       }
     }
-    
+
     // Close existing database
     if (db) {
       db.close();
     }
-    
+
     // Copy backup to database path
     copyFileSync(backupPath, dbConfig.path);
-    
+
     // Also restore bloom filter if it exists
     const backupBloomPath = backupPath.replace('.db', '.cbloom');
     const targetBloomPath = dbConfig.path.replace('.db', '.cbloom');
     if (existsSync(backupBloomPath)) {
       copyFileSync(backupBloomPath, targetBloomPath);
     }
-    
+
     // Reinitialize database
     const newDb = new MemoryDatabase(dbConfig.path);
     this.databases.set(targetContext, newDb);
-    
+
     // Reload entity mappings
     this.loadEntityMappings();
-    
+
     const stats = newDb.getStats();
     return {
       backupPath,
       context: targetContext,
       stats: {
         entityCount: stats.totalEntities,
-        relationCount: stats.totalRelations
-      }
+        relationCount: stats.totalRelations,
+      },
     };
   }
 
@@ -483,7 +485,7 @@ export class MultiDatabaseManager {
     // Placeholder for transaction checking
     return false;
   }
-  
+
   public getDatabase(context?: string): MemoryDatabase {
     const targetContext = context || this._currentContext;
     const db = this.databases.get(targetContext);
@@ -494,7 +496,10 @@ export class MultiDatabaseManager {
   }
 
   public getNeighbors(entityName: string, options: GetNeighborsOptions): GraphResult {
-    const targetContext = options.context || this.entityContextMap.get(entityName.toLowerCase()) || this._currentContext;
+    const targetContext =
+      options.context ||
+      this.entityContextMap.get(entityName.toLowerCase()) ||
+      this._currentContext;
     const db = this.databases.get(targetContext);
     if (!db) throw new Error(`Invalid context: ${targetContext}`);
 
@@ -502,18 +507,22 @@ export class MultiDatabaseManager {
     return { entities: [], relations: [] };
   }
 
-  public findShortestPath(from: string, to: string, options: FindShortestPathOptions): ShortestPathResult {
+  public findShortestPath(
+    from: string,
+    to: string,
+    options: FindShortestPathOptions
+  ): ShortestPathResult {
     const fromContext = this.entityContextMap.get(from.toLowerCase());
     const toContext = this.entityContextMap.get(to.toLowerCase());
-    
+
     if (fromContext !== toContext) {
       return { found: false, path: [], distance: -1 };
     }
-    
+
     const targetContext = options.context || fromContext || this._currentContext;
     const db = this.databases.get(targetContext);
     if (!db) throw new Error(`Invalid context: ${targetContext}`);
-    
+
     // For now, return not found as this would require implementing graph algorithms
     return { found: false, path: [], distance: -1 };
   }
@@ -525,7 +534,7 @@ export class MultiDatabaseManager {
       const entity = db.getEntity(name);
       return entity || null;
     }
-    
+
     // Search all contexts
     for (const [ctx, db] of this.databases) {
       const entity = db.getEntity(name);
@@ -533,7 +542,7 @@ export class MultiDatabaseManager {
         return { ...entity, _context: ctx };
       }
     }
-    
+
     return null;
   }
 

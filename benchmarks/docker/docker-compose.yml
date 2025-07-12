@@ -60,7 +60,7 @@ services:
     build:
       context: ../
       dockerfile: docker/base/Dockerfile
-    command: ["node", "dist/runner.js"]
+    command: ['node', 'dist/runner.js']
     depends_on:
       - benchmark-mem100x
       - benchmark-official

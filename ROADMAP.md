@@ -7,6 +7,7 @@ Mem100x aims to be the **fastest and most reliable** Model Context Protocol (MCP
 ## Current Status: v1.0.0 (Core Complete)
 
 ### Completed Features
+
 - All 11 MCP tools implemented and tested
 - Multi-context support (personal/work separation)
 - **59,780 entities/second** creation rate (20x faster than alternatives)
@@ -18,12 +19,13 @@ Mem100x aims to be the **fastest and most reliable** Model Context Protocol (MCP
 - Comprehensive quality assurance completed
 
 ### Performance Achievements
-| Metric | Performance | vs Competition |
-|--------|------------|----------------|
-| Entity Creation | 59,780/sec | 20x faster |
-| Search (FTS5) | 8,829/sec | 88x faster |
-| Relations | 261,455/sec | Industry leading |
-| Cache Operations | 20M+/sec | O(1) complexity |
+
+| Metric           | Performance   | vs Competition     |
+| ---------------- | ------------- | ------------------ |
+| Entity Creation  | 59,780/sec    | 20x faster         |
+| Search (FTS5)    | 8,829/sec     | 88x faster         |
+| Relations        | 261,455/sec   | Industry leading   |
+| Cache Operations | 20M+/sec      | O(1) complexity    |
 | Token Efficiency | 98% reduction | Optimized for LLMs |
 
 ---
@@ -33,6 +35,7 @@ Mem100x aims to be the **fastest and most reliable** Model Context Protocol (MCP
 **Goal**: Fix remaining cache implementation bugs and optimize memory usage
 
 ### Features
+
 - [ ] Fix Two-Queue (2Q) cache statistics tracking (8 tests)
 - [ ] Fix ARC cache edge cases and zero capacity handling (1 test)
 - [ ] Fix cache interface edge cases (3 tests)
@@ -41,6 +44,7 @@ Mem100x aims to be the **fastest and most reliable** Model Context Protocol (MCP
 - [ ] Add cache performance metrics
 
 ### Benefits
+
 - Improved memory efficiency
 - Better cache hit rates
 - Predictable memory usage
@@ -55,13 +59,14 @@ Mem100x aims to be the **fastest and most reliable** Model Context Protocol (MCP
 **Goal**: Add advanced graph algorithms for relationship analysis
 
 ### Features
+
 - [ ] Graph traversal algorithms (11 tests)
   - [ ] Breadth-First Search (BFS)
   - [ ] Depth-First Search (DFS)
   - [ ] Level-order traversal
 - [ ] Shortest path algorithms (14 tests)
   - [ ] Dijkstra's algorithm
-  - [ ] A* pathfinding
+  - [ ] A\* pathfinding
   - [ ] All-pairs shortest paths
 - [ ] Graph analysis tools
   - [ ] Connected components detection
@@ -70,6 +75,7 @@ Mem100x aims to be the **fastest and most reliable** Model Context Protocol (MCP
   - [ ] Community detection
 
 ### Benefits
+
 - Advanced relationship queries
 - Path analysis between entities
 - Knowledge graph insights
@@ -84,6 +90,7 @@ Mem100x aims to be the **fastest and most reliable** Model Context Protocol (MCP
 **Goal**: Enterprise-ready deployment and monitoring tools
 
 ### Features
+
 - [ ] Command-line interface (CLI)
   - [ ] Database management commands
   - [ ] Import/export utilities
@@ -103,6 +110,7 @@ Mem100x aims to be the **fastest and most reliable** Model Context Protocol (MCP
   - [ ] Structured logging
 
 ### Benefits
+
 - Easy deployment
 - Production monitoring
 - Scalability options
@@ -117,6 +125,7 @@ Mem100x aims to be the **fastest and most reliable** Model Context Protocol (MCP
 **Goal**: Horizontal scaling and distributed knowledge graphs
 
 ### Features
+
 - [ ] Sharding support
   - [ ] Consistent hashing
   - [ ] Shard rebalancing
@@ -134,6 +143,7 @@ Mem100x aims to be the **fastest and most reliable** Model Context Protocol (MCP
   - [ ] WebSocket subscriptions
 
 ### Benefits
+
 - Unlimited scale
 - High availability
 - Real-time updates
@@ -146,18 +156,21 @@ Mem100x aims to be the **fastest and most reliable** Model Context Protocol (MCP
 ## Future Considerations
 
 ### v2.1.0 - AI Enhancement
+
 - [ ] Vector embeddings for semantic search
 - [ ] LLM-powered entity extraction
 - [ ] Automatic relationship inference
 - [ ] Knowledge graph completion
 
 ### v2.2.0 - Multi-Model Support
+
 - [ ] Property graph model
 - [ ] RDF triple store
 - [ ] Document store hybrid
 - [ ] Time-series data support
 
 ### v3.0.0 - Cloud Native
+
 - [ ] Managed service offering
 - [ ] Multi-cloud support (AWS, GCP, Azure)
 - [ ] Serverless deployment options
@@ -168,6 +181,7 @@ Mem100x aims to be the **fastest and most reliable** Model Context Protocol (MCP
 ## Community Roadmap
 
 ### Documentation & Examples
+
 - [ ] Comprehensive API documentation
 - [ ] Video tutorials
 - [ ] Example applications
@@ -175,12 +189,14 @@ Mem100x aims to be the **fastest and most reliable** Model Context Protocol (MCP
 - [ ] Performance tuning guide
 
 ### Ecosystem
+
 - [ ] Language SDKs (Python, Go, Rust)
 - [ ] Framework integrations (LangChain, etc.)
 - [ ] MCP marketplace listing
 - [ ] Community plugins
 
 ### Governance
+
 - [ ] Open source governance model
 - [ ] Contribution guidelines
 - [ ] Security policy
@@ -210,4 +226,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ---
 
-*This roadmap is a living document and will be updated based on community feedback and priorities.*
+_This roadmap is a living document and will be updated based on community feedback and priorities._

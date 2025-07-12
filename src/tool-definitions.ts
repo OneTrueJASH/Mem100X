@@ -9,17 +9,17 @@ import { addDestructiveSafetyInfo } from './utils/destructive-ops.js';
 export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
   set_context: {
     name: 'set_context',
-    description: 'Switch to a specific memory context (e.g., \'personal\' or \'work\')',
+    description: "Switch to a specific memory context (e.g., 'personal' or 'work')",
     inputSchema: {
       type: 'object',
       properties: {
         context: {
           type: 'string',
-          description: 'The context to switch to'
-        }
+          description: 'The context to switch to',
+        },
       },
-      required: ['context']
-    }
+      required: ['context'],
+    },
   },
 
   get_context_info: {
@@ -27,13 +27,14 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
     description: 'Get information about available contexts and current state',
     inputSchema: {
       type: 'object',
-      properties: {}
-    }
+      properties: {},
+    },
   },
 
   create_entities: {
     name: 'create_entities',
-    description: 'Create multiple new entities in the knowledge graph. Performance: 59,780+ entities/sec',
+    description:
+      'Create multiple new entities in the knowledge graph. Performance: 59,780+ entities/sec',
     inputSchema: {
       type: 'object',
       properties: {
@@ -44,59 +45,64 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
             properties: {
               name: {
                 type: 'string',
-                description: 'The name of the entity'
+                description: 'The name of the entity',
               },
               entityType: {
                 type: 'string',
-                description: 'The type of the entity'
+                description: 'The type of the entity',
               },
               content: {
                 type: 'array',
                 items: {
                   type: 'object',
                   properties: {
-                    type: { type: 'string', enum: ['text', 'image', 'audio', 'resource_link', 'resource'] },
+                    type: {
+                      type: 'string',
+                      enum: ['text', 'image', 'audio', 'resource_link', 'resource'],
+                    },
                     text: { type: 'string', description: 'The text content' },
                     data: { type: 'string', description: 'Binary or base64 data' },
                     mimeType: { type: 'string', description: 'MIME type' },
                     uri: { type: 'string', description: 'Resource URI' },
                     title: { type: 'string', description: 'Title' },
-                    description: { type: 'string', description: 'Description' }
+                    description: { type: 'string', description: 'Description' },
                   },
-                  required: ['type']
+                  required: ['type'],
                 },
-                description: 'An array of content blocks associated with the entity'
-              }
+                description: 'An array of content blocks associated with the entity',
+              },
             },
-            required: ['name', 'entityType', 'content']
-          }
-        }
+            required: ['name', 'entityType', 'content'],
+          },
+        },
       },
-      required: ['entities']
-    }
+      required: ['entities'],
+    },
   },
 
   search_nodes: {
     name: 'search_nodes',
-    description: 'Search for nodes in the knowledge graph based on a query. Uses FTS5 for 88x faster performance (8,829 searches/sec)',
+    description:
+      'Search for nodes in the knowledge graph based on a query. Uses FTS5 for 88x faster performance (8,829 searches/sec)',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'The search query to match against entity names, types, and observation content'
+          description:
+            'The search query to match against entity names, types, and observation content',
         },
         limit: {
           type: 'number',
-          description: 'Maximum number of results to return (default: 100)'
+          description: 'Maximum number of results to return (default: 100)',
         },
         context: {
           type: 'string',
-          description: 'Optional: specific context to use (overrides auto-detection)'
-        }
+          description: 'Optional: specific context to use (overrides auto-detection)',
+        },
       },
-      required: ['query']
-    }
+      required: ['query'],
+    },
   },
 
   read_graph: {
@@ -107,18 +113,18 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
       properties: {
         limit: {
           type: 'number',
-          description: 'Optional: limit the number of entities returned for pagination'
+          description: 'Optional: limit the number of entities returned for pagination',
         },
         offset: {
           type: 'number',
-          description: 'Optional: offset for pagination (default: 0)'
+          description: 'Optional: offset for pagination (default: 0)',
         },
         context: {
           type: 'string',
-          description: 'Optional: specific context to use (overrides auto-detection)'
-        }
-      }
-    }
+          description: 'Optional: specific context to use (overrides auto-detection)',
+        },
+      },
+    },
   },
 
   open_nodes: {
@@ -130,22 +136,23 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
         names: {
           type: 'array',
           items: {
-            type: 'string'
+            type: 'string',
           },
-          description: 'An array of entity names to retrieve'
+          description: 'An array of entity names to retrieve',
         },
         context: {
           type: 'string',
-          description: 'Optional: specific context to use (overrides auto-detection)'
-        }
+          description: 'Optional: specific context to use (overrides auto-detection)',
+        },
       },
-      required: ['names']
-    }
+      required: ['names'],
+    },
   },
 
   create_relations: {
     name: 'create_relations',
-    description: 'Create multiple new relations between entities in the knowledge graph. Performance: 261,455+ relations/sec',
+    description:
+      'Create multiple new relations between entities in the knowledge graph. Performance: 261,455+ relations/sec',
     inputSchema: {
       type: 'object',
       properties: {
@@ -156,23 +163,23 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
             properties: {
               from: {
                 type: 'string',
-                description: 'The name of the entity where the relation starts'
+                description: 'The name of the entity where the relation starts',
               },
               to: {
                 type: 'string',
-                description: 'The name of the entity where the relation ends'
+                description: 'The name of the entity where the relation ends',
               },
               relationType: {
                 type: 'string',
-                description: 'The type of the relation'
-              }
+                description: 'The type of the relation',
+              },
             },
-            required: ['from', 'to', 'relationType']
-          }
-        }
+            required: ['from', 'to', 'relationType'],
+          },
+        },
       },
-      required: ['relations']
-    }
+      required: ['relations'],
+    },
   },
 
   delete_relations: {
@@ -189,28 +196,29 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
             properties: {
               from: {
                 type: 'string',
-                description: 'The name of the entity where the relation starts'
+                description: 'The name of the entity where the relation starts',
               },
               to: {
                 type: 'string',
-                description: 'The name of the entity where the relation ends'
+                description: 'The name of the entity where the relation ends',
               },
               relationType: {
                 type: 'string',
-                description: 'The type of the relation'
-              }
+                description: 'The type of the relation',
+              },
             },
-            required: ['from', 'to', 'relationType']
-          }
-        }
+            required: ['from', 'to', 'relationType'],
+          },
+        },
       },
-      required: ['relations']
-    }
+      required: ['relations'],
+    },
   },
 
   add_observations: {
     name: 'add_observations',
-    description: 'Add new observations to existing entities in the knowledge graph. Batched for performance',
+    description:
+      'Add new observations to existing entities in the knowledge graph. Batched for performance',
     inputSchema: {
       type: 'object',
       properties: {
@@ -221,37 +229,41 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
             properties: {
               entityName: {
                 type: 'string',
-                description: 'The name of the entity to add the observations to'
+                description: 'The name of the entity to add the observations to',
               },
               content: {
                 type: 'array',
                 items: {
                   type: 'object',
                   properties: {
-                    type: { type: 'string', enum: ['text', 'image', 'audio', 'resource_link', 'resource'] },
+                    type: {
+                      type: 'string',
+                      enum: ['text', 'image', 'audio', 'resource_link', 'resource'],
+                    },
                     text: { type: 'string', description: 'The text content' },
                     data: { type: 'string', description: 'Binary or base64 data' },
                     mimeType: { type: 'string', description: 'MIME type' },
                     uri: { type: 'string', description: 'Resource URI' },
                     title: { type: 'string', description: 'Title' },
-                    description: { type: 'string', description: 'Description' }
+                    description: { type: 'string', description: 'Description' },
                   },
-                  required: ['type']
+                  required: ['type'],
                 },
-                description: 'An array of content blocks to add'
-              }
+                description: 'An array of content blocks to add',
+              },
             },
-            required: ['entityName', 'content']
-          }
-        }
+            required: ['entityName', 'content'],
+          },
+        },
       },
-      required: ['updates']
-    }
+      required: ['updates'],
+    },
   },
 
   delete_observations: {
     name: 'delete_observations',
-    description: 'Delete specific observations from entities in the knowledge graph. Batched for performance',
+    description:
+      'Delete specific observations from entities in the knowledge graph. Batched for performance',
     inputSchema: {
       type: 'object',
       properties: {
@@ -262,7 +274,7 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
             properties: {
               entityName: {
                 type: 'string',
-                description: 'The name of the entity containing the observations'
+                description: 'The name of the entity containing the observations',
               },
               observations: {
                 type: 'array',
@@ -270,19 +282,19 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
                   type: 'object',
                   properties: {
                     type: { type: 'string', enum: ['text'] },
-                    text: { type: 'string', description: 'The text content' }
+                    text: { type: 'string', description: 'The text content' },
                   },
-                  required: ['type', 'text']
+                  required: ['type', 'text'],
                 },
-                description: 'An array of text observations to delete'
-              }
+                description: 'An array of text observations to delete',
+              },
             },
-            required: ['entityName', 'observations']
-          }
-        }
+            required: ['entityName', 'observations'],
+          },
+        },
       },
-      required: ['deletions']
-    }
+      required: ['deletions'],
+    },
   },
 
   delete_entities: {
@@ -294,23 +306,21 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
         entityNames: {
           type: 'array',
           items: {
-            type: 'string'
+            type: 'string',
           },
-          description: 'An array of entity names to delete'
-        }
+          description: 'An array of entity names to delete',
+        },
       },
-      required: ['entityNames']
-    }
-  }
+      required: ['entityNames'],
+    },
+  },
 };
 
 /**
  * Get all tool definitions as an array with safety info applied
  */
 export function getAllToolDefinitions(): MCPToolDefinition[] {
-  return Object.entries(TOOL_DEFINITIONS).map(([name, def]) =>
-    addDestructiveSafetyInfo(def, name)
-  );
+  return Object.entries(TOOL_DEFINITIONS).map(([name, def]) => addDestructiveSafetyInfo(def, name));
 }
 
 /**

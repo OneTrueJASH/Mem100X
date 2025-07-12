@@ -6,7 +6,9 @@ process.stderr.write('[Mem100x] STDERR: Server process started\n');
 
 // Echo every line received on stdin (for debugging)
 process.stdin.on('data', (chunk) => {
-  process.stderr.write('[Mem100x] STDIN RECEIVED: ' + chunk.toString().replace(/\n/g, '\\n') + '\n');
+  process.stderr.write(
+    '[Mem100x] STDIN RECEIVED: ' + chunk.toString().replace(/\n/g, '\\n') + '\n'
+  );
 });
 
 // Log process events
@@ -60,19 +62,28 @@ async function main() {
     const result = {
       tools: getAllToolDefinitions(),
     };
-    process.stderr.write('[Mem100x] ListToolsRequestSchema returning: ' + JSON.stringify(result).substring(0, 200) + '...\n');
+    process.stderr.write(
+      '[Mem100x] ListToolsRequestSchema returning: ' +
+        JSON.stringify(result).substring(0, 200) +
+        '...\n'
+    );
     return result;
   });
 
   // Register handler for MCP protocol method
   const toolHandler = async (request: any) => {
     process.stderr.write('[Mem100x] ToolHandler called with method: ' + request.method + '\n');
-    process.stderr.write('[Mem100x] ToolHandler params: ' + JSON.stringify(request.params).substring(0, 200) + '...\n');
+    process.stderr.write(
+      '[Mem100x] ToolHandler params: ' + JSON.stringify(request.params).substring(0, 200) + '...\n'
+    );
 
     const fs = require('fs');
     const logPath = '/tmp/mem100x-calltool.log';
     try {
-      fs.appendFileSync(logPath, `[${new Date().toISOString()}] [${request.method}] Received tool call: ${JSON.stringify(request)}\n`);
+      fs.appendFileSync(
+        logPath,
+        `[${new Date().toISOString()}] [${request.method}] Received tool call: ${JSON.stringify(request)}\n`
+      );
     } catch (e) {}
     const { name, arguments: args } = request.params;
     // The rest of the handler logic is identical to the CallToolRequestSchema handler
@@ -98,8 +109,8 @@ async function main() {
             created,
             performance: {
               duration: `${duration.toFixed(2)}ms`,
-              rate: `${rate} entities/sec`
-            }
+              rate: `${rate} entities/sec`,
+            },
           };
 
           const response = {
@@ -107,7 +118,11 @@ async function main() {
             structuredContent,
           };
 
-          process.stderr.write('[Mem100x] create_entities response: ' + JSON.stringify(response).substring(0, 200) + '...\n');
+          process.stderr.write(
+            '[Mem100x] create_entities response: ' +
+              JSON.stringify(response).substring(0, 200) +
+              '...\n'
+          );
           return response;
         }
         case 'search_nodes': {
@@ -122,25 +137,39 @@ async function main() {
             ...results,
             performance: {
               duration: `${duration.toFixed(2)}ms`,
-              resultCount: results.entities.length
-            }
+              resultCount: results.entities.length,
+            },
           };
 
           const response = {
-            content: [createTextContent(`Found ${results.entities.length} entities matching "${validated.query}"`)],
+            content: [
+              createTextContent(
+                `Found ${results.entities.length} entities matching "${validated.query}"`
+              ),
+            ],
             structuredContent,
           };
 
-          process.stderr.write('[Mem100x] search_nodes response: ' + JSON.stringify(response).substring(0, 200) + '...\n');
+          process.stderr.write(
+            '[Mem100x] search_nodes response: ' +
+              JSON.stringify(response).substring(0, 200) +
+              '...\n'
+          );
           return response;
         }
         case 'read_graph': {
           const fs = require('fs');
           const logPath = '/tmp/mem100x-read-graph.log';
           try {
-            fs.appendFileSync(logPath, `[${new Date().toISOString()}] Entered read_graph handler\n`);
+            fs.appendFileSync(
+              logPath,
+              `[${new Date().toISOString()}] Entered read_graph handler\n`
+            );
             const validated = toolSchemas.read_graph.parse(args);
-            fs.appendFileSync(logPath, `[${new Date().toISOString()}] Parsed args: ${JSON.stringify(validated)}\n`);
+            fs.appendFileSync(
+              logPath,
+              `[${new Date().toISOString()}] Parsed args: ${JSON.stringify(validated)}\n`
+            );
             const startTime = performance.now();
 
             const graph = db.readGraph(validated.limit, validated.offset || 0);
@@ -153,20 +182,31 @@ async function main() {
               performance: {
                 duration: `${duration.toFixed(2)}ms`,
                 entityCount: graph.entities.length,
-                relationCount: graph.relations.length
-              }
+                relationCount: graph.relations.length,
+              },
             };
 
             const response = {
-              content: [createTextContent(`Graph contains ${graph.entities.length} entities and ${graph.relations.length} relations`)],
+              content: [
+                createTextContent(
+                  `Graph contains ${graph.entities.length} entities and ${graph.relations.length} relations`
+                ),
+              ],
               structuredContent,
             };
 
             fs.appendFileSync(logPath, `[${new Date().toISOString()}] Returning response\n`);
-            process.stderr.write('[Mem100x] read_graph response: ' + JSON.stringify(response).substring(0, 200) + '...\n');
+            process.stderr.write(
+              '[Mem100x] read_graph response: ' +
+                JSON.stringify(response).substring(0, 200) +
+                '...\n'
+            );
             return response;
           } catch (err: any) {
-            fs.appendFileSync(logPath, `[${new Date().toISOString()}] ERROR: ${err && err.stack ? err.stack : err}\n`);
+            fs.appendFileSync(
+              logPath,
+              `[${new Date().toISOString()}] ERROR: ${err && err.stack ? err.stack : err}\n`
+            );
             process.stderr.write('[Mem100x] read_graph ERROR: ' + err.message + '\n');
             throw err;
           }
@@ -184,8 +224,8 @@ async function main() {
             created,
             performance: {
               duration: `${duration.toFixed(2)}ms`,
-              rate: `${rate} relations/sec`
-            }
+              rate: `${rate} relations/sec`,
+            },
           };
 
           const response = {
@@ -193,7 +233,11 @@ async function main() {
             structuredContent,
           };
 
-          process.stderr.write('[Mem100x] create_relations response: ' + JSON.stringify(response).substring(0, 200) + '...\n');
+          process.stderr.write(
+            '[Mem100x] create_relations response: ' +
+              JSON.stringify(response).substring(0, 200) +
+              '...\n'
+          );
           return response;
         }
         case 'add_observations': {
@@ -213,16 +257,24 @@ async function main() {
             success: true,
             observationsAdded: validated.updates.length,
             performance: {
-              duration: `${duration.toFixed(2)}ms`
-            }
+              duration: `${duration.toFixed(2)}ms`,
+            },
           };
 
           const response = {
-            content: [createTextContent(`Added observations to ${validated.updates.length} entities successfully`)],
+            content: [
+              createTextContent(
+                `Added observations to ${validated.updates.length} entities successfully`
+              ),
+            ],
             structuredContent,
           };
 
-          process.stderr.write('[Mem100x] add_observations response: ' + JSON.stringify(response).substring(0, 200) + '...\n');
+          process.stderr.write(
+            '[Mem100x] add_observations response: ' +
+              JSON.stringify(response).substring(0, 200) +
+              '...\n'
+          );
           return response;
         }
         case 'delete_entities': {
@@ -237,16 +289,22 @@ async function main() {
             success: true,
             deletedCount: validated.entityNames.length,
             performance: {
-              duration: `${duration.toFixed(2)}ms`
-            }
+              duration: `${duration.toFixed(2)}ms`,
+            },
           };
 
           const response = {
-            content: [createTextContent(`Deleted ${validated.entityNames.length} entities successfully`)],
+            content: [
+              createTextContent(`Deleted ${validated.entityNames.length} entities successfully`),
+            ],
             structuredContent,
           };
 
-          process.stderr.write('[Mem100x] delete_entities response: ' + JSON.stringify(response).substring(0, 200) + '...\n');
+          process.stderr.write(
+            '[Mem100x] delete_entities response: ' +
+              JSON.stringify(response).substring(0, 200) +
+              '...\n'
+          );
           return response;
         }
         case 'delete_observations': {
@@ -266,16 +324,24 @@ async function main() {
             success: true,
             deletionsProcessed: validated.deletions.length,
             performance: {
-              duration: `${duration.toFixed(2)}ms`
-            }
+              duration: `${duration.toFixed(2)}ms`,
+            },
           };
 
           const response = {
-            content: [createTextContent(`Deleted observations from ${validated.deletions.length} entities successfully`)],
+            content: [
+              createTextContent(
+                `Deleted observations from ${validated.deletions.length} entities successfully`
+              ),
+            ],
             structuredContent,
           };
 
-          process.stderr.write('[Mem100x] delete_observations response: ' + JSON.stringify(response).substring(0, 200) + '...\n');
+          process.stderr.write(
+            '[Mem100x] delete_observations response: ' +
+              JSON.stringify(response).substring(0, 200) +
+              '...\n'
+          );
           return response;
         }
         case 'delete_relations': {
@@ -290,16 +356,22 @@ async function main() {
             success: true,
             deletedCount: validated.relations.length,
             performance: {
-              duration: `${duration.toFixed(2)}ms`
-            }
+              duration: `${duration.toFixed(2)}ms`,
+            },
           };
 
           const response = {
-            content: [createTextContent(`Deleted ${validated.relations.length} relations successfully`)],
+            content: [
+              createTextContent(`Deleted ${validated.relations.length} relations successfully`),
+            ],
             structuredContent,
           };
 
-          process.stderr.write('[Mem100x] delete_relations response: ' + JSON.stringify(response).substring(0, 200) + '...\n');
+          process.stderr.write(
+            '[Mem100x] delete_relations response: ' +
+              JSON.stringify(response).substring(0, 200) +
+              '...\n'
+          );
           return response;
         }
         case 'open_nodes': {
@@ -315,30 +387,39 @@ async function main() {
             performance: {
               duration: `${duration.toFixed(2)}ms`,
               requestedCount: validated.names.length,
-              foundCount: results.entities.length
-            }
+              foundCount: results.entities.length,
+            },
           };
 
           const response = {
-            content: [createTextContent(`Opened ${results.entities.length} entities and found ${results.relations.length} relations`)],
+            content: [
+              createTextContent(
+                `Opened ${results.entities.length} entities and found ${results.relations.length} relations`
+              ),
+            ],
             structuredContent,
           };
 
-          process.stderr.write('[Mem100x] open_nodes response: ' + JSON.stringify(response).substring(0, 200) + '...\n');
+          process.stderr.write(
+            '[Mem100x] open_nodes response: ' + JSON.stringify(response).substring(0, 200) + '...\n'
+          );
           return response;
         }
         default:
           process.stderr.write('[Mem100x] Unknown tool: ' + name + '\n');
-          throw new McpError(
-            ErrorCode.MethodNotFound,
-            `Unknown tool: ${name}`
-          );
+          throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
       }
     } catch (error) {
-      process.stderr.write('[Mem100x] ToolHandler ERROR: ' + (error instanceof Error ? error.message : String(error)) + '\n');
+      process.stderr.write(
+        '[Mem100x] ToolHandler ERROR: ' +
+          (error instanceof Error ? error.message : String(error)) +
+          '\n'
+      );
       // Always return a valid MCP response structure
       return {
-        content: [createTextContent(`Error: ${error instanceof Error ? error.message : String(error)}`)],
+        content: [
+          createTextContent(`Error: ${error instanceof Error ? error.message : String(error)}`),
+        ],
         structuredContent: { error: error instanceof Error ? error.message : String(error) },
       };
     }

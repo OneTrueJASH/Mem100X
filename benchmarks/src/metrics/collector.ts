@@ -47,28 +47,28 @@ export class MetricsCollector {
 
   private async collectLinux(): Promise<ResourceMetrics> {
     const fs = await import('fs/promises');
-    
+
     // Read memory info from /proc
     const status = await fs.readFile(`/proc/${this.pid}/status`, 'utf-8');
     const vmRssMatch = status.match(/VmRSS:\s+(\d+)\s+kB/);
     const vmSizeMatch = status.match(/VmSize:\s+(\d+)\s+kB/);
-    
+
     // Read CPU info from /proc
     const stat = await fs.readFile(`/proc/${this.pid}/stat`, 'utf-8');
     const fields = stat.split(' ');
     const utime = parseInt(fields[13]);
     const stime = parseInt(fields[14]);
-    
+
     return {
       memory: {
         rss: vmRssMatch ? parseInt(vmRssMatch[1]) * 1024 : 0,
         heapTotal: vmSizeMatch ? parseInt(vmSizeMatch[1]) * 1024 : 0,
-        heapUsed: 0 // Not directly available
+        heapUsed: 0, // Not directly available
       },
       cpu: {
         user: utime,
-        system: stime
-      }
+        system: stime,
+      },
     };
   }
 
@@ -76,23 +76,23 @@ export class MetricsCollector {
     // Use ps command on macOS
     const { stdout } = await execAsync(`ps -p ${this.pid} -o rss,vsz,%cpu`);
     const lines = stdout.trim().split('\n');
-    
+
     if (lines.length < 2) {
       throw new Error('Process not found');
     }
-    
+
     const [rss, vsz, cpu] = lines[1].trim().split(/\s+/).map(Number);
-    
+
     return {
       memory: {
         rss: rss * 1024, // Convert KB to bytes
         heapTotal: vsz * 1024,
-        heapUsed: 0
+        heapUsed: 0,
       },
       cpu: {
         user: cpu,
-        system: 0
-      }
+        system: 0,
+      },
     };
   }
 
@@ -102,12 +102,12 @@ export class MetricsCollector {
       memory: {
         rss: process.memoryUsage().rss,
         heapTotal: process.memoryUsage().heapTotal,
-        heapUsed: process.memoryUsage().heapUsed
+        heapUsed: process.memoryUsage().heapUsed,
       },
       cpu: {
         user: process.cpuUsage().user,
-        system: process.cpuUsage().system
-      }
+        system: process.cpuUsage().system,
+      },
     };
   }
 
@@ -116,20 +116,20 @@ export class MetricsCollector {
       return null;
     }
 
-    const memoryRss = this.samples.map(s => s.memory.rss);
-    const cpuUser = this.samples.map(s => s.cpu.user);
-    
+    const memoryRss = this.samples.map((s) => s.memory.rss);
+    const cpuUser = this.samples.map((s) => s.cpu.user);
+
     return {
       memory: {
         initial: memoryRss[0],
         peak: Math.max(...memoryRss),
         final: memoryRss[memoryRss.length - 1],
-        average: memoryRss.reduce((a, b) => a + b, 0) / memoryRss.length
+        average: memoryRss.reduce((a, b) => a + b, 0) / memoryRss.length,
       },
       cpu: {
         average: cpuUser.reduce((a, b) => a + b, 0) / cpuUser.length,
-        peak: Math.max(...cpuUser)
-      }
+        peak: Math.max(...cpuUser),
+      },
     };
   }
 }

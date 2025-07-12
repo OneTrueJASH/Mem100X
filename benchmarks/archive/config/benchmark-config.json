@@ -33,9 +33,7 @@
               {
                 "name": "entity-{{timestamp}}-{{index}}",
                 "entityType": "benchmark",
-                "observations": [
-                  { "type": "text", "text": "Created at {{timestamp}}" }
-                ]
+                "observations": [{ "type": "text", "text": "Created at {{timestamp}}" }]
               }
             ]
           }
@@ -57,42 +55,58 @@
               {
                 "name": "batch-{{index}}-1",
                 "entityType": "benchmark",
-                "observations": [ { "type": "text", "text": "Batch entity 1 created at {{timestamp}}" } ]
+                "observations": [
+                  { "type": "text", "text": "Batch entity 1 created at {{timestamp}}" }
+                ]
               },
               {
                 "name": "batch-{{index}}-2",
                 "entityType": "benchmark",
-                "observations": [ { "type": "text", "text": "Batch entity 2 created at {{timestamp}}" } ]
+                "observations": [
+                  { "type": "text", "text": "Batch entity 2 created at {{timestamp}}" }
+                ]
               },
               {
                 "name": "batch-{{index}}-3",
                 "entityType": "benchmark",
-                "observations": [ { "type": "text", "text": "Batch entity 3 created at {{timestamp}}" } ]
+                "observations": [
+                  { "type": "text", "text": "Batch entity 3 created at {{timestamp}}" }
+                ]
               },
               {
                 "name": "batch-{{index}}-4",
                 "entityType": "benchmark",
-                "observations": [ { "type": "text", "text": "Batch entity 4 created at {{timestamp}}" } ]
+                "observations": [
+                  { "type": "text", "text": "Batch entity 4 created at {{timestamp}}" }
+                ]
               },
               {
                 "name": "batch-{{index}}-5",
                 "entityType": "benchmark",
-                "observations": [ { "type": "text", "text": "Batch entity 5 created at {{timestamp}}" } ]
+                "observations": [
+                  { "type": "text", "text": "Batch entity 5 created at {{timestamp}}" }
+                ]
               },
               {
                 "name": "batch-{{index}}-6",
                 "entityType": "benchmark",
-                "observations": [ { "type": "text", "text": "Batch entity 6 created at {{timestamp}}" } ]
+                "observations": [
+                  { "type": "text", "text": "Batch entity 6 created at {{timestamp}}" }
+                ]
               },
               {
                 "name": "batch-{{index}}-7",
                 "entityType": "benchmark",
-                "observations": [ { "type": "text", "text": "Batch entity 7 created at {{timestamp}}" } ]
+                "observations": [
+                  { "type": "text", "text": "Batch entity 7 created at {{timestamp}}" }
+                ]
               },
               {
                 "name": "batch-{{index}}-8",
                 "entityType": "benchmark",
-                "observations": [ { "type": "text", "text": "Batch entity 8 created at {{timestamp}}" } ]
+                "observations": [
+                  { "type": "text", "text": "Batch entity 8 created at {{timestamp}}" }
+                ]
               },
               {
                 "name": "batch-{{index}}-9",
@@ -470,9 +484,7 @@
               {
                 "name": "session-{{timestamp}}-{{index}}",
                 "entityType": "session",
-                "observations": [
-                  { "type": "text", "text": "User interaction at step {{index}}" }
-                ]
+                "observations": [{ "type": "text", "text": "User interaction at step {{index}}" }]
               }
             ]
           }

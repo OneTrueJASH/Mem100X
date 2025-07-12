@@ -39,19 +39,13 @@ export interface ToolContext {
 export function handleSetContext(args: any, ctx: ToolContext) {
   const validated = toolSchemas.set_context.parse(args) as SetContextInput;
   const message = ctx.manager.setContext(validated.context);
-  return createMCPToolResponse(
-    { message },
-    `Context set to: ${validated.context}`
-  );
+  return createMCPToolResponse({ message }, `Context set to: ${validated.context}`);
 }
 
 export function handleGetContextInfo(args: any, ctx: ToolContext) {
   toolSchemas.get_context_info.parse(args); // Validate empty object
   const contextInfo = ctx.manager.getContextInfo();
-  return createMCPToolResponse(
-    contextInfo,
-    `Current context: ${contextInfo.currentContext}`
-  );
+  return createMCPToolResponse(contextInfo, `Current context: ${contextInfo.currentContext}`);
 }
 
 // Entity operation handlers
@@ -150,10 +144,7 @@ export function handleCreateRelations(args: any, ctx: ToolContext) {
     },
   };
 
-  return createMCPToolResponse(
-    result,
-    `Created ${created.length} relations successfully`
-  );
+  return createMCPToolResponse(result, `Created ${created.length} relations successfully`);
 }
 
 export function handleDeleteRelations(args: any, ctx: ToolContext) {
@@ -249,10 +240,7 @@ export function handleBeginTransaction(args: any, ctx: ToolContext) {
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
 
-  return createMCPToolResponse(
-    result,
-    `Transaction ${transactionId} started successfully`
-  );
+  return createMCPToolResponse(result, `Transaction ${transactionId} started successfully`);
 }
 
 export function handleCommitTransaction(args: any, ctx: ToolContext) {
@@ -266,10 +254,7 @@ export function handleCommitTransaction(args: any, ctx: ToolContext) {
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
 
-  return createMCPToolResponse(
-    result,
-    'Transaction committed successfully'
-  );
+  return createMCPToolResponse(result, 'Transaction committed successfully');
 }
 
 export function handleRollbackTransaction(args: any, ctx: ToolContext) {
@@ -283,17 +268,14 @@ export function handleRollbackTransaction(args: any, ctx: ToolContext) {
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
 
-  return createMCPToolResponse(
-    result,
-    'Transaction rolled back successfully'
-  );
+  return createMCPToolResponse(result, 'Transaction rolled back successfully');
 }
 
 // Backup and restore handlers
 export function handleCreateBackup(args: any, ctx: ToolContext) {
   const validated = toolSchemas.create_backup.parse(args) as CreateBackupInput;
   const backupInfo = ctx.manager.createBackup(
-    validated.backupPath || '',  // Empty string will be handled by the manager
+    validated.backupPath || '', // Empty string will be handled by the manager
     validated.context || ctx.manager.currentContext
   );
   const duration = performance.now() - ctx.startTime;
@@ -308,10 +290,7 @@ export function handleCreateBackup(args: any, ctx: ToolContext) {
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
 
-  return createMCPToolResponse(
-    result,
-    `Backup created successfully at ${backupInfo.path}`
-  );
+  return createMCPToolResponse(result, `Backup created successfully at ${backupInfo.path}`);
 }
 
 export function handleRestoreBackup(args: any, ctx: ToolContext) {
@@ -345,16 +324,13 @@ export function handleRestoreBackup(args: any, ctx: ToolContext) {
 // Graph traversal handlers
 export function handleGetNeighbors(args: any, ctx: ToolContext) {
   const validated = toolSchemas.get_neighbors.parse(args) as GetNeighborsInput;
-  const result = ctx.manager.getNeighbors(
-    validated.entityName,
-    {
-      direction: validated.direction || 'both',
-      relationType: validated.relationType,
-      depth: validated.depth || 1,
-      includeRelations: validated.includeRelations !== false,
-      context: validated.context
-    }
-  );
+  const result = ctx.manager.getNeighbors(validated.entityName, {
+    direction: validated.direction || 'both',
+    relationType: validated.relationType,
+    depth: validated.depth || 1,
+    includeRelations: validated.includeRelations !== false,
+    context: validated.context,
+  });
   const duration = performance.now() - ctx.startTime;
 
   const response = {
@@ -363,7 +339,7 @@ export function handleGetNeighbors(args: any, ctx: ToolContext) {
       duration: `${duration.toFixed(2)}ms`,
       nodesVisited: result.entities.length,
       relationsFound: result.relations?.length || 0,
-      depth: validated.depth || 1
+      depth: validated.depth || 1,
     },
   };
 
@@ -375,16 +351,12 @@ export function handleGetNeighbors(args: any, ctx: ToolContext) {
 
 export function handleFindShortestPath(args: any, ctx: ToolContext) {
   const validated = toolSchemas.find_shortest_path.parse(args) as FindShortestPathInput;
-  const result = ctx.manager.findShortestPath(
-    validated.from,
-    validated.to,
-    {
-      bidirectional: validated.bidirectional !== false,
-      relationType: validated.relationType,
-      maxDepth: validated.maxDepth || 6,
-      context: validated.context
-    }
-  );
+  const result = ctx.manager.findShortestPath(validated.from, validated.to, {
+    bidirectional: validated.bidirectional !== false,
+    relationType: validated.relationType,
+    maxDepth: validated.maxDepth || 6,
+    context: validated.context,
+  });
   const duration = performance.now() - ctx.startTime;
 
   const response = {
@@ -394,7 +366,7 @@ export function handleFindShortestPath(args: any, ctx: ToolContext) {
     performance: {
       duration: `${duration.toFixed(2)}ms`,
       nodesExplored: result.nodesExplored || 0,
-      pathLength: result.distance
+      pathLength: result.distance,
     },
   };
 
@@ -402,45 +374,42 @@ export function handleFindShortestPath(args: any, ctx: ToolContext) {
     ? `Found path from "${validated.from}" to "${validated.to}" with distance ${result.distance}`
     : `No path found from "${validated.from}" to "${validated.to}"`;
 
-  return createMCPToolResponse(
-    response,
-    message
-  );
+  return createMCPToolResponse(response, message);
 }
 
 // Tool handler registry
 export const toolHandlers: Record<string, (args: any, ctx: ToolContext) => any> = {
   // Context management
-  'set_context': handleSetContext,
-  'get_context_info': handleGetContextInfo,
+  set_context: handleSetContext,
+  get_context_info: handleGetContextInfo,
 
   // Entity operations
-  'create_entities': handleCreateEntities,
-  'search_nodes': handleSearchNodes,
-  'read_graph': handleReadGraph,
-  'open_nodes': handleOpenNodes,
+  create_entities: handleCreateEntities,
+  search_nodes: handleSearchNodes,
+  read_graph: handleReadGraph,
+  open_nodes: handleOpenNodes,
 
   // Relation operations
-  'create_relations': handleCreateRelations,
-  'delete_relations': handleDeleteRelations,
+  create_relations: handleCreateRelations,
+  delete_relations: handleDeleteRelations,
 
   // Observation operations
-  'add_observations': handleAddObservations,
-  'delete_observations': handleDeleteObservations,
+  add_observations: handleAddObservations,
+  delete_observations: handleDeleteObservations,
 
   // Entity deletion
-  'delete_entities': handleDeleteEntities,
+  delete_entities: handleDeleteEntities,
 
   // Transaction management
-  'begin_transaction': handleBeginTransaction,
-  'commit_transaction': handleCommitTransaction,
-  'rollback_transaction': handleRollbackTransaction,
+  begin_transaction: handleBeginTransaction,
+  commit_transaction: handleCommitTransaction,
+  rollback_transaction: handleRollbackTransaction,
 
   // Backup and restore
-  'create_backup': handleCreateBackup,
-  'restore_backup': handleRestoreBackup,
+  create_backup: handleCreateBackup,
+  restore_backup: handleRestoreBackup,
 
   // Graph traversal
-  'get_neighbors': handleGetNeighbors,
-  'find_shortest_path': handleFindShortestPath,
+  get_neighbors: handleGetNeighbors,
+  find_shortest_path: handleFindShortestPath,
 };

@@ -30,8 +30,13 @@ export interface ScenarioConfig {
 }
 
 export interface Operation {
-  type: 'create_entities' | 'search_nodes' | 'create_relations' | 
-        'add_observations' | 'read_graph' | 'delete_entities';
+  type:
+    | 'create_entities'
+    | 'search_nodes'
+    | 'create_relations'
+    | 'add_observations'
+    | 'read_graph'
+    | 'delete_entities';
   weight: number; // For mixed workloads
   params?: any;
 }

@@ -97,7 +97,10 @@ export function validateContentBlock(content: any, path: string[] = []): void {
     }
   }
 
-  if ((content.type === 'image' || content.type === 'audio' || content.type === 'resource') && content.data) {
+  if (
+    (content.type === 'image' || content.type === 'audio' || content.type === 'resource') &&
+    content.data
+  ) {
     if (content.data.length > INPUT_SIZE_LIMITS.MAX_BASE64_LENGTH) {
       throw new McpError(
         ErrorCode.InvalidParams,
@@ -120,10 +123,7 @@ export function validateEntityInput(entity: any): void {
 
   if (entity.observations) {
     if (!Array.isArray(entity.observations)) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'Entity observations must be an array'
-      );
+      throw new McpError(ErrorCode.InvalidParams, 'Entity observations must be an array');
     }
 
     entity.observations.forEach((obs: any, index: number) => {
@@ -150,7 +150,10 @@ export function validateRelationInput(relation: any): void {
     );
   }
 
-  if (relation.relationType && relation.relationType.length > INPUT_SIZE_LIMITS.MAX_RELATION_TYPE_LENGTH) {
+  if (
+    relation.relationType &&
+    relation.relationType.length > INPUT_SIZE_LIMITS.MAX_RELATION_TYPE_LENGTH
+  ) {
     throw new McpError(
       ErrorCode.InvalidParams,
       `Relation type exceeds maximum length of ${INPUT_SIZE_LIMITS.MAX_RELATION_TYPE_LENGTH} characters`
@@ -170,10 +173,7 @@ export function validateToolInput(toolName: string, args: any): void {
     case 'create_entities':
       if (args.entities) {
         if (!Array.isArray(args.entities)) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            'Entities must be an array'
-          );
+          throw new McpError(ErrorCode.InvalidParams, 'Entities must be an array');
         }
         args.entities.forEach((entity: any, index: number) => {
           validateEntityInput(entity);
@@ -184,10 +184,7 @@ export function validateToolInput(toolName: string, args: any): void {
     case 'create_relations':
       if (args.relations) {
         if (!Array.isArray(args.relations)) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            'Relations must be an array'
-          );
+          throw new McpError(ErrorCode.InvalidParams, 'Relations must be an array');
         }
         args.relations.forEach((relation: any, index: number) => {
           validateRelationInput(relation);
@@ -198,17 +195,11 @@ export function validateToolInput(toolName: string, args: any): void {
     case 'add_observations':
       if (args.observations) {
         if (!Array.isArray(args.observations)) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            'Observations must be an array'
-          );
+          throw new McpError(ErrorCode.InvalidParams, 'Observations must be an array');
         }
         args.observations.forEach((obs: any, obsIndex: number) => {
           if (obs.entityName && obs.entityName.length > INPUT_SIZE_LIMITS.MAX_ENTITY_NAME_LENGTH) {
-            throw new McpError(
-              ErrorCode.InvalidParams,
-              `Entity name exceeds maximum length`
-            );
+            throw new McpError(ErrorCode.InvalidParams, `Entity name exceeds maximum length`);
           }
           if (obs.contents) {
             if (!Array.isArray(obs.contents)) {
@@ -218,7 +209,12 @@ export function validateToolInput(toolName: string, args: any): void {
               );
             }
             obs.contents.forEach((content: any, contentIndex: number) => {
-              validateContentBlock(content, ['observations', String(obsIndex), 'contents', String(contentIndex)]);
+              validateContentBlock(content, [
+                'observations',
+                String(obsIndex),
+                'contents',
+                String(contentIndex),
+              ]);
             });
           }
         });
@@ -228,17 +224,14 @@ export function validateToolInput(toolName: string, args: any): void {
     case 'delete_observations':
       if (args.deletions) {
         if (!Array.isArray(args.deletions)) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            'Deletions must be an array'
-          );
+          throw new McpError(ErrorCode.InvalidParams, 'Deletions must be an array');
         }
         args.deletions.forEach((deletion: any, index: number) => {
-          if (deletion.entityName && deletion.entityName.length > INPUT_SIZE_LIMITS.MAX_ENTITY_NAME_LENGTH) {
-            throw new McpError(
-              ErrorCode.InvalidParams,
-              `Entity name exceeds maximum length`
-            );
+          if (
+            deletion.entityName &&
+            deletion.entityName.length > INPUT_SIZE_LIMITS.MAX_ENTITY_NAME_LENGTH
+          ) {
+            throw new McpError(ErrorCode.InvalidParams, `Entity name exceeds maximum length`);
           }
           if (deletion.observations) {
             if (!Array.isArray(deletion.observations)) {
@@ -248,7 +241,12 @@ export function validateToolInput(toolName: string, args: any): void {
               );
             }
             deletion.observations.forEach((obs: any, obsIndex: number) => {
-              validateContentBlock(obs, ['deletions', String(index), 'observations', String(obsIndex)]);
+              validateContentBlock(obs, [
+                'deletions',
+                String(index),
+                'observations',
+                String(obsIndex),
+              ]);
             });
           }
         });

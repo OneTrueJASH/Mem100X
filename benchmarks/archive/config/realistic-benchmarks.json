@@ -326,9 +326,7 @@
             "observations": [
               {
                 "entityName": "read-heavy-{{timestamp}}-1",
-                "contents": [
-                  { "type": "text", "text": "Updated observation: {{randomUpdate}}" }
-                ]
+                "contents": [{ "type": "text", "text": "Updated observation: {{randomUpdate}}" }]
               }
             ]
           }
@@ -344,13 +342,52 @@
     "collectMetrics": true,
     "outputFormat": "table",
     "randomData": {
-      "topics": ["AI", "Machine Learning", "Data Science", "Programming", "Research", "Collaboration", "Analysis"],
+      "topics": [
+        "AI",
+        "Machine Learning",
+        "Data Science",
+        "Programming",
+        "Research",
+        "Collaboration",
+        "Analysis"
+      ],
       "users": ["alice", "bob", "charlie", "diana", "eve", "frank", "grace"],
-      "projects": ["Project Alpha", "Project Beta", "Project Gamma", "Research Initiative", "Data Analysis"],
+      "projects": [
+        "Project Alpha",
+        "Project Beta",
+        "Project Gamma",
+        "Research Initiative",
+        "Data Analysis"
+      ],
       "sources": ["Paper", "Article", "Book", "Website", "Interview", "Experiment", "Survey"],
-      "searchTerms": ["algorithm", "method", "approach", "technique", "analysis", "result", "finding", "conclusion"],
-      "contexts": ["meeting", "discussion", "brainstorming", "review", "planning", "execution", "evaluation"],
-      "thoughts": ["insight", "observation", "hypothesis", "question", "idea", "concern", "suggestion"]
+      "searchTerms": [
+        "algorithm",
+        "method",
+        "approach",
+        "technique",
+        "analysis",
+        "result",
+        "finding",
+        "conclusion"
+      ],
+      "contexts": [
+        "meeting",
+        "discussion",
+        "brainstorming",
+        "review",
+        "planning",
+        "execution",
+        "evaluation"
+      ],
+      "thoughts": [
+        "insight",
+        "observation",
+        "hypothesis",
+        "question",
+        "idea",
+        "concern",
+        "suggestion"
+      ]
     }
   }
 }

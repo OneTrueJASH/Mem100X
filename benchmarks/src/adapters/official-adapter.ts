@@ -8,7 +8,7 @@ export class OfficialMemoryAdapter extends BaseAdapter {
 
   constructor(config: ServerConfig) {
     super('official-memory', config);
-    
+
     // Determine the executable path based on environment
     if (process.env.BENCHMARK_MODE === 'docker') {
       this.execPath = '/app/servers/src/memory/build/index.js';
@@ -16,16 +16,17 @@ export class OfficialMemoryAdapter extends BaseAdapter {
       // Local development mode
       // Check if symlink exists first
       const symlinkPath = path.join(
-        process.cwd(), 
-        'servers', 
-        'official-memory', 
-        'dist', 
+        process.cwd(),
+        'servers',
+        'official-memory',
+        'dist',
         'index.js'
       );
-      
+
       // Fallback to direct path if symlink doesn't exist
-      const directPath = '/Users/josh/source/personal/mcp-servers-official/src/memory/dist/index.js';
-      
+      const directPath =
+        '/Users/josh/source/personal/mcp-servers-official/src/memory/dist/index.js';
+
       // Use fs.existsSync to check which path to use
       const fs = require('fs');
       if (fs.existsSync(symlinkPath)) {
@@ -33,7 +34,9 @@ export class OfficialMemoryAdapter extends BaseAdapter {
       } else if (fs.existsSync(directPath)) {
         this.execPath = directPath;
       } else {
-        throw new Error('Official memory server not found. Please run setup-official-server.sh first.');
+        throw new Error(
+          'Official memory server not found. Please run setup-official-server.sh first.'
+        );
       }
     }
   }
@@ -45,7 +48,7 @@ export class OfficialMemoryAdapter extends BaseAdapter {
   protected getArgs(): string[] {
     return [this.execPath];
   }
-  
+
   protected getEnv(): Record<string, string> {
     return {
       ...process.env,

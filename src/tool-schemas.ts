@@ -137,42 +137,70 @@ export const toolSchemas = {
 
   // Backup and restore
   create_backup: z.object({
-    backupPath: z.string().optional().describe('Path for the backup file. If not provided, a timestamped backup will be created in the default backup directory'),
-    context: z.string().optional().describe('Specific context to backup. If not provided, backs up current context'),
+    backupPath: z
+      .string()
+      .optional()
+      .describe(
+        'Path for the backup file. If not provided, a timestamped backup will be created in the default backup directory'
+      ),
+    context: z
+      .string()
+      .optional()
+      .describe('Specific context to backup. If not provided, backs up current context'),
   }),
 
   restore_backup: z.object({
     backupPath: z.string().describe('Path to the backup file to restore'),
-    context: z.string().optional().describe('Context to restore to. If not provided, restores to current context'),
+    context: z
+      .string()
+      .optional()
+      .describe('Context to restore to. If not provided, restores to current context'),
     confirmRestore: z.boolean().describe('Must be true to confirm the restore operation'),
   }),
 
   // Graph traversal operations
   get_neighbors: z.object({
     entityName: z.string().min(1, 'Entity name is required'),
-    direction: z.enum(['outgoing', 'incoming', 'both']).default('both').optional()
+    direction: z
+      .enum(['outgoing', 'incoming', 'both'])
+      .default('both')
+      .optional()
       .describe('Direction of relations to follow'),
-    relationType: z.string().optional()
-      .describe('Filter by specific relation type'),
-    depth: z.number().int().min(1).max(5).default(1).optional()
+    relationType: z.string().optional().describe('Filter by specific relation type'),
+    depth: z
+      .number()
+      .int()
+      .min(1)
+      .max(5)
+      .default(1)
+      .optional()
       .describe('How many hops to traverse (1-5)'),
-    includeRelations: z.boolean().default(true).optional()
+    includeRelations: z
+      .boolean()
+      .default(true)
+      .optional()
       .describe('Include relation details in response'),
-    context: z.string().optional()
-      .describe('Specific context to search in'),
+    context: z.string().optional().describe('Specific context to search in'),
   }),
 
   find_shortest_path: z.object({
     from: z.string().min(1, 'Source entity name is required'),
     to: z.string().min(1, 'Target entity name is required'),
-    bidirectional: z.boolean().default(true).optional()
+    bidirectional: z
+      .boolean()
+      .default(true)
+      .optional()
       .describe('Whether to follow relations in both directions'),
-    relationType: z.string().optional()
-      .describe('Filter by specific relation type'),
-    maxDepth: z.number().int().min(1).max(10).default(6).optional()
+    relationType: z.string().optional().describe('Filter by specific relation type'),
+    maxDepth: z
+      .number()
+      .int()
+      .min(1)
+      .max(10)
+      .default(6)
+      .optional()
       .describe('Maximum path length to search (1-10)'),
-    context: z.string().optional()
-      .describe('Specific context to search in'),
+    context: z.string().optional().describe('Specific context to search in'),
   }),
 };
 
@@ -210,7 +238,7 @@ export {
 export function validateToolInput<T extends keyof typeof toolSchemas>(
   toolName: T,
   input: unknown
-): z.infer<typeof toolSchemas[T]> {
+): z.infer<(typeof toolSchemas)[T]> {
   const schema = toolSchemas[toolName];
   if (!schema) {
     throw new Error(`No schema defined for tool: ${toolName}`);

@@ -27,7 +27,7 @@ export function validateDestructiveOperation(toolName: string, args: any): void 
   if (!isDestructiveOperation(toolName)) {
     return;
   }
-  
+
   // Check for confirmation flag
   if (!args.confirm || args.confirm !== true) {
     throw new McpError(
@@ -44,17 +44,17 @@ export function addDestructiveSafetyInfo(toolDefinition: any, toolName: string):
   if (!isDestructiveOperation(toolName)) {
     return toolDefinition;
   }
-  
+
   // Clone the definition to avoid mutation
   const safeDef = JSON.parse(JSON.stringify(toolDefinition));
-  
+
   // Add confirm property to input schema
   if (!safeDef.inputSchema.properties.confirm) {
     safeDef.inputSchema.properties.confirm = {
       type: 'boolean',
       description: 'Required confirmation for this destructive operation. Must be true.',
     };
-    
+
     // Add to required fields if not already there
     if (!safeDef.inputSchema.required) {
       safeDef.inputSchema.required = [];
@@ -63,11 +63,11 @@ export function addDestructiveSafetyInfo(toolDefinition: any, toolName: string):
       safeDef.inputSchema.required.push('confirm');
     }
   }
-  
+
   // Update description to mention confirmation requirement
   if (safeDef.description && !safeDef.description.includes('requires confirmation')) {
     safeDef.description += ' ⚠️ This is a destructive operation and requires confirmation.';
   }
-  
+
   return safeDef;
 }

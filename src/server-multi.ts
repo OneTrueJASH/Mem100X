@@ -15,7 +15,7 @@ import { getAllToolDefinitions } from './tool-definitions.js';
 import { stringifyGeneric, createTextContent } from './utils/fast-json.js';
 import { logger, logError, logInfo } from './utils/logger.js';
 import { config } from './config.js';
-import { CircuitBreaker } from './utils/circuit-breaker.js';
+import { createCircuitBreaker, CircuitBreaker } from './utils/circuit-breaker.js';
 import { ZeroDelayWriteAggregator } from './utils/zero-delay-aggregator.js';
 import { mapErrorToMcpCode, createMcpError } from './utils/mcp-errors.js';
 import { validateToolInput } from './utils/input-validation.js';
@@ -49,7 +49,12 @@ export async function main() {
       ? { failureThreshold: 3, resetTimeout: 10000, halfOpenMaxAttempts: 2 }
       : { failureThreshold: 5, resetTimeout: 5000, halfOpenMaxAttempts: 3 };
 
-    circuitBreakers.set(toolName, new CircuitBreaker(options));
+    circuitBreakers.set(toolName, createCircuitBreaker({
+      failureThreshold: options.failureThreshold,
+      recoveryTimeout: options.resetTimeout,
+      expectedVolume: 1000,
+      enableBulkOperations: true
+    }));
   }
 
   const server = new Server(
@@ -61,7 +66,7 @@ export async function main() {
       capabilities: {
         tools: {},
         resources: {},
-        prompts: {}
+        prompts: {},
       },
     }
   );
@@ -80,8 +85,10 @@ export async function main() {
     const requestStartTime = process.hrtime.bigint();
 
     // Extract correlation ID from request meta
-    const correlationId = String(request.params._meta?.progressToken ||
-                         `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+    const correlationId = String(
+      request.params._meta?.progressToken ||
+        `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    );
 
     let requestSuccess = false;
 
@@ -130,27 +137,27 @@ export async function main() {
       // Execute all other operations through circuit breaker
       else {
         result = await circuitBreaker.execute(async () => {
-        const dbCallStartTime = process.hrtime.bigint();
+          const dbCallStartTime = process.hrtime.bigint();
 
-        const context: ToolContext = {
-          manager,
-          startTime: performance.now(),
-          toolName: name,
-          correlationId,
-        };
+          const context: ToolContext = {
+            manager,
+            startTime: performance.now(),
+            toolName: name,
+            correlationId,
+          };
 
-        const dbResult = await handler(args, context);
+          const dbResult = await handler(args, context);
 
-        const dbCallEndTime = process.hrtime.bigint();
-        const dbCallTime = Number(dbCallEndTime - dbCallStartTime) / 1_000_000;
+          const dbCallEndTime = process.hrtime.bigint();
+          const dbCallTime = Number(dbCallEndTime - dbCallStartTime) / 1_000_000;
 
-        // Log timing for operations
-        if (dbCallTime > 50) {
-          logInfo(`DB timing for ${name}`, { dbCallTime_ms: dbCallTime });
-        }
+          // Log timing for operations
+          if (dbCallTime > 50) {
+            logInfo(`DB timing for ${name}`, { dbCallTime_ms: dbCallTime });
+          }
 
-        return dbResult;
-      });
+          return dbResult;
+        });
       }
 
       const circuitBreakerEndTime = process.hrtime.bigint();
@@ -158,14 +165,16 @@ export async function main() {
 
       // Calculate timings
       const totalRequestTime = Number(requestEndTime - requestStartTime) / 1_000_000;
-      const circuitBreakerTime = Number(circuitBreakerEndTime - circuitBreakerStartTime) / 1_000_000;
+      const circuitBreakerTime =
+        Number(circuitBreakerEndTime - circuitBreakerStartTime) / 1_000_000;
 
       // Log timing details for analysis
-      if (totalRequestTime > 50) { // Log slow requests
+      if (totalRequestTime > 50) {
+        // Log slow requests
         logInfo(`Request timing for ${name}`, {
           totalRequestTime_ms: totalRequestTime,
           circuitBreakerTime_ms: circuitBreakerTime,
-          overhead_ms: circuitBreakerTime - totalRequestTime
+          overhead_ms: circuitBreakerTime - totalRequestTime,
         });
       }
 
@@ -184,7 +193,12 @@ export async function main() {
       let content, structuredContent;
 
       // Check if result already has the MCP format
-      if (result && typeof result === 'object' && 'content' in result && 'structuredContent' in result) {
+      if (
+        result &&
+        typeof result === 'object' &&
+        'content' in result &&
+        'structuredContent' in result
+      ) {
         content = result.content;
         structuredContent = result.structuredContent;
       } else {
@@ -222,7 +236,7 @@ export async function main() {
       // Handle circuit breaker open state
       if (error instanceof Error && error.message.includes('Circuit breaker is open')) {
         const breaker = circuitBreakers.get(name);
-        const stats = breaker?.getStats();
+        const stats = breaker?.getStatus();
         logError(`Circuit breaker open for ${name}`, error, { stats });
         throw new McpError(
           ErrorCode.InternalError,
@@ -232,7 +246,9 @@ export async function main() {
 
       if (error && typeof error === 'object' && 'issues' in error) {
         const zodError = error as any;
-        const issues = zodError.issues.map((issue: any) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
+        const issues = zodError.issues
+          .map((issue: any) => `${issue.path.join('.')}: ${issue.message}`)
+          .join(', ');
         throw new McpError(ErrorCode.InvalidParams, `Invalid parameters for ${name}: ${issues}`);
       }
 
@@ -241,7 +257,7 @@ export async function main() {
       logError(`Error executing tool: ${name}`, error as Error, {
         args,
         mcpError,
-        correlationId
+        correlationId,
       });
       throw new McpError(mcpError.code, mcpError.message, mcpError.data);
     } finally {
@@ -262,7 +278,7 @@ export async function main() {
 
       // Stop rate limiters if enabled
       if (rateLimiters) {
-        Object.values(rateLimiters).forEach(limiter => limiter.stop());
+        Object.values(rateLimiters).forEach((limiter) => limiter.stop());
         logInfo('Rate limiters stopped.');
       }
 

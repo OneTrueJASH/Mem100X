@@ -1,12 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import {
-  ServerAdapter,
-  Operation,
-  OperationResult,
-  ResourceMetrics,
-  ServerConfig
-} from '../types';
+import { ServerAdapter, Operation, OperationResult, ResourceMetrics, ServerConfig } from '../types';
 import microtime from 'microtime';
 import { spawn, ChildProcess } from 'child_process';
 
@@ -43,7 +37,10 @@ export abstract class BaseAdapter implements ServerAdapter {
   protected createdEntities: string[] = [];
   private entitiesMutex = new Mutex(); // Add mutex for synchronizing access to createdEntities
 
-  constructor(public name: string, config: ServerConfig) {
+  constructor(
+    public name: string,
+    config: ServerConfig
+  ) {
     this.config = config;
   }
 
@@ -60,12 +57,15 @@ export abstract class BaseAdapter implements ServerAdapter {
     // Store transport for later access
     (this as any).transport = transport;
 
-    this.client = new Client({
-      name: `benchmark-client-${this.name}`,
-      version: '1.0.0',
-    }, {
-      capabilities: {}
-    });
+    this.client = new Client(
+      {
+        name: `benchmark-client-${this.name}`,
+        version: '1.0.0',
+      },
+      {
+        capabilities: {},
+      }
+    );
 
     // Add error handler
     this.client.onerror = (error) => {
@@ -137,16 +137,21 @@ export abstract class BaseAdapter implements ServerAdapter {
       return {
         success: true,
         duration,
-        data: result
+        data: result,
       };
     } catch (error) {
       const duration = microtime.now() - startTime;
-      console.error(`[${this.name}] Operation failed:`, error instanceof Error ? error.message : error, 'Full error:', error);
+      console.error(
+        `[${this.name}] Operation failed:`,
+        error instanceof Error ? error.message : error,
+        'Full error:',
+        error
+      );
 
       return {
         success: false,
         duration,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
@@ -163,7 +168,7 @@ export abstract class BaseAdapter implements ServerAdapter {
       cpu: {
         user: process.cpuUsage().user,
         system: process.cpuUsage().system,
-      }
+      },
     };
   }
 
@@ -182,11 +187,13 @@ export abstract class BaseAdapter implements ServerAdapter {
     if (!params) {
       const entityName = `test-entity-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       params = {
-        entities: [{
-          name: entityName,
-          entityType: 'benchmark',
-          observations: [{ type: 'text', text: 'Test observation' }]
-        }]
+        entities: [
+          {
+            name: entityName,
+            entityType: 'benchmark',
+            observations: [{ type: 'text', text: 'Test observation' }],
+          },
+        ],
       };
     }
 
@@ -210,7 +217,7 @@ export abstract class BaseAdapter implements ServerAdapter {
 
     return await this.client!.callTool({
       name: 'create_entities',
-      arguments: params
+      arguments: params,
     });
   }
 
@@ -218,8 +225,8 @@ export abstract class BaseAdapter implements ServerAdapter {
     return await this.client!.callTool({
       name: 'search_nodes',
       arguments: params || {
-        query: 'test'
-      }
+        query: 'test',
+      },
     });
   }
 
@@ -236,14 +243,14 @@ export abstract class BaseAdapter implements ServerAdapter {
               {
                 name: `relation-entity-1-${Date.now()}`,
                 entityType: 'benchmark',
-                observations: [{ type: 'text', text: 'Entity for relation test' }]
+                observations: [{ type: 'text', text: 'Entity for relation test' }],
               },
               {
                 name: `relation-entity-2-${Date.now()}`,
                 entityType: 'benchmark',
-                observations: [{ type: 'text', text: 'Entity for relation test' }]
-              }
-            ]
+                observations: [{ type: 'text', text: 'Entity for relation test' }],
+              },
+            ],
           });
         }
 
@@ -252,11 +259,13 @@ export abstract class BaseAdapter implements ServerAdapter {
         const toEntity = this.createdEntities[this.createdEntities.length - 1];
 
         params = {
-          relations: [{
-            from: fromEntity,
-            to: toEntity,
-            relationType: 'relates_to'
-          }]
+          relations: [
+            {
+              from: fromEntity,
+              to: toEntity,
+              relationType: 'relates_to',
+            },
+          ],
         };
       } finally {
         this.entitiesMutex.release();
@@ -265,7 +274,7 @@ export abstract class BaseAdapter implements ServerAdapter {
 
     return await this.client!.callTool({
       name: 'create_relations',
-      arguments: params
+      arguments: params,
     });
   }
 
@@ -280,15 +289,16 @@ export abstract class BaseAdapter implements ServerAdapter {
         }
 
         // Use a random existing entity
-        const entityName = this.createdEntities[
-          Math.floor(Math.random() * this.createdEntities.length)
-        ];
+        const entityName =
+          this.createdEntities[Math.floor(Math.random() * this.createdEntities.length)];
 
         params = {
-          observations: [{
-            entityName: entityName,
-            contents: [{ type: 'text', text: `New observation at ${Date.now()}` }]
-          }]
+          observations: [
+            {
+              entityName: entityName,
+              contents: [{ type: 'text', text: `New observation at ${Date.now()}` }],
+            },
+          ],
         };
       } finally {
         this.entitiesMutex.release();
@@ -297,14 +307,14 @@ export abstract class BaseAdapter implements ServerAdapter {
 
     return await this.client!.callTool({
       name: 'add_observations',
-      arguments: params
+      arguments: params,
     });
   }
 
   private async readGraph(params: any) {
     return await this.client!.callTool({
       name: 'read_graph',
-      arguments: params || {}
+      arguments: params || {},
     });
   }
 
@@ -332,7 +342,7 @@ export abstract class BaseAdapter implements ServerAdapter {
 
         params = {
           entityNames: [entityToDelete],
-          confirm: true  // Required for destructive operations
+          confirm: true, // Required for destructive operations
         };
       } finally {
         this.entitiesMutex.release();
@@ -341,7 +351,7 @@ export abstract class BaseAdapter implements ServerAdapter {
 
     return await this.client!.callTool({
       name: 'delete_entities',
-      arguments: params
+      arguments: params,
     });
   }
 }

@@ -37,6 +37,7 @@ Please send a detailed report to the project maintainers through GitHub (check t
 ### 5. Disclosure
 
 We follow responsible disclosure:
+
 - The vulnerability will not be publicly disclosed until a patch is available
 - Credit will be given to the reporter (unless you prefer to remain anonymous)
 

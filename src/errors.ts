@@ -9,26 +9,26 @@
 export class Mem100xError extends Error {
   public readonly timestamp: Date;
   public readonly context?: Record<string, any>;
-  
+
   constructor(message: string, context?: Record<string, any>) {
     super(message);
     this.name = this.constructor.name;
     this.timestamp = new Date();
     this.context = context;
-    
+
     // Maintains proper stack trace for where error was thrown
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, this.constructor);
     }
   }
-  
+
   toJSON() {
     return {
       name: this.name,
       message: this.message,
       timestamp: this.timestamp.toISOString(),
       context: this.context,
-      stack: this.stack
+      stack: this.stack,
     };
   }
 }
@@ -44,7 +44,7 @@ export class DatabaseError extends Mem100xError {
 
 export class EntityNotFoundError extends DatabaseError {
   public readonly entityName: string;
-  
+
   constructor(entityName: string) {
     super(`Entity not found: ${entityName}`, { entityName });
     this.entityName = entityName;
@@ -53,7 +53,7 @@ export class EntityNotFoundError extends DatabaseError {
 
 export class DuplicateEntityError extends DatabaseError {
   public readonly entityName: string;
-  
+
   constructor(entityName: string) {
     super(`Entity already exists: ${entityName}`, { entityName });
     this.entityName = entityName;
@@ -64,7 +64,7 @@ export class InvalidRelationError extends DatabaseError {
   public readonly from: string;
   public readonly to: string;
   public readonly relationType: string;
-  
+
   constructor(from: string, to: string, relationType: string, reason: string) {
     super(`Invalid relation: ${reason}`, { from, to, relationType });
     this.from = from;
@@ -106,12 +106,12 @@ export class ContextError extends Mem100xError {
 export class InvalidContextError extends ContextError {
   public readonly invalidContext: string;
   public readonly validContexts: string[];
-  
+
   constructor(invalidContext: string, validContexts: string[]) {
-    super(
-      `Invalid context '${invalidContext}'. Valid contexts: ${validContexts.join(', ')}`,
-      { invalidContext, validContexts }
-    );
+    super(`Invalid context '${invalidContext}'. Valid contexts: ${validContexts.join(', ')}`, {
+      invalidContext,
+      validContexts,
+    });
     this.invalidContext = invalidContext;
     this.validContexts = validContexts;
   }
@@ -129,7 +129,7 @@ export class ContextDetectionError extends ContextError {
 export class ValidationError extends Mem100xError {
   public readonly field?: string;
   public readonly value?: any;
-  
+
   constructor(message: string, field?: string, value?: any) {
     super(message, { field, value });
     this.field = field;
@@ -158,7 +158,7 @@ export class ConfigurationError extends Mem100xError {
 
 export class MissingConfigError extends ConfigurationError {
   public readonly configKey: string;
-  
+
   constructor(configKey: string) {
     super(`Missing required configuration: ${configKey}`, { configKey });
     this.configKey = configKey;
@@ -168,12 +168,9 @@ export class MissingConfigError extends ConfigurationError {
 export class InvalidConfigError extends ConfigurationError {
   public readonly configKey: string;
   public readonly configValue: any;
-  
+
   constructor(configKey: string, configValue: any, reason: string) {
-    super(
-      `Invalid configuration for '${configKey}': ${reason}`,
-      { configKey, configValue }
-    );
+    super(`Invalid configuration for '${configKey}': ${reason}`, { configKey, configValue });
     this.configKey = configKey;
     this.configValue = configValue;
   }
@@ -191,12 +188,12 @@ export class CacheError extends Mem100xError {
 export class CacheCapacityError extends CacheError {
   public readonly requestedSize: number;
   public readonly maxSize: number;
-  
+
   constructor(requestedSize: number, maxSize: number) {
-    super(
-      `Cache capacity exceeded: requested ${requestedSize}, max ${maxSize}`,
-      { requestedSize, maxSize }
-    );
+    super(`Cache capacity exceeded: requested ${requestedSize}, max ${maxSize}`, {
+      requestedSize,
+      maxSize,
+    });
     this.requestedSize = requestedSize;
     this.maxSize = maxSize;
   }
@@ -214,12 +211,12 @@ export class BackupError extends Mem100xError {
 export class BackupFailedError extends BackupError {
   public readonly backupPath: string;
   public readonly originalError?: Error;
-  
+
   constructor(backupPath: string, originalError?: Error) {
-    super(
-      `Backup failed for path: ${backupPath}`,
-      { backupPath, originalError: originalError?.message }
-    );
+    super(`Backup failed for path: ${backupPath}`, {
+      backupPath,
+      originalError: originalError?.message,
+    });
     this.backupPath = backupPath;
     this.originalError = originalError;
   }
@@ -228,12 +225,12 @@ export class BackupFailedError extends BackupError {
 export class RestoreFailedError extends BackupError {
   public readonly restorePath: string;
   public readonly originalError?: Error;
-  
+
   constructor(restorePath: string, originalError?: Error) {
-    super(
-      `Restore failed from path: ${restorePath}`,
-      { restorePath, originalError: originalError?.message }
-    );
+    super(`Restore failed from path: ${restorePath}`, {
+      restorePath,
+      originalError: originalError?.message,
+    });
     this.restorePath = restorePath;
     this.originalError = originalError;
   }
@@ -244,7 +241,7 @@ export class RestoreFailedError extends BackupError {
  */
 export class MCPError extends Mem100xError {
   public readonly toolName?: string;
-  
+
   constructor(message: string, toolName?: string, context?: Record<string, any>) {
     super(message, { ...context, toolName });
     this.toolName = toolName;
@@ -259,13 +256,11 @@ export class ToolNotFoundError extends MCPError {
 
 export class ToolExecutionError extends MCPError {
   public readonly originalError?: Error;
-  
+
   constructor(toolName: string, originalError?: Error) {
-    super(
-      `Tool execution failed: ${toolName}`,
-      toolName,
-      { originalError: originalError?.message }
-    );
+    super(`Tool execution failed: ${toolName}`, toolName, {
+      originalError: originalError?.message,
+    });
     this.originalError = originalError;
   }
 }
@@ -292,24 +287,24 @@ export function createErrorResponse(error: unknown): {
       error: {
         type: error.constructor.name,
         message: error.message,
-        details: error.context
-      }
+        details: error.context,
+      },
     };
   }
-  
+
   if (error instanceof Error) {
     return {
       error: {
         type: 'Error',
-        message: error.message
-      }
+        message: error.message,
+      },
     };
   }
-  
+
   return {
     error: {
       type: 'UnknownError',
-      message: String(error)
-    }
+      message: String(error),
+    },
   };
 }

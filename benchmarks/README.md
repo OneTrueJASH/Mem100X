@@ -9,6 +9,7 @@ This benchmark suite focuses on **direct database operations** to measure the co
 ## Key Findings
 
 ### ✅ Database Performance (Excellent)
+
 - **Database initialization**: 17-18ms
 - **Single entity creation**: 1ms
 - **Bulk insert (200 entities)**: 6ms
@@ -18,6 +19,7 @@ This benchmark suite focuses on **direct database operations** to measure the co
 - **Observations**: 0-5ms
 
 ### ❌ MCP Layer Issues (Needs Investigation)
+
 - **Server startup**: 136ms (acceptable)
 - **Tool listing**: 1ms (works fine)
 - **Tool execution**: 5+ second timeouts (problematic)
@@ -25,19 +27,24 @@ This benchmark suite focuses on **direct database operations** to measure the co
 ## Benchmark Files
 
 ### 1. `simple-bench.js` - Basic Operations
+
 Tests fundamental database operations with minimal data:
+
 - Single entity creation
 - Small batch operations (10-100 entities)
 - Basic search and graph operations
 - Relations and observations
 
 **Usage:**
+
 ```bash
 node benchmarks/simple-bench.js
 ```
 
 ### 2. `comprehensive-bench.js` - Full Performance Test
+
 Comprehensive benchmark with realistic data scenarios:
+
 - 200 entities with various types and complexity
 - 45 relations between entities
 - Multiple search patterns
@@ -45,18 +52,22 @@ Comprehensive benchmark with realistic data scenarios:
 - Concurrent operations simulation
 
 **Usage:**
+
 ```bash
 node benchmarks/comprehensive-bench.js
 ```
 
 ### 3. `mcp-simple-test.js` - MCP Layer Test
+
 Tests the MCP server layer (currently has timeout issues):
+
 - Server connection
 - Tool listing
 - Simple tool operations
 - Entity creation via MCP
 
 **Usage:**
+
 ```bash
 node benchmarks/mcp-simple-test.js
 ```
@@ -64,6 +75,7 @@ node benchmarks/mcp-simple-test.js
 ## Performance Results
 
 ### Comprehensive Benchmark Summary (Latest Run)
+
 ```
 Total operations: 18
 Total time: 117ms
@@ -81,6 +93,7 @@ Results by Category:
 ```
 
 ### Performance Highlights
+
 - **Fastest operations**: Graph reads (0-1ms), simple searches (0-2ms)
 - **Most intensive**: Complex text search (33ms), bulk relations (17ms)
 - **Scalability**: Bulk insert of 200 entities in 6ms (33,333 entities/second)
@@ -91,24 +104,28 @@ Results by Category:
 The comprehensive benchmark uses realistic test data:
 
 ### Entities (200 total)
+
 - **100 simple entities**: Single observation each
 - **50 complex entities**: 3 observations each
 - **25 person entities**: With age and location data
 - **25 city entities**: With population data
 
 ### Relations (45 total)
+
 - **25 person-city relations**: "lives_in" relationships
 - **20 person-person relations**: "knows" relationships
 
 ## Architecture
 
 ### Clean Database Approach
+
 - Uses temporary databases for each test run
 - Automatic cleanup of database files and bloom filters
 - No interference between test runs
 - Consistent baseline performance
 
 ### MCP Layer Isolation
+
 - Database operations tested directly
 - MCP issues identified and isolated
 - Clear separation of concerns
@@ -116,13 +133,17 @@ The comprehensive benchmark uses realistic test data:
 ## Troubleshooting
 
 ### Hanging Cleanup
+
 If tests hang during cleanup:
+
 1. Check for active database connections
 2. Ensure proper database.close() calls
 3. Add delays for file handle release
 
 ### MCP Timeouts
+
 If MCP tests timeout:
+
 1. The issue is in the MCP tool handlers, not the database
 2. Focus on direct database benchmarks for performance metrics
 3. Investigate MCP layer separately

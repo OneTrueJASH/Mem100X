@@ -25,6 +25,7 @@ Mem100x is the **fastest MCP memory server** with **full MCP SDK 1.15.1 compatib
 ## Features
 
 ### Blazing Fast Performance
+
 - SQLite with WAL mode for concurrent operations
 - Prepared statements for 10x query speed
 - Optimized indexes on all searchable fields
@@ -32,6 +33,7 @@ Mem100x is the **fastest MCP memory server** with **full MCP SDK 1.15.1 compatib
 - Bloom filters for ultra-fast lookups
 
 ### Full MCP SDK 1.15.1 Compatibility
+
 - Complete content block union schema support
 - Proper `content[]` and `structuredContent` response format
 - All MCP tools implemented with latest standards
@@ -39,19 +41,23 @@ Mem100x is the **fastest MCP memory server** with **full MCP SDK 1.15.1 compatib
 - Type-safe TypeScript implementation
 
 ### Intelligent Multi-Context Support
+
 - Automatic personal/work context detection
 - ML-like confidence scoring system
 - Cross-context search capabilities
 - Instant context switching (< 0.1ms)
 
 ### Complete MCP Tool Suite
+
 All MCP tools implemented with performance tracking:
+
 - Entity management (create, search, read, delete)
 - Relation management (create, delete)
 - Observation management (add, delete)
 - Context management (switch, info)
 
 ### Production Ready
+
 - Full TypeScript with strict mode
 - Comprehensive error handling
 - Graceful shutdown support
@@ -74,6 +80,7 @@ Using Mem100x with Claude Desktop:
 ```
 
 Then in Claude:
+
 - "Remember that my project meeting is tomorrow at 2pm with Sarah"
 - "What meetings do I have this week?"
 - "Store these API keys: production: sk-123, staging: sk-456"
@@ -146,6 +153,7 @@ node dist/index.js
 Add to your Claude Desktop config for the default multi-context server:
 
 **Using npx (Recommended):**
+
 ```json
 {
   "mcpServers": {
@@ -158,6 +166,7 @@ Add to your Claude Desktop config for the default multi-context server:
 ```
 
 **If installed globally:**
+
 ```json
 {
   "mcpServers": {
@@ -169,6 +178,7 @@ Add to your Claude Desktop config for the default multi-context server:
 ```
 
 **If installed from source:**
+
 ```json
 {
   "mcpServers": {
@@ -183,6 +193,7 @@ Add to your Claude Desktop config for the default multi-context server:
 For single-context usage:
 
 **Using npx (Recommended):**
+
 ```json
 {
   "mcpServers": {
@@ -195,6 +206,7 @@ For single-context usage:
 ```
 
 **If installed globally:**
+
 ```json
 {
   "mcpServers": {
@@ -206,6 +218,7 @@ For single-context usage:
 ```
 
 **If installed from source:**
+
 ```json
 {
   "mcpServers": {
@@ -222,6 +235,7 @@ For single-context usage:
 Mem100x delivers industry-leading performance validated through comprehensive benchmarks:
 
 ### Latest Performance Metrics
+
 - **Entity Creation**: 118,856 entities/sec (40x faster than alternatives)
 - **Search Operations**: 310,310 searches/sec with sub-millisecond response
 - **Relation Creation**: 9,575 relations/sec
@@ -229,12 +243,14 @@ Mem100x delivers industry-leading performance validated through comprehensive be
 - **Context Detection**: 100% accuracy with ML-like scoring
 
 ### Real-World Performance
+
 - Sub-millisecond response times for all operations
 - Handles 100,000+ entities without performance degradation
 - Instant context switching (< 0.1ms)
 - 98% token reduction through smart result limiting
 
 ### Benchmark Results
+
 - **Entity Creation**: 118,856 entities/sec
 - **Search Operations**: 310,310 searches/sec
 - **Graph Reading**: 117,585 entities/sec
@@ -245,20 +261,24 @@ Mem100x delivers industry-leading performance validated through comprehensive be
 ## MCP Tools Reference
 
 ### Context Management
+
 - `set_context` - Switch between contexts
 - `get_context_info` - View context statistics
 
 ### Entity Operations
+
 - `create_entities` - Bulk entity creation with MCP content blocks
 - `search_nodes` - Lightning-fast search
 - `read_graph` - Token-efficient reading
 - `open_nodes` - Open specific entities
 
 ### Relation Operations
+
 - `create_relations` - Create relationships
 - `delete_relations` - Remove relationships
 
 ### Observation Management
+
 - `add_observations` - Add notes to entities with MCP content blocks
 - `delete_observations` - Remove observations
 - `delete_entities` - Delete entities
@@ -269,12 +289,12 @@ Mem100x fully supports the MCP content block union schema:
 
 ```typescript
 // Supported content types
-type ContentBlock = 
-  | { type: "text"; text: string }
-  | { type: "image"; image: { uri: string } }
-  | { type: "audio"; audio: { uri: string } }
-  | { type: "resource_link"; resourceLink: { uri: string } }
-  | { type: "resource"; resource: { uri: string; mimeType: string } }
+type ContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; image: { uri: string } }
+  | { type: 'audio'; audio: { uri: string } }
+  | { type: 'resource_link'; resourceLink: { uri: string } }
+  | { type: 'resource'; resource: { uri: string; mimeType: string } };
 ```
 
 ### Example Usage
@@ -282,31 +302,35 @@ type ContentBlock =
 ```typescript
 // Create entities with rich content
 await client.callTool({
-  name: "create_entities",
+  name: 'create_entities',
   arguments: {
-    entities: [{
-      name: "Project Documentation",
-      entityType: "document",
-      content: [
-        { type: "text", text: "API documentation for the new service" },
-        { type: "resource_link", resourceLink: { uri: "https://docs.example.com/api" } }
-      ]
-    }]
-  }
+    entities: [
+      {
+        name: 'Project Documentation',
+        entityType: 'document',
+        content: [
+          { type: 'text', text: 'API documentation for the new service' },
+          { type: 'resource_link', resourceLink: { uri: 'https://docs.example.com/api' } },
+        ],
+      },
+    ],
+  },
 });
 
 // Add observations with mixed content
 await client.callTool({
-  name: "add_observations",
+  name: 'add_observations',
   arguments: {
-    updates: [{
-      entityName: "Meeting Notes",
-      content: [
-        { type: "text", text: "Key decisions from today's meeting" },
-        { type: "image", image: { uri: "file:///path/to/diagram.png" } }
-      ]
-    }]
-  }
+    updates: [
+      {
+        entityName: 'Meeting Notes',
+        content: [
+          { type: 'text', text: "Key decisions from today's meeting" },
+          { type: 'image', image: { uri: 'file:///path/to/diagram.png' } },
+        ],
+      },
+    ],
+  },
 });
 ```
 
@@ -348,6 +372,7 @@ All benchmarks use the MCP server interface for accurate performance measurement
 We love contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 Quick steps:
+
 1. Fork the repository
 2. Create a feature branch
 3. Ensure all tests pass

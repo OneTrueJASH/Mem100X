@@ -30,7 +30,7 @@ export class ConnectionPool extends EventEmitter {
   }> = [];
   private nextId = 1;
   private cleanupInterval?: NodeJS.Timeout;
-  
+
   constructor(
     private readonly dbPath: string,
     private readonly options: PoolOptions = {
@@ -38,7 +38,7 @@ export class ConnectionPool extends EventEmitter {
       maxConnections: 10,
       acquireTimeout: 5000,
       idleTimeout: 60000,
-      readonly: false
+      readonly: false,
     }
   ) {
     super();
@@ -50,7 +50,7 @@ export class ConnectionPool extends EventEmitter {
     for (let i = 0; i < this.options.minConnections; i++) {
       this.createConnection();
     }
-    
+
     // Start cleanup interval
     this.cleanupInterval = setInterval(() => {
       this.cleanupIdleConnections();
@@ -61,26 +61,26 @@ export class ConnectionPool extends EventEmitter {
     const id = this.nextId++;
     const db = new Database(this.dbPath, {
       readonly: this.options.readonly,
-      fileMustExist: true
+      fileMustExist: true,
     });
-    
+
     // Apply optimized pragmas
     db.pragma('journal_mode = WAL');
     db.pragma('synchronous = NORMAL');
     db.pragma('busy_timeout = 5000');
     db.pragma('cache_size = -64000'); // 64MB
-    
+
     const connection: PooledConnection = {
       db,
       id,
       lastUsed: Date.now(),
-      inUse: false
+      inUse: false,
     };
-    
+
     this.connections.set(id, connection);
     this.availableConnections.push(id);
     this.emit('connection-created', id);
-    
+
     return connection;
   }
 
@@ -89,7 +89,7 @@ export class ConnectionPool extends EventEmitter {
     while (this.availableConnections.length > 0) {
       const id = this.availableConnections.shift()!;
       const conn = this.connections.get(id);
-      
+
       if (conn && !conn.inUse) {
         conn.inUse = true;
         conn.lastUsed = Date.now();
@@ -97,7 +97,7 @@ export class ConnectionPool extends EventEmitter {
         return conn;
       }
     }
-    
+
     // Create new connection if under limit
     if (this.connections.size < this.options.maxConnections) {
       const conn = this.createConnection();
@@ -105,27 +105,27 @@ export class ConnectionPool extends EventEmitter {
       conn.inUse = true;
       return conn;
     }
-    
+
     // Wait for connection to become available
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        const index = this.waitQueue.findIndex(w => w.timeout === timeout);
+        const index = this.waitQueue.findIndex((w) => w.timeout === timeout);
         if (index !== -1) {
           this.waitQueue.splice(index, 1);
         }
         reject(new Error('Connection acquire timeout'));
       }, this.options.acquireTimeout);
-      
+
       this.waitQueue.push({ resolve, reject, timeout });
     });
   }
 
   release(connection: PooledConnection): void {
     if (!connection.inUse) return;
-    
+
     connection.inUse = false;
     connection.lastUsed = Date.now();
-    
+
     // Check if anyone is waiting
     const waiter = this.waitQueue.shift();
     if (waiter) {
@@ -141,15 +141,17 @@ export class ConnectionPool extends EventEmitter {
   private cleanupIdleConnections(): void {
     const now = Date.now();
     const toRemove: number[] = [];
-    
+
     for (const [id, conn] of this.connections) {
-      if (!conn.inUse && 
-          this.connections.size > this.options.minConnections &&
-          now - conn.lastUsed > this.options.idleTimeout) {
+      if (
+        !conn.inUse &&
+        this.connections.size > this.options.minConnections &&
+        now - conn.lastUsed > this.options.idleTimeout
+      ) {
         toRemove.push(id);
       }
     }
-    
+
     for (const id of toRemove) {
       this.removeConnection(id);
     }
@@ -158,12 +160,12 @@ export class ConnectionPool extends EventEmitter {
   private removeConnection(id: number): void {
     const conn = this.connections.get(id);
     if (!conn || conn.inUse) return;
-    
+
     const index = this.availableConnections.indexOf(id);
     if (index !== -1) {
       this.availableConnections.splice(index, 1);
     }
-    
+
     conn.db.close();
     this.connections.delete(id);
     this.emit('connection-removed', id);
@@ -171,19 +173,19 @@ export class ConnectionPool extends EventEmitter {
 
   async close(): Promise<void> {
     clearInterval(this.cleanupInterval);
-    
+
     // Reject all waiters
     for (const waiter of this.waitQueue) {
       clearTimeout(waiter.timeout);
       waiter.reject(new Error('Pool closing'));
     }
     this.waitQueue = [];
-    
+
     // Close all connections
     for (const conn of this.connections.values()) {
       conn.db.close();
     }
-    
+
     this.connections.clear();
     this.availableConnections = [];
     this.emit('closed');
@@ -194,12 +196,12 @@ export class ConnectionPool extends EventEmitter {
     for (const conn of this.connections.values()) {
       if (conn.inUse) inUse++;
     }
-    
+
     return {
       total: this.connections.size,
       available: this.availableConnections.length,
       inUse,
-      waiting: this.waitQueue.length
+      waiting: this.waitQueue.length,
     };
   }
 }

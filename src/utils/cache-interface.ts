@@ -28,10 +28,7 @@ import { TwoQueueCache } from './two-queue-cache.js';
 import { ARCCache } from './arc-cache.js';
 import { RadixTreeCache } from './radix-tree-cache.js';
 
-export function createCache<K, V>(
-  strategy: CacheStrategy,
-  maxSize: number
-): ICache<K, V> {
+export function createCache<K, V>(strategy: CacheStrategy, maxSize: number): ICache<K, V> {
   switch (strategy) {
     case 'lru':
       return new LRUCache<K, V>(maxSize);
@@ -49,10 +46,7 @@ export function createCache<K, V>(
 }
 
 // Specialized factory for string-key caches (common in entity storage)
-export function createStringCache<V>(
-  strategy: CacheStrategy,
-  maxSize: number
-): ICache<string, V> {
+export function createStringCache<V>(strategy: CacheStrategy, maxSize: number): ICache<string, V> {
   switch (strategy) {
     case 'lru':
       return new LRUCache<string, V>(maxSize);

@@ -96,15 +96,11 @@ function loadConfig() {
         ? process.env.COMPRESSION_ENABLED === 'true'
         : undefined,
       cacheStrategy: process.env.CACHE_STRATEGY as 'lru' | '2q' | 'arc' | 'radix' | undefined,
-      useReadPool: process.env.USE_READ_POOL
-        ? process.env.USE_READ_POOL === 'true'
-        : undefined,
+      useReadPool: process.env.USE_READ_POOL ? process.env.USE_READ_POOL === 'true' : undefined,
       readPoolSize: process.env.READ_POOL_SIZE
         ? parseInt(process.env.READ_POOL_SIZE, 10)
         : undefined,
-      batchSize: process.env.BATCH_SIZE
-        ? parseInt(process.env.BATCH_SIZE, 10)
-        : undefined,
+      batchSize: process.env.BATCH_SIZE ? parseInt(process.env.BATCH_SIZE, 10) : undefined,
       enableBulkOperations: process.env.ENABLE_BULK_OPERATIONS
         ? process.env.ENABLE_BULK_OPERATIONS === 'true'
         : undefined,
@@ -129,9 +125,7 @@ function loadConfig() {
       level: process.env.LOG_LEVEL as 'error' | 'warn' | 'info' | 'debug' | undefined,
     },
     server: {
-      port: process.env.SERVER_PORT
-        ? parseInt(process.env.SERVER_PORT, 10)
-        : undefined,
+      port: process.env.SERVER_PORT ? parseInt(process.env.SERVER_PORT, 10) : undefined,
       host: process.env.SERVER_HOST,
     },
   };

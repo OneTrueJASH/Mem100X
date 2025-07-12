@@ -97,22 +97,15 @@ export const FTS_REBUILD = `
  * Get complete schema creation SQL
  */
 export function getCompleteSchema(): string {
-  return [
-    TABLES,
-    INDEXES,
-    FTS_SCHEMA,
-    FTS_TRIGGERS,
-    FTS_REBUILD
-  ].join('\n');
+  return [TABLES, INDEXES, FTS_SCHEMA, FTS_TRIGGERS, FTS_REBUILD].join('\n');
 }
 
 /**
  * Get pragmas as individual statements for execution
  */
 export function getPragmas(): string[] {
-  return PRAGMAS
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.startsWith('PRAGMA'))
-    .map(line => line.replace(/;$/, ''));
+  return PRAGMAS.split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('PRAGMA'))
+    .map((line) => line.replace(/;$/, ''));
 }

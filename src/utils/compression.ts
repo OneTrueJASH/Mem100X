@@ -32,7 +32,7 @@ export class CompressionUtils {
           if (base64.length < obs.text.length) {
             return {
               type: 'text',
-              text: `COMPRESSED:${this.COMPRESSION_VERSION}:${base64}`
+              text: `COMPRESSED:${this.COMPRESSION_VERSION}:${base64}`,
             } as TextContent;
           }
         }
@@ -64,7 +64,7 @@ export class CompressionUtils {
             const compressed = Buffer.from(base64, 'base64');
             return {
               type: 'text',
-              text: gunzipSync(compressed).toString()
+              text: gunzipSync(compressed).toString(),
             } as TextContent;
           }
         } catch (error) {

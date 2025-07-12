@@ -74,6 +74,14 @@ export interface DatabaseStats {
     search: CacheStats;
   };
   bloomStats: BloomStats;
+  circuitBreaker?: {
+    state: string;
+    failureCount: number;
+    successCount: number;
+    totalRequests: number;
+    failureRate: number;
+    bulkOperationsEnabled: boolean;
+  };
 }
 
 export interface SearchOptions {
@@ -197,12 +205,15 @@ export interface ContextScore {
 
 export interface ContextInfo {
   currentContext: string;
-  contexts: Record<string, {
-    path: string;
-    entities: number;
-    relations: number;
-    sizeKb: number;
-  }>;
+  contexts: Record<
+    string,
+    {
+      path: string;
+      entities: number;
+      relations: number;
+      sizeKb: number;
+    }
+  >;
   lastDetection: {
     topChoice: ContextScore;
     alternatives: ContextScore[];
