@@ -56,8 +56,51 @@ export const INDEXES = `
   CREATE INDEX IF NOT EXISTS idx_relation_composite ON relations(from_entity, to_entity);
 `;
 
+// Enhanced FTS configurations for different use cases
+export const FTS_CONFIGURATIONS = {
+  // Default configuration - unicode61 tokenizer for good performance and Unicode support
+  DEFAULT: {
+    tokenize: 'unicode61 remove_diacritics 2',
+    prefix: '2,3,4',
+    content: 'entities',
+    content_rowid: 'rowid'
+  },
+
+  // Performance-optimized configuration (unicode61 with enhanced prefix)
+  PERFORMANCE: {
+    tokenize: 'unicode61 remove_diacritics 2',
+    prefix: '1,2,3,4,5',
+    content: 'entities',
+    content_rowid: 'rowid'
+  },
+
+  // Feature-rich configuration with stemming
+  FEATURE_RICH: {
+    tokenize: 'porter unicode61 remove_diacritics 2',
+    prefix: '2,3,4',
+    content: 'entities',
+    content_rowid: 'rowid'
+  },
+
+  // Simple tokenizer (if available)
+  SIMPLE: {
+    tokenize: 'simple',
+    prefix: '2,3,4',
+    content: 'entities',
+    content_rowid: 'rowid'
+  },
+
+  // Minimal configuration for simple searches
+  MINIMAL: {
+    tokenize: 'unicode61 remove_diacritics 2',
+    prefix: '2,3',
+    content: 'entities',
+    content_rowid: 'rowid'
+  }
+};
+
 export const FTS_SCHEMA = `
-  -- Create FTS5 virtual table for full-text search with enhanced configuration
+  -- Create FTS5 virtual table for full-text search with unicode61 tokenizer (fallback from simple)
   CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
     name,
     entity_type,
@@ -71,6 +114,22 @@ export const FTS_SCHEMA = `
   -- Create auxiliary functions for ranking and highlighting
   -- Note: fts5vocab tables are created automatically by SQLite, no need to create manually
 `;
+
+// Function to create FTS schema with custom configuration
+export function createFTSSchema(configName: keyof typeof FTS_CONFIGURATIONS = 'DEFAULT'): string {
+  const ftsConfig = FTS_CONFIGURATIONS[configName];
+  return `
+    CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
+      name,
+      entity_type,
+      observations,
+      tokenize='${ftsConfig.tokenize}',
+      prefix='${ftsConfig.prefix}',
+      content='entities',
+      content_rowid='rowid'
+    );
+  `;
+}
 
 export const FTS_TRIGGERS = `
   -- Triggers to keep FTS table in sync with entities table
@@ -99,11 +158,50 @@ export const FTS_REBUILD = `
   SELECT name, entity_type, observations FROM entities;
 `;
 
+// Additional FTS optimization queries
+export const FTS_OPTIMIZATION = `
+  -- Optimize FTS index
+  INSERT INTO entities_fts(entities_fts) VALUES('optimize');
+
+  -- Merge FTS segments for better performance
+  INSERT INTO entities_fts(entities_fts) VALUES('merge');
+
+  -- Rebuild FTS index completely
+  INSERT INTO entities_fts(entities_fts) VALUES('rebuild');
+`;
+
+// FTS statistics and analysis queries
+export const FTS_STATS = `
+  -- Get FTS table statistics
+  SELECT
+    'entities_fts' as table_name,
+    COUNT(*) as total_rows,
+    (SELECT COUNT(*) FROM entities_fts WHERE entities_fts MATCH '*') as indexed_terms
+  FROM entities_fts;
+
+  -- Get vocabulary statistics
+  SELECT
+    term,
+    doc,
+    cnt
+  FROM entities_fts_vocab
+  ORDER BY cnt DESC
+  LIMIT 100;
+`;
+
 /**
  * Get complete schema creation SQL
  */
 export function getCompleteSchema(): string {
   return [TABLES, INDEXES, FTS_SCHEMA, FTS_TRIGGERS, FTS_REBUILD].join('\n');
+}
+
+/**
+ * Get complete schema with custom FTS configuration
+ */
+export function getCompleteSchemaWithFTS(ftsConfigName: keyof typeof FTS_CONFIGURATIONS = 'DEFAULT'): string {
+  const customFTS = createFTSSchema(ftsConfigName);
+  return [TABLES, INDEXES, customFTS, FTS_TRIGGERS, FTS_REBUILD].join('\n');
 }
 
 /**

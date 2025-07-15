@@ -5,7 +5,7 @@
  */
 
 import xxhash from 'xxhash-wasm';
-import fs from 'fs';
+import * as fs from 'fs';
 
 // Initialize xxhash instance
 let hashInstance: Awaited<ReturnType<typeof xxhash>> | null = null;
