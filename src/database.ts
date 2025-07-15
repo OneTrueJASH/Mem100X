@@ -36,7 +36,7 @@ import { ValidationError } from './errors.js'
 import { createCircuitBreaker } from './utils/circuit-breaker.js'
 import { Worker } from 'worker_threads';
 import { parseSearchQuery, buildFTSQuery, calculateRelevance, generateHighlights, determineMatchType, sortByRelevance, filterSearchResults } from './utils/search-optimizer.js'
-import { needsFTSMigration, migrateFTSToUnicode61 } from './utils/fts-migration.js'
+import { needsFTSMigration, migrateFTSToPorterUnicode61 } from './utils/fts-migration.js'
 
 const LARGE_BATCH_THRESHOLD = 1000;
 
@@ -158,10 +158,10 @@ export class MemoryDatabase {
     // Create schema
     this.db.exec(getCompleteSchema());
 
-    // Check and migrate FTS to unicode61 Tokenizer if needed
+    // Check and migrate FTS to Porter + Unicode61 Tokenizer if needed
     if (needsFTSMigration(this.dbPath)) {
-      logInfo('FTS migration to unicode61 Tokenizer required', { dbPath: this.dbPath });
-      const migrationResult = migrateFTSToUnicode61(this.dbPath);
+      logInfo('FTS migration to Porter + Unicode61 Tokenizer required', { dbPath: this.dbPath });
+      const migrationResult = migrateFTSToPorterUnicode61(this.dbPath);
       if (migrationResult.success) {
         logInfo('FTS migration completed successfully', {
           migrationTime: migrationResult.migrationTime,

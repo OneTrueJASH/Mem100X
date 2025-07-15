@@ -1,6 +1,6 @@
 /**
  * FTS Migration Utility
- * Migrates existing FTS tables to use Simple Tokenizer for maximum performance
+ * Migrates existing FTS tables to use Porter + Unicode61 Tokenizer for maximum performance
  */
 
 import Database from 'better-sqlite3';
@@ -15,13 +15,13 @@ export interface MigrationResult {
 }
 
 /**
- * Migrate FTS table to use unicode61 Tokenizer for better performance
+ * Migrate FTS table to use Porter + Unicode61 Tokenizer for best performance
  */
-export function migrateFTSToUnicode61(dbPath: string): MigrationResult {
+export function migrateFTSToPorterUnicode61(dbPath: string): MigrationResult {
   const startTime = Date.now();
 
   try {
-    logInfo('Starting FTS migration to unicode61 Tokenizer', { dbPath });
+    logInfo('Starting FTS migration to Porter + Unicode61 Tokenizer', { dbPath });
 
     const db = new Database(dbPath);
 
@@ -51,14 +51,14 @@ export function migrateFTSToUnicode61(dbPath: string): MigrationResult {
     const oldConfig = currentConfig.sql;
     logInfo('Current FTS configuration detected', { config: oldConfig });
 
-    // Check if already using unicode61 Tokenizer
-    if (oldConfig.includes("tokenize='unicode61 remove_diacritics 2'")) {
-      logInfo('FTS already using unicode61 Tokenizer, no migration needed');
+    // Check if already using Porter + Unicode61 Tokenizer
+    if (oldConfig.includes("tokenize='porter unicode61'")) {
+      logInfo('FTS already using Porter + Unicode61 Tokenizer, no migration needed');
       db.close();
       return {
         success: true,
-        oldConfig: 'unicode61',
-        newConfig: 'unicode61',
+        oldConfig: 'porter unicode61',
+        newConfig: 'porter unicode61',
         migrationTime: Date.now() - startTime
       };
     }
@@ -67,13 +67,13 @@ export function migrateFTSToUnicode61(dbPath: string): MigrationResult {
     db.exec('BEGIN TRANSACTION');
 
     try {
-      // Create new FTS table with unicode61 Tokenizer
+      // Create new FTS table with Porter + Unicode61 Tokenizer
       db.exec(`
         CREATE VIRTUAL TABLE entities_fts_new USING fts5(
           name,
           entity_type,
           observations,
-          tokenize='unicode61 remove_diacritics 2',
+          tokenize='porter unicode61',
           prefix='2,3,4',
           content='entities',
           content_rowid='rowid'
@@ -126,13 +126,13 @@ export function migrateFTSToUnicode61(dbPath: string): MigrationResult {
       logInfo('FTS migration completed successfully', {
         migrationTime,
         oldConfig: 'previous',
-        newConfig: 'unicode61'
+        newConfig: 'porter unicode61'
       });
 
       return {
         success: true,
         oldConfig: 'previous',
-        newConfig: 'unicode61',
+        newConfig: 'porter unicode61',
         migrationTime
       };
 
@@ -156,7 +156,7 @@ export function migrateFTSToUnicode61(dbPath: string): MigrationResult {
 }
 
 /**
- * Check if database needs FTS migration
+ * Check if database needs FTS migration to Porter + Unicode61
  */
 export function needsFTSMigration(dbPath: string): boolean {
   try {
@@ -185,8 +185,8 @@ export function needsFTSMigration(dbPath: string): boolean {
       return false;
     }
 
-    // Return true if not using unicode61 Tokenizer
-    return !currentConfig.sql.includes("tokenize='unicode61 remove_diacritics 2'");
+    // Return true if not using Porter + Unicode61 Tokenizer
+    return !currentConfig.sql.includes("tokenize='porter unicode61'");
 
   } catch (error) {
     const errorObj = error instanceof Error ? error : new Error(String(error));

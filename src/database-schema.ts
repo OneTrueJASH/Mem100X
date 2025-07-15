@@ -58,23 +58,23 @@ export const INDEXES = `
 
 // Enhanced FTS configurations for different use cases
 export const FTS_CONFIGURATIONS = {
-  // Default configuration - unicode61 tokenizer for good performance and Unicode support
+  // Default configuration - porter unicode61 tokenizer for best performance and search relevance
   DEFAULT: {
-    tokenize: 'unicode61 remove_diacritics 2',
+    tokenize: 'porter unicode61',
     prefix: '2,3,4',
     content: 'entities',
     content_rowid: 'rowid'
   },
 
-  // Performance-optimized configuration (unicode61 with enhanced prefix)
+  // Performance-optimized configuration (porter unicode61 with enhanced prefix)
   PERFORMANCE: {
-    tokenize: 'unicode61 remove_diacritics 2',
+    tokenize: 'porter unicode61',
     prefix: '1,2,3,4,5',
     content: 'entities',
     content_rowid: 'rowid'
   },
 
-  // Feature-rich configuration with stemming
+  // Feature-rich configuration with stemming and diacritics removal
   FEATURE_RICH: {
     tokenize: 'porter unicode61 remove_diacritics 2',
     prefix: '2,3,4',
@@ -82,9 +82,9 @@ export const FTS_CONFIGURATIONS = {
     content_rowid: 'rowid'
   },
 
-  // Simple tokenizer (if available)
-  SIMPLE: {
-    tokenize: 'simple',
+  // Legacy unicode61 configuration (for backward compatibility)
+  LEGACY: {
+    tokenize: 'unicode61 remove_diacritics 2',
     prefix: '2,3,4',
     content: 'entities',
     content_rowid: 'rowid'
@@ -92,7 +92,7 @@ export const FTS_CONFIGURATIONS = {
 
   // Minimal configuration for simple searches
   MINIMAL: {
-    tokenize: 'unicode61 remove_diacritics 2',
+    tokenize: 'porter unicode61',
     prefix: '2,3',
     content: 'entities',
     content_rowid: 'rowid'
@@ -100,12 +100,12 @@ export const FTS_CONFIGURATIONS = {
 };
 
 export const FTS_SCHEMA = `
-  -- Create FTS5 virtual table for full-text search with unicode61 tokenizer (fallback from simple)
+  -- Create FTS5 virtual table for full-text search with porter unicode61 tokenizer (best performance)
   CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
     name,
     entity_type,
     observations,
-    tokenize='unicode61 remove_diacritics 2',
+    tokenize='porter unicode61',
     prefix='2,3,4',
     content='entities',
     content_rowid='rowid'
