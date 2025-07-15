@@ -1,8 +1,8 @@
 // src/utils/zero-delay-aggregator.ts
 // Zero-delay write aggregator using process.nextTick for minimal overhead
 
-import { MultiDatabaseManager } from '../multi-database.js';
-import { logInfo, logError } from './logger.js';
+import { MultiDatabaseManager } from '../multi-database.js'
+import { logInfo, logError } from './logger.js'
 
 type PendingWrite = {
   operation: 'create_entities' | 'add_observations' | 'create_relations' | 'delete_entities';

@@ -69,7 +69,7 @@ export const FTS_SCHEMA = `
   );
 
   -- Create auxiliary functions for ranking and highlighting
-  CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts_config USING fts5vocab(entities_fts, 'row');
+  -- Note: fts5vocab tables are created automatically by SQLite, no need to create manually
 `;
 
 export const FTS_TRIGGERS = `

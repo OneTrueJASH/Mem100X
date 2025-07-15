@@ -1,12 +1,12 @@
 # Contributing to Mem100x
 
-First off, thank you for considering contributing to Mem100x! We're building the FASTEST MCP memory server, and your help can make it even better.
+First off, thank you for considering contributing to Mem100x! We're building the FASTEST, most reliable, and most maintainable MCP memory server, and your help can make it even better.
 
 ## How Can I Contribute?
 
 ### Reporting Bugs
 
-Found a performance issue? Let us know!
+Found a performance or reliability issue? Let us know!
 
 1. Check if the issue already exists
 2. Create a new issue with:
@@ -18,13 +18,13 @@ Found a performance issue? Let us know!
 
 ### Suggesting Enhancements
 
-Have an idea to make Mem100x even faster? We're all ears!
+Have an idea to make Mem100x even faster, more reliable, or easier to use?
 
 1. Check if it's already suggested
 2. Create an issue with:
    - Clear description of the enhancement
    - Why it would be useful
-   - **Performance impact analysis**
+   - **Performance or maintainability impact analysis**
    - Possible implementation approach
 
 ### Pull Requests
@@ -48,10 +48,11 @@ git checkout -b feature/your-amazing-feature
 #### Development Guidelines
 
 1. **Performance First**: Every change must maintain or improve performance
-2. **TypeScript Strict**: All code must pass strict type checking
-3. **Performance Focus**: Ensure changes don't degrade performance
-4. **Small Functions**: Keep functions under 50 lines
-5. **Clear Names**: Use descriptive variable and function names
+2. **Multi-Context & MCP Compliance**: Do not break multi-context support or MCP protocol compliance
+3. **TypeScript Strict**: All code must pass strict type checking
+4. **Maintainability**: Keep code simple, clear, and well-documented
+5. **Small Functions**: Keep functions under 50 lines
+6. **Clear Names**: Use descriptive variable and function names
 
 #### Before Submitting
 
@@ -68,6 +69,7 @@ npm run build
 - [ ] Passes all TypeScript checks
 - [ ] Performance impact has been considered
 - [ ] Performance is maintained or improved
+- [ ] Multi-context and MCP compliance are maintained
 - [ ] Documentation is updated
 - [ ] Commit messages are clear
 
@@ -75,8 +77,8 @@ npm run build
 
 Any PR must meet these standards:
 
-- Entity creation: > 60,000/sec
-- Search time: < 2ms
+- Entity creation: > 100,000/sec
+- Search time: < 1ms
 - No memory leaks
 - Cache hit rate: > 95% when applicable
 
@@ -94,10 +96,10 @@ Every change must:
 We especially welcome contributions in:
 
 1. **Performance Optimizations**: Make it even faster!
-2. **New Storage Backends**: Redis? PostgreSQL?
-3. **Benchmarks**: More comprehensive testing
-4. **Documentation**: Examples, tutorials, guides
-5. **Tooling**: VS Code extension? CLI tools?
+2. **Multi-Context Enhancements**: Smarter context detection, cross-context features
+3. **Benchmarks**: More comprehensive and comparative testing
+4. **Documentation & Onboarding**: Examples, tutorials, guides, onboarding improvements
+5. **Reliability & Maintainability**: Error handling, code clarity, test coverage
 
 ## Code Style
 
@@ -129,14 +131,14 @@ Looking for easy contributions?
 - Improve error messages
 - Add debug logging options
 - Create example use cases
-- Improve documentation
+- Improve documentation and onboarding
 
 ## License
 
 By contributing, you agree that your contributions will be licensed under the MIT License.
 
-## Thank You!
+**Thank You!**
 
 Every contribution, no matter how small, helps make Mem100x better. We appreciate your time and effort!
 
-**Let's make the FASTEST MCP server even FASTER together!**
+**Let's make the FASTEST, most reliable MCP server even BETTER together!**

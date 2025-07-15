@@ -20,21 +20,21 @@ process.on('unhandledRejection', (reason, promise) => {
   process.stderr.write('[Mem100x] UNHANDLED REJECTION: ' + String(reason) + '\n');
 });
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { Server } from '@modelcontextprotocol/sdk/server/index'
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio'
 import {
   CallToolRequestSchema,
   ErrorCode,
   ListToolsRequestSchema,
   McpError,
-} from '@modelcontextprotocol/sdk/types.js';
-import { MemoryDatabase } from './database.js';
+} from '@modelcontextprotocol/sdk/types'
+import { MemoryDatabase } from './database.js'
 import { homedir } from 'os';
 import { join } from 'path';
-import { stringifyToolResponse } from './utils/fast-json.js';
-import { getAllToolDefinitions } from './tool-definitions.js';
-import { createTextContent } from './utils/fast-json.js';
-import { toolSchemas, AddObservationsInput, CreateRelationsInput } from './tool-schemas.js';
+import { stringifyToolResponse } from './utils/fast-json.js'
+import { getAllToolDefinitions } from './tool-definitions.js'
+import { createTextContent } from './utils/fast-json.js'
+import { toolSchemas, AddObservationsInput, CreateRelationsInput } from './tool-schemas.js'
 
 async function main() {
   process.stderr.write('[Mem100x] Starting main function\n');

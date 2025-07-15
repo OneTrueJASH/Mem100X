@@ -4,7 +4,7 @@
  */
 
 import winston from 'winston';
-import { config } from '../config.js';
+import { config } from '../config.js'
 
 // Custom log levels
 const customLevels = {

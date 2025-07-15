@@ -3,6 +3,8 @@
  * Uses doubly-linked list and hash map for optimal performance
  */
 
+import type { ICache } from './cache-interface.js'
+
 class ListNode<K, V> {
   constructor(
     public key: K,

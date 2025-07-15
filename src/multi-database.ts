@@ -3,8 +3,8 @@
  * Intelligently manages multiple memory contexts with automatic routing
  */
 
-import { MemoryDatabase } from './database.js';
-import { ContextConfidenceScorer } from './context-confidence.js';
+import { MemoryDatabase } from './database.js'
+import { ContextConfidenceScorer } from './context-confidence.js'
 import {
   MemoryConfig,
   GraphResult,
@@ -18,11 +18,11 @@ import {
   GetNeighborsOptions,
   FindShortestPathOptions,
   ShortestPathResult,
-} from './types.js';
+} from './types.js'
 import { existsSync, mkdirSync, copyFileSync, statSync } from 'fs';
 import { join, dirname } from 'path';
-import { config as appConfig } from './config.js';
-import { logInfo } from './utils/logger.js';
+import { config as appConfig } from './config.js'
+import { logInfo } from './utils/logger.js'
 
 export class MultiDatabaseManager {
   protected databases: Map<string, MemoryDatabase> = new Map();

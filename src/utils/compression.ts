@@ -4,8 +4,8 @@
  */
 
 import { gzipSync, gunzipSync } from 'zlib';
-import { stringifyObservations, parseObservations } from './fast-json.js';
-import { RichContent, TextContent } from '../types.js';
+import { stringifyObservations, parseObservations } from './fast-json.js'
+import { RichContent, TextContent } from '../types.js'
 
 export class CompressionUtils {
   private static readonly MIN_COMPRESS_LENGTH = 100; // Don't compress small strings

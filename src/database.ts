@@ -23,21 +23,46 @@ import {
   ShortestPathResult,
   RichContent,
   TextContent,
-} from './types.js';
-import { ICache, createStringCache } from './utils/cache-interface.js';
-import { CountingBloomFilter } from './utils/counting-bloom-filter.js';
-import { CompressionUtils } from './utils/compression.js';
-import { ConnectionPool } from './utils/connection-pool.js';
-import { getCompleteSchema, getPragmas } from './database-schema.js';
-import { logger, logInfo, logDebug, logError, PerformanceTracker } from './utils/logger.js';
-import { stringifyObservations, parseObservations } from './utils/fast-json.js';
-import { config } from './config.js';
-import { ValidationError } from './errors.js';
-import { createCircuitBreaker } from './utils/circuit-breaker.js';
+} from './types.js'
+import { ICache, createStringCache } from './utils/cache-interface.js'
+import { CountingBloomFilter } from './utils/counting-bloom-filter.js'
+import { CompressionUtils } from './utils/compression.js'
+import { ConnectionPool } from './utils/connection-pool.js'
+import { getCompleteSchema, getPragmas } from './database-schema.js'
+import { logger, logInfo, logDebug, logError, PerformanceTracker } from './utils/logger.js'
+import { stringifyObservations, parseObservations } from './utils/fast-json.js'
+import { config } from './config.js'
+import { ValidationError } from './errors.js'
+import { createCircuitBreaker } from './utils/circuit-breaker.js'
 import { Worker } from 'worker_threads';
-import { parseSearchQuery, buildFTSQuery, calculateRelevance, generateHighlights, determineMatchType, sortByRelevance, filterSearchResults } from './utils/search-optimizer.js';
+import { parseSearchQuery, buildFTSQuery, calculateRelevance, generateHighlights, determineMatchType, sortByRelevance, filterSearchResults } from './utils/search-optimizer.js'
 
 const LARGE_BATCH_THRESHOLD = 1000;
+
+// Set profilingEnabled to use config.performance.profilingEnabled
+const profilingEnabled = config.performance.profilingEnabled;
+
+// Utility for structured logging
+function logProfile(event: string, data: Record<string, any>, correlationId?: string) {
+  if (!profilingEnabled) return;
+  const log = {
+    timestamp: new Date().toISOString(),
+    level: 'profile',
+    event,
+    correlationId: correlationId || uuidv4(),
+    ...data,
+  };
+  process.stderr.write(JSON.stringify(log) + '\n');
+}
+
+// Use a local uuidv4 function as previously defined
+function uuidv4() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (Math.random() * 16) | 0,
+      v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 export class MemoryDatabase {
   private db!: Database.Database;
@@ -260,13 +285,18 @@ export class MemoryDatabase {
   }
 
   createEntities(entities: CreateEntityInput[]): EntityResult[] {
-    const perf = new PerformanceTracker('createEntities', { count: entities.length });
+    const correlationId = uuidv4();
+    const start = process.hrtime.bigint();
+    logProfile('createEntities_start', { count: entities.length }, correlationId);
 
     // Fast path for single entity creation
     if (entities.length === 1) {
       // Patch: ensure observations is always an array
       if (!entities[0].observations) entities[0].observations = [];
-      return this.createSingleEntityOptimized(entities[0], perf);
+      return this.createSingleEntityOptimized(
+        entities[0],
+        new PerformanceTracker('createSingleEntityOptimized', { single: true })
+      );
     }
 
     // Use batch method if enabled and above threshold
@@ -319,7 +349,14 @@ export class MemoryDatabase {
 
     // Clear search cache as new entities were added
     this.searchCache.clear();
-    perf.end({ created: created.length });
+    const end = process.hrtime.bigint();
+    const durationMs = Number(end - start) / 1_000_000;
+    logProfile('createEntities_end', {
+      count: entities.length,
+      durationMs,
+      avgPerEntity: durationMs / entities.length,
+      created: created.length
+    }, correlationId);
     return created;
   }
 
@@ -328,6 +365,9 @@ export class MemoryDatabase {
     entity: CreateEntityInput,
     perf: PerformanceTracker
   ): EntityResult[] {
+    const correlationId = uuidv4();
+    const start = process.hrtime.bigint();
+    logProfile('createSingleEntityOptimized_start', { name: entity.name }, correlationId);
     // Patch: ensure observations is always an array
     if (!entity.observations) entity.observations = [];
     // Validate entity has required fields
@@ -363,6 +403,12 @@ export class MemoryDatabase {
 
         // Skip search cache clearing for single entity
         perf.end({ created: 1, optimized: true, fastPath: true });
+        const end = process.hrtime.bigint();
+        const durationMs = Number(end - start) / 1_000_000;
+        logProfile('createSingleEntityOptimized_end', {
+          name: entity.name,
+          durationMs
+        }, correlationId);
         return [result];
       } catch (error: any) {
         // If it's a unique constraint error, fall through to update path
@@ -400,6 +446,12 @@ export class MemoryDatabase {
       }
 
       perf.end({ created: 1, optimized: true, update: true });
+      const end = process.hrtime.bigint();
+      const durationMs = Number(end - start) / 1_000_000;
+      logProfile('createSingleEntityOptimized_end', {
+        name: entity.name,
+        durationMs
+      }, correlationId);
       return [result];
     } catch (error) {
       this.db.exec('ROLLBACK');
@@ -409,7 +461,13 @@ export class MemoryDatabase {
 
     // Optimized batch entity creation for better performance
   createEntitiesBatch(entities: CreateEntityInput[]): EntityResult[] {
+    const correlationId = uuidv4();
+    const start = process.hrtime.bigint();
+    logProfile('createEntitiesBatch_start', { count: entities.length }, correlationId);
+
     if (entities.length === 0) return [];
+
+    const perf = { end: () => {} };
 
     // Use regular method for small batches
     if (entities.length < 10) {
@@ -440,18 +498,19 @@ export class MemoryDatabase {
       batchSize = optimalBatchSize;
     }
 
-    const perf = new PerformanceTracker('createEntitiesBatch', {
-      count: entities.length,
-      ftsOptimization: true,
-      batchSize: batchSize,
-      dynamicSizing: config.performance.enableDynamicBatchSizing
-    });
-
-    // Use circuit breaker for bulk operations
-    return this.bulkOperationCircuitBreaker.executeSync(
-      () => this.executeBulkEntityCreation(entities, perf),
+    const results = this.bulkOperationCircuitBreaker.executeSync(
+      () => this.executeBulkEntityCreation(entities, perf, correlationId),
       'createEntitiesBatch'
     );
+    const end = process.hrtime.bigint();
+    const durationMs = Number(end - start) / 1_000_000;
+    logProfile('createEntitiesBatch_end', {
+      count: entities.length,
+      durationMs,
+      avgPerEntity: durationMs / entities.length,
+      created: results.length
+    }, correlationId);
+    return results;
   }
 
   // New: Asynchronous worker-based batch entity creation
@@ -504,7 +563,14 @@ export class MemoryDatabase {
     return Math.max(totalSize / entities.length, 100); // Minimum 100 bytes
   }
 
-  private executeBulkEntityCreation(entities: CreateEntityInput[], perf: PerformanceTracker): EntityResult[] {
+  private executeBulkEntityCreation(entities: CreateEntityInput[], perf: any = { end: () => {} }, correlationId?: string): EntityResult[] {
+    const startMem = process.memoryUsage();
+    const start = process.hrtime.bigint();
+    logProfile('executeBulkEntityCreation_start', {
+      count: entities.length,
+      memory: startMem
+    }, correlationId);
+
     // Monitor memory usage during bulk operations (MCP Section 8.3)
     const memoryBefore = process.memoryUsage();
     logDebug('Bulk operation memory baseline', {
@@ -675,11 +741,27 @@ export class MemoryDatabase {
       heapDelta: Math.round((memoryAfter.heapUsed - memoryBefore.heapUsed) / 1024 / 1024)
     });
 
-    perf.end({
+    if (perf && typeof perf.end === 'function') {
+      perf.end({
+        created: created.length,
+        memoryDelta: Math.round((memoryAfter.heapUsed - memoryBefore.heapUsed) / 1024 / 1024),
+        optimization: 'bulk'
+      });
+    }
+    const endMem = process.memoryUsage();
+    const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
+    logProfile('executeBulkEntityCreation_end', {
+      count: entities.length,
+      durationMs,
+      avgPerEntity: durationMs / entities.length,
       created: created.length,
-      memoryDelta: Math.round((memoryAfter.heapUsed - memoryBefore.heapUsed) / 1024 / 1024),
-      optimization: 'bulk'
-    });
+      memoryBefore: startMem,
+      memoryAfter: endMem,
+      memoryDelta: {
+        rss: endMem.rss - startMem.rss,
+        heapUsed: endMem.heapUsed - startMem.heapUsed
+      }
+    }, correlationId);
     return created;
   }
 
@@ -858,12 +940,14 @@ export class MemoryDatabase {
 
         if (rows.length === 0) {
           const likePattern = `%${query}%`;
-          rows = this.statements.searchEntitiesLike!.all(
+          const likeRows = this.statements.searchEntitiesLike!.all(
             likePattern,
             likePattern,
             likePattern,
             limit
           ) as EntityRow[];
+          // Add fts_rank property for consistency
+          rows = likeRows.map(row => ({ ...row, fts_rank: 0 }));
         }
 
         return rows;
@@ -919,12 +1003,14 @@ export class MemoryDatabase {
 
       if (rows.length === 0) {
         const likePattern = `%${query}%`;
-        rows = this.statements.searchEntitiesLike!.all(
+        const likeRows = this.statements.searchEntitiesLike!.all(
           likePattern,
           likePattern,
           likePattern,
           limit
         ) as EntityRow[];
+        // Add fts_rank property for consistency
+        rows = likeRows.map(row => ({ ...row, fts_rank: 0 }));
       }
     }
 
@@ -1364,6 +1450,16 @@ export class MemoryDatabase {
         bulkOperationsEnabled: circuitBreakerStats.options.enableBulkOperations
       },
     };
+  }
+
+  /**
+   * Dynamically set SQLite PRAGMAs for performance tuning and benchmarking.
+   * @param pragmas - An object where keys are PRAGMA names and values are their settings.
+   */
+  public setPragmas(pragmas: Record<string, string | number>): void {
+    for (const [key, value] of Object.entries(pragmas)) {
+      this.db.pragma(`${key} = ${value}`);
+    }
   }
 
   // Utility method for tests that expect async initialization

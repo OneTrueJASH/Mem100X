@@ -2,216 +2,94 @@
 
 ## Project Vision
 
-Mem100x aims to be the **fastest and most reliable** Model Context Protocol (MCP) server for knowledge graph management, with blazing-fast performance, multi-context support, and enterprise-grade reliability.
+Mem100x is the **fastest, most reliable, and most maintainable** Model Context Protocol (MCP) server for knowledge graph management. Our focus is on:
 
-## Current Status: v1.0.0 (Core Complete)
+- Blazing-fast performance (118K+ entities/sec, 310K+ searches/sec)
+- Intelligent multi-context support (personal/work separation, context detection)
+- Full MCP SDK compliance (content block union, protocol standards)
+- Simplicity, maintainability, and user empowerment
+
+## Current Status: v1.x (Core Complete)
 
 ### Completed Features
 
-- All 11 MCP tools implemented and tested
-- Multi-context support (personal/work separation)
-- **59,780 entities/second** creation rate (20x faster than alternatives)
-- **8,829 searches/second** with FTS5 (88x faster)
-- Transaction support for atomic operations
+- All MCP tools implemented and tested
+- Multi-context support (personal/work separation, context detection, cross-context search)
+- **118,856 entities/second** creation rate (40x faster than alternatives)
+- **310,310 searches/second** with FTS5 (sub-millisecond response)
+- Transaction batching and circuit breaker for reliability
 - Backup/restore functionality
-- Persistent Bloom filter with xxhash
-- O(1) LRU cache implementation
-- Comprehensive quality assurance completed
+- Persistent Bloom filter for fast lookups
+- Multiple cache strategies (LRU, 2Q, ARC, Radix)
+- Comprehensive quality assurance and benchmarks
 
 ### Performance Achievements
 
 | Metric           | Performance   | vs Competition     |
 | ---------------- | ------------- | ------------------ |
-| Entity Creation  | 59,780/sec    | 20x faster         |
-| Search (FTS5)    | 8,829/sec     | 88x faster         |
+| Entity Creation  | 118,856/sec   | 40x faster         |
+| Search (FTS5)    | 310,310/sec   | Industry leading   |
 | Relations        | 261,455/sec   | Industry leading   |
-| Cache Operations | 20M+/sec      | O(1) complexity    |
 | Token Efficiency | 98% reduction | Optimized for LLMs |
 
 ---
 
-## v1.1.0 - Cache & Memory Optimization (Q1 2025)
+## v1.2.x+ - Ongoing Improvements (2025)
 
-**Goal**: Fix remaining cache implementation bugs and optimize memory usage
+**Goal:** Continue to lead in performance, reliability, and usability.
 
-### Features
+### Focus Areas
 
-- [ ] Fix Two-Queue (2Q) cache statistics tracking (8 tests)
-- [ ] Fix ARC cache edge cases and zero capacity handling (1 test)
-- [ ] Fix cache interface edge cases (3 tests)
-- [ ] Add cache memory pressure monitoring
-- [ ] Implement cache size auto-tuning
-- [ ] Add cache performance metrics
-
-### Benefits
-
-- Improved memory efficiency
-- Better cache hit rates
-- Predictable memory usage
-- Enhanced monitoring capabilities
-
-**Estimated Timeline**: 1-2 days of development
-
----
-
-## v1.2.0 - Graph Intelligence (Q1 2025)
-
-**Goal**: Add advanced graph algorithms for relationship analysis
-
-### Features
-
-- [ ] Graph traversal algorithms (11 tests)
-  - [ ] Breadth-First Search (BFS)
-  - [ ] Depth-First Search (DFS)
-  - [ ] Level-order traversal
-- [ ] Shortest path algorithms (14 tests)
-  - [ ] Dijkstra's algorithm
-  - [ ] A\* pathfinding
-  - [ ] All-pairs shortest paths
-- [ ] Graph analysis tools
-  - [ ] Connected components detection
-  - [ ] Cycle detection
-  - [ ] Centrality measures
-  - [ ] Community detection
+- [ ] Further optimize batch operations and search
+- [ ] Enhance context detection and cross-context intelligence
+- [ ] Expand test coverage and benchmarks
+- [ ] Improve documentation and onboarding
+- [ ] Add more user-configurable options for privacy, monitoring, and deployment
 
 ### Benefits
 
-- Advanced relationship queries
-- Path analysis between entities
-- Knowledge graph insights
-- Network analysis capabilities
-
-**Estimated Timeline**: 3-4 days of development
+- Even faster and more reliable memory server
+- Easier onboarding for new users and contributors
+- More flexible and user-driven experience
 
 ---
 
-## v1.3.0 - Production Tooling (Q1 2025)
+## v2.x - Advanced Features (Future/Aspirational)
 
-**Goal**: Enterprise-ready deployment and monitoring tools
+**Goal:** Explore advanced features while maintaining core simplicity and speed.
 
-### Features
+### Possible Directions
 
-- [ ] Command-line interface (CLI)
-  - [ ] Database management commands
-  - [ ] Import/export utilities
-  - [ ] Performance profiling tools
-- [ ] Docker optimization
-  - [ ] Multi-stage builds
-  - [ ] Alpine Linux base image
-  - [ ] Health checks
-- [ ] Kubernetes manifests
-  - [ ] Helm chart
-  - [ ] Horizontal pod autoscaling
-  - [ ] Persistent volume claims
-- [ ] Monitoring & Observability
-  - [ ] OpenTelemetry integration
-  - [ ] Prometheus metrics
-  - [ ] Grafana dashboards
-  - [ ] Structured logging
+- [ ] Advanced graph algorithms (traversal, shortest path, community detection)
+- [ ] Vector embeddings for semantic/AI-powered search
+- [ ] LLM-powered entity extraction and relationship inference
+- [ ] CLI and import/export utilities (if user demand is high)
+- [ ] Optional Docker/Kubernetes support for advanced deployments
+- [ ] Monitoring and observability integrations (OpenTelemetry, Prometheus)
 
-### Benefits
+### Guiding Principle
 
-- Easy deployment
-- Production monitoring
-- Scalability options
-- Enterprise compliance
-
-**Estimated Timeline**: 1 week of development
-
----
-
-## v2.0.0 - Distributed Scale (Q2 2025)
-
-**Goal**: Horizontal scaling and distributed knowledge graphs
-
-### Features
-
-- [ ] Sharding support
-  - [ ] Consistent hashing
-  - [ ] Shard rebalancing
-  - [ ] Cross-shard queries
-- [ ] Replication
-  - [ ] Primary-replica architecture
-  - [ ] Read replicas
-  - [ ] Automatic failover
-- [ ] Distributed transactions
-  - [ ] Two-phase commit
-  - [ ] Saga pattern support
-- [ ] Event streaming
-  - [ ] Change data capture
-  - [ ] Kafka integration
-  - [ ] WebSocket subscriptions
-
-### Benefits
-
-- Unlimited scale
-- High availability
-- Real-time updates
-- Enterprise scale
-
-**Estimated Timeline**: 1 month of development
-
----
-
-## Future Considerations
-
-### v2.1.0 - AI Enhancement
-
-- [ ] Vector embeddings for semantic search
-- [ ] LLM-powered entity extraction
-- [ ] Automatic relationship inference
-- [ ] Knowledge graph completion
-
-### v2.2.0 - Multi-Model Support
-
-- [ ] Property graph model
-- [ ] RDF triple store
-- [ ] Document store hybrid
-- [ ] Time-series data support
-
-### v3.0.0 - Cloud Native
-
-- [ ] Managed service offering
-- [ ] Multi-cloud support (AWS, GCP, Azure)
-- [ ] Serverless deployment options
-- [ ] Global edge distribution
+- **Only add features that do not compromise speed, reliability, or maintainability.**
 
 ---
 
 ## Community Roadmap
 
-### Documentation & Examples
-
-- [ ] Comprehensive API documentation
-- [ ] Video tutorials
-- [ ] Example applications
-- [ ] Best practices guide
-- [ ] Performance tuning guide
-
-### Ecosystem
-
-- [ ] Language SDKs (Python, Go, Rust)
-- [ ] Framework integrations (LangChain, etc.)
-- [ ] MCP marketplace listing
-- [ ] Community plugins
-
-### Governance
-
-- [ ] Open source governance model
-- [ ] Contribution guidelines
-- [ ] Security policy
-- [ ] Release process documentation
+- [ ] Comprehensive API documentation and examples
+- [ ] Best practices and performance tuning guides
+- [ ] Language SDKs and framework integrations (as community grows)
+- [ ] Open source governance and contribution guidelines
 
 ---
 
 ## How to Contribute
 
-We welcome contributions! Priority areas:
+We welcome contributions that:
 
-1. **Quality**: Improve error handling and edge cases
-2. **Performance**: Optimize hot paths
-3. **Documentation**: Improve examples and guides
-4. **Features**: Pick from the roadmap items above
+1. **Improve performance** (faster, leaner, more reliable)
+2. **Enhance multi-context or MCP compliance**
+3. **Simplify or clarify the codebase**
+4. **Improve documentation or onboarding**
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
@@ -219,11 +97,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## Version History
 
-- **v0.1.0** - Initial prototype
-- **v0.5.0** - Core database implementation
-- **v0.9.0** - MCP protocol integration
-- **v1.0.0** - First stable release (current)
+- **v1.0.0** - Core, blazing-fast, multi-context MCP server
+- **v1.1.x** - Performance and reliability improvements
+- **v1.2.x** - Ongoing optimizations and user experience enhancements
 
 ---
 
-_This roadmap is a living document and will be updated based on community feedback and priorities._
+_This roadmap is a living document and will be updated as the project and community evolve._

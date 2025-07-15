@@ -3,7 +3,7 @@
  * Prevents cascading failures and provides graceful degradation
  */
 
-import { logError, logWarn, logInfo } from './logger.js';
+import { logError, logWarn, logInfo } from './logger.js'
 
 export enum CircuitState {
   CLOSED = 'CLOSED',    // Normal operation

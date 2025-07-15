@@ -78,11 +78,7 @@ vitest.config.ts
 jest.config.js
 
 # Benchmarks
-benchmark/
-benchmarks/servers/official-memory
-benchmarks/results/
-benchmarks/data/
-benchmarks/logs/
+benchmarks/*
 
 # Development scripts (but not benchmark scripts)
 *.sh
@@ -103,4 +99,6 @@ IMPLEMENTATION*.md
 IMPROVEMENT*.md
 COMPARISON*.md
 TEST_SUMMARY*.md
+MUST_HAVE_FEATURES.md
 !benchmarks/**/*.md
+MILESTONES.md

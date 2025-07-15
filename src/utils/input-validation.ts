@@ -3,8 +3,8 @@
  * Prevents DoS attacks by limiting input sizes
  */
 
-import { McpError } from '@modelcontextprotocol/sdk/types.js';
-import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { McpError } from '@modelcontextprotocol/sdk/types'
+import { ErrorCode } from '@modelcontextprotocol/sdk/types'
 import { RichContentSchema } from '../tool-schemas.js';
 
 // Size limits

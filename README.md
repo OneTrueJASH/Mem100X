@@ -1,4 +1,4 @@
-# Mem100x - The FASTEST Memory MCP Server Ever Built!
+# Mem100x - The FASTEST Memory MCP Server Ever Built
 
 [![npm version](https://img.shields.io/npm/v/mem100x.svg)](https://www.npmjs.com/package/mem100x)
 [![npm downloads](https://img.shields.io/npm/dm/mem100x.svg)](https://www.npmjs.com/package/mem100x)
@@ -338,7 +338,7 @@ await client.callTool({
 
 Built with performance and MCP compliance as priorities:
 
-```
+```plaintext
 src/
 ├── database.ts          # High-performance SQLite core
 ├── multi-database.ts    # Multi-context manager
@@ -382,10 +382,10 @@ Quick steps:
 
 MIT License - see LICENSE file
 
-## Star This Repo!
+## Star This Repo
 
-If you're impressed by the performance (and you should be!), please star this repo! Let's make this the go-to memory MCP server for Claude!
+If you're impressed by the performance (and hopefully you will be!), please star this repo! Let's make this the go-to memory MCP server for Claude!
 
 ---
 
-**Built with a need for speed by the Mem100x team**
+## **Built with a need for speed by the Mem100x team**

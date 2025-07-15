@@ -38,7 +38,7 @@ Add to your Claude Desktop configuration file:
 }
 ```
 
-### 3. Test it out!
+### 3. Test it out
 
 Restart Claude Desktop and try:
 

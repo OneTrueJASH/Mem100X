@@ -10,6 +10,8 @@
  * The algorithm adapts the target size p for T1 based on workload.
  */
 
+import type { ICache } from './cache-interface.js'
+
 interface ARCNode<K, V> {
   key: K;
   value?: V;

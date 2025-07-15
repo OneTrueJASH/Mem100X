@@ -37,6 +37,7 @@ const configSchema = z.object({
     enableDynamicBatchSizing: z.boolean().default(true), // New: enable dynamic batch sizing
     maxBatchSize: z.number().default(5000), // New: maximum batch size
     targetBatchMemoryMb: z.number().default(50), // New: target memory per batch
+    profilingEnabled: z.boolean().default(false), // <-- add this line
   }),
 
   // Bloom Filter Configuration
@@ -116,6 +117,9 @@ function loadConfig() {
       maxBatchSize: process.env.MAX_BATCH_SIZE ? parseInt(process.env.MAX_BATCH_SIZE, 10) : undefined,
       targetBatchMemoryMb: process.env.TARGET_BATCH_MEMORY_MB
         ? parseInt(process.env.TARGET_BATCH_MEMORY_MB, 10)
+        : undefined,
+      profilingEnabled: process.env.PROFILING_ENABLED
+        ? process.env.PROFILING_ENABLED === 'true'
         : undefined,
     },
     bloomFilter: {

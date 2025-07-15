@@ -3,7 +3,7 @@
  * Maps Mem100x errors to standard JSON-RPC error codes
  */
 
-import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode } from '@modelcontextprotocol/sdk/types'
 import {
   Mem100xError,
   EntityNotFoundError,
@@ -16,6 +16,7 @@ import {
   CacheCapacityError,
   ConfigurationError,
 } from '../errors.js';
+import { config } from '../config.js'
 
 /**
  * Maps Mem100x errors to MCP/JSON-RPC error codes

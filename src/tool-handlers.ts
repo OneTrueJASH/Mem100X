@@ -3,7 +3,7 @@
  * Separates tool logic from server setup for better maintainability
  */
 
-import { MultiDatabaseManager } from './multi-database.js';
+import { MultiDatabaseManager } from './multi-database.js'
 import {
   toolSchemas,
   SetContextInput,
@@ -24,9 +24,9 @@ import {
   RestoreBackupInput,
   GetNeighborsInput,
   FindShortestPathInput,
-} from './tool-schemas.js';
-import { createMCPToolResponse } from './mcp-types.js';
-import { createTextContent } from './utils/fast-json.js';
+} from './tool-schemas.js'
+import { createMCPToolResponse } from './mcp-types.js'
+import { createTextContent } from './utils/fast-json.js'
 
 export interface ToolContext {
   manager: MultiDatabaseManager;

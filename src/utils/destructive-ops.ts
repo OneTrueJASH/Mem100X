@@ -3,7 +3,7 @@
  * Ensures dangerous operations require explicit confirmation
  */
 
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types'
 
 // List of destructive operations that require confirmation
 export const DESTRUCTIVE_OPERATIONS = [

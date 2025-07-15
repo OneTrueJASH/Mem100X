@@ -5,6 +5,7 @@
  */
 
 import xxhash from 'xxhash-wasm';
+import fs from 'fs';
 
 // Initialize xxhash instance
 let hashInstance: Awaited<ReturnType<typeof xxhash>> | null = null;
@@ -222,7 +223,6 @@ export class CountingBloomFilter {
 
   // Synchronous save to file
   saveToFileSync(filePath: string): void {
-    const fs = require('fs');
     const buffer = this.serialize();
     fs.writeFileSync(filePath, buffer);
   }
@@ -244,7 +244,6 @@ export class CountingBloomFilter {
 
   // Synchronous load from file
   static loadFromFileSync(filePath: string): CountingBloomFilter | null {
-    const fs = require('fs');
     try {
       const buffer = fs.readFileSync(filePath);
       const filter = CountingBloomFilter.deserialize(buffer);

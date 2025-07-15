@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { Server } from '@modelcontextprotocol/sdk/server/index'
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio'
 import {
   CallToolRequestSchema,
   ErrorCode,
@@ -8,19 +8,19 @@ import {
   McpError,
   InitializeRequestSchema,
   InitializedNotificationSchema,
-} from '@modelcontextprotocol/sdk/types.js';
-import { MultiDatabaseManager } from './multi-database.js';
-import { toolHandlers, ToolContext } from './tool-handlers.js';
-import { getAllToolDefinitions } from './tool-definitions.js';
-import { stringifyGeneric, createTextContent } from './utils/fast-json.js';
-import { logger, logError, logInfo } from './utils/logger.js';
-import { config } from './config.js';
-import { createCircuitBreaker, CircuitBreaker } from './utils/circuit-breaker.js';
-import { ZeroDelayWriteAggregator } from './utils/zero-delay-aggregator.js';
-import { mapErrorToMcpCode, createMcpError } from './utils/mcp-errors.js';
-import { validateToolInput } from './utils/input-validation.js';
-import { validateDestructiveOperation } from './utils/destructive-ops.js';
-import { createRateLimiters, getRateLimiterForTool } from './utils/rate-limiter.js';
+} from '@modelcontextprotocol/sdk/types'
+import { MultiDatabaseManager } from './multi-database.js'
+import { toolHandlers, ToolContext } from './tool-handlers.js'
+import { getAllToolDefinitions } from './tool-definitions.js'
+import { stringifyGeneric, createTextContent } from './utils/fast-json.js'
+import { logger, logError, logInfo } from './utils/logger.js'
+import { config } from './config.js'
+import { createCircuitBreaker, CircuitBreaker } from './utils/circuit-breaker.js'
+import { ZeroDelayWriteAggregator } from './utils/zero-delay-aggregator.js'
+import { mapErrorToMcpCode, createMcpError } from './utils/mcp-errors.js'
+import { validateToolInput } from './utils/input-validation.js'
+import { validateDestructiveOperation } from './utils/destructive-ops.js'
+import { createRateLimiters, getRateLimiterForTool } from './utils/rate-limiter.js'
 
 export async function main() {
   logInfo('Starting Mem100x Multi-Context MCP server...');
