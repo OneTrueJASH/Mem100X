@@ -3,7 +3,7 @@
  * Maps Mem100x errors to standard JSON-RPC error codes
  */
 
-import { ErrorCode } from '@modelcontextprotocol/sdk/types'
+import { ErrorCode } from '../types.js'
 import {
   Mem100xError,
   EntityNotFoundError,

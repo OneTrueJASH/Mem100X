@@ -220,3 +220,21 @@ export interface ContextInfo {
     confidenceLevel: string;
   } | null;
 }
+
+// Temporary stub types for SDK imports
+export class McpError extends Error {
+  constructor(message: string, public code?: string, public details?: any) {
+    super(message);
+    this.name = 'McpError';
+  }
+}
+
+export enum ErrorCode {
+  InvalidParams = 'invalid_params',
+  InvalidRequest = 'invalid_request',
+  MethodNotFound = 'method_not_found',
+  InternalError = 'internal_error',
+  RateLimited = 'rate_limited',
+  NotFound = 'not_found',
+  PermissionDenied = 'permission_denied'
+}

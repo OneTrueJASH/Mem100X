@@ -3,7 +3,7 @@
  * Prevents abuse by limiting request rates per client
  */
 
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types'
+import { McpError, ErrorCode } from '../types.js'
 import { config } from '../config.js'
 
 interface RateLimitConfig {
