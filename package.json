@@ -18,6 +18,7 @@
     "test:watch": "vitest watch",
     "benchmark": "node scripts/benchmark.js",
     "benchmark:quick": "node benchmarks/bulk-operations-benchmark.ts",
+    "config:validate": "tsx scripts/validate-config.js",
     "format": "prettier --write \"src/**/*.ts\" \"benchmark/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"benchmark/**/*.ts\""
   },

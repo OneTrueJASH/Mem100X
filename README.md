@@ -334,6 +334,60 @@ await client.callTool({
 });
 ```
 
+## Configuration
+
+Mem100x provides extensive configuration options for power users:
+
+### Quick Configuration
+
+```bash
+# Copy example configuration
+cp env.example .env
+
+# Edit settings
+nano .env
+
+# Validate configuration
+npm run config:validate
+```
+
+### Key Configuration Options
+
+- **Performance Tuning**: Cache sizes, batch operations, connection pools
+- **Database Settings**: SQLite optimization, memory mapping, WAL settings
+- **Multi-Context**: Custom database paths, default contexts
+- **Logging**: Debug levels, performance profiling
+- **Advanced**: Rate limiting, compression, bloom filters
+
+### Configuration Profiles
+
+**High-Performance Profile:**
+```bash
+DATABASE_CACHE_SIZE_MB=1024
+ENTITY_CACHE_SIZE=100000
+CACHE_STRATEGY=arc
+READ_POOL_SIZE=50
+BATCH_SIZE=5000
+```
+
+**Memory-Optimized Profile:**
+```bash
+DATABASE_CACHE_SIZE_MB=64
+ENTITY_CACHE_SIZE=10000
+CACHE_STRATEGY=lru
+READ_POOL_SIZE=5
+BATCH_SIZE=100
+```
+
+**Development Profile:**
+```bash
+LOG_LEVEL=debug
+PROFILING_ENABLED=true
+COMPRESSION_ENABLED=false
+```
+
+For complete configuration documentation, see [CONFIGURATION.md](CONFIGURATION.md).
+
 ## Architecture
 
 Built with performance and MCP compliance as priorities:
@@ -347,6 +401,7 @@ src/
 ├── index.ts            # Single-context server
 ├── tool-handlers.ts    # MCP tool implementations
 ├── tool-schemas.ts     # Zod validation schemas
+├── config.ts           # Flexible configuration system
 └── types.ts           # MCP-compatible type definitions
 ```
 
