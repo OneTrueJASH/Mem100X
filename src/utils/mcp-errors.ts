@@ -17,6 +17,7 @@ import {
   ConfigurationError,
 } from '../errors.js';
 import { config } from '../config.js'
+import { getUserFriendlyError, formatErrorForUser } from './error-messages.js'
 
 /**
  * Maps Mem100x errors to MCP/JSON-RPC error codes
@@ -61,7 +62,7 @@ export function mapErrorToMcpCode(error: unknown): ErrorCode {
 }
 
 /**
- * Creates an MCP-compliant error response
+ * Creates an MCP-compliant error response with user-friendly messages
  */
 export function createMcpError(error: unknown): {
   code: ErrorCode;
@@ -69,15 +70,21 @@ export function createMcpError(error: unknown): {
   data?: any;
 } {
   const code = mapErrorToMcpCode(error);
+  const userError = getUserFriendlyError(error);
 
   if (error instanceof Mem100xError) {
     return {
       code,
-      message: error.message,
+      message: userError.message,
       data: {
         type: error.constructor.name,
         context: error.context,
         timestamp: error.timestamp,
+        severity: userError.severity,
+        category: userError.category,
+        suggestions: userError.suggestions,
+        troubleshooting: userError.troubleshooting,
+        technicalDetails: error.message, // Keep original message for debugging
       },
     };
   }
@@ -85,9 +92,14 @@ export function createMcpError(error: unknown): {
   if (error instanceof Error) {
     return {
       code,
-      message: error.message,
+      message: userError.message,
       data: {
         type: error.constructor.name,
+        severity: userError.severity,
+        category: userError.category,
+        suggestions: userError.suggestions,
+        troubleshooting: userError.troubleshooting,
+        technicalDetails: error.message, // Keep original message for debugging
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       },
     };
@@ -95,7 +107,13 @@ export function createMcpError(error: unknown): {
 
   return {
     code,
-    message: String(error),
-    data: { type: 'UnknownError' },
+    message: userError.message,
+    data: {
+      type: 'UnknownError',
+      severity: userError.severity,
+      category: userError.category,
+      suggestions: userError.suggestions,
+      troubleshooting: userError.troubleshooting,
+    },
   };
 }

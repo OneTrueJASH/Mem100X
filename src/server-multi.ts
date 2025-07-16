@@ -17,7 +17,8 @@ import { logger, logError, logInfo } from './utils/logger.js'
 import { config } from './config.js'
 import { createCircuitBreaker, CircuitBreaker } from './utils/circuit-breaker.js'
 import { ZeroDelayWriteAggregator } from './utils/zero-delay-aggregator.js'
-import { mapErrorToMcpCode, createMcpError } from './utils/mcp-errors.js'
+import { mapErrorToMcpCode, createMcpError } from './utils/mcp-errors.js';
+import { formatErrorForUser } from './utils/error-messages.js';
 import { validateToolInput } from './utils/input-validation.js'
 import { validateDestructiveOperation } from './utils/destructive-ops.js'
 import { createRateLimiters, getRateLimiterForTool } from './utils/rate-limiter.js'
