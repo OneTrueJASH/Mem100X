@@ -88,7 +88,19 @@ Then in Claude:
 
 ## Installation
 
-### Option 1: Use with npx (Recommended)
+### Option 1: Universal Installer (Recommended)
+
+```bash
+# Auto-detect best installation method
+curl -fsSL https://raw.githubusercontent.com/OneTrueJASH/Mem100X/main/install.sh | bash
+
+# Or specify method
+./install.sh npm      # npm installation
+./install.sh docker   # Docker installation
+./install.sh source   # Source installation
+```
+
+### Option 2: Use with npx
 
 No installation needed! Just use directly with `npx`:
 
@@ -100,13 +112,24 @@ npx mem100x
 npx mem100x-single
 ```
 
-### Option 2: Install globally
+### Option 3: Install globally
 
 ```bash
 npm install -g mem100x
 ```
 
-### Option 3: Install from source
+### Option 4: Docker
+
+```bash
+# Build and run
+docker build -t mem100x .
+docker run --rm -v $(pwd)/data:/app/data mem100x
+
+# Or use Docker Compose
+docker-compose up mem100x
+```
+
+### Option 5: Install from source
 
 ```bash
 # Clone the repository

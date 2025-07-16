@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # Mem100x Multi-Context Server (Default)
+  mem100x:
+    build: .
+    container_name: mem100x-multi
+    restart: unless-stopped
+    volumes:
+      # Persist data across container restarts
+      - mem100x_data:/app/data
+      # Mount custom configuration (optional)
+      - ./env.example:/app/.env:ro
+    environment:
+      # Override default configuration
+      - LOG_LEVEL=info
+      - DATABASE_CACHE_SIZE_MB=512
+      - ENTITY_CACHE_SIZE=50000
+    # For MCP stdio mode, use stdin/stdout
+    stdin_open: true
+    tty: true
+    # Health check
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('Health check passed')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Mem100x Single-Context Server
+  mem100x-single:
+    build: .
+    container_name: mem100x-single
+    restart: unless-stopped
+    command: ["node", "dist/index.js"]
+    volumes:
+      # Separate data volume for single-context
+      - mem100x_single_data:/app/data
+      # Mount custom configuration (optional)
+      - ./env.example:/app/.env:ro
+    environment:
+      - LOG_LEVEL=info
+      - DATABASE_CACHE_SIZE_MB=256
+      - ENTITY_CACHE_SIZE=25000
+    stdin_open: true
+    tty: true
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('Health check passed')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Development version with debug logging
+  mem100x-dev:
+    build: .
+    container_name: mem100x-dev
+    restart: unless-stopped
+    volumes:
+      - mem100x_dev_data:/app/data
+      - ./env.example:/app/.env:ro
+      # Mount source code for development
+      - ./src:/app/src:ro
+    environment:
+      - LOG_LEVEL=debug
+      - PROFILING_ENABLED=true
+      - ENTITY_CACHE_SIZE=1000
+      - SEARCH_CACHE_SIZE=500
+    stdin_open: true
+    tty: true
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('Health check passed')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Named volumes for data persistence
+volumes:
+  mem100x_data:
+    driver: local
+  mem100x_single_data:
+    driver: local
+  mem100x_dev_data:
+    driver: local
