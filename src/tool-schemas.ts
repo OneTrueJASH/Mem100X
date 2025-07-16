@@ -199,8 +199,74 @@ export const toolSchemas = {
       .max(10)
       .default(6)
       .optional()
-      .describe('Maximum path length to search (1-10)'),
-    context: z.string().optional().describe('Specific context to search in'),
+      .describe('Maximum depth to search (1-10)'),
+  }),
+
+  // System resilience operations
+  get_resilience_stats: z.object({}),
+
+  get_transaction_logs: z.object({
+    limit: z.number().int().positive().max(1000).default(100).optional(),
+  }),
+
+  get_recovery_actions: z.object({}),
+
+  detect_and_repair_corruption: z.object({}),
+
+  validate_data_integrity: z.object({
+    data: z.any().describe('Data to validate'),
+    expectedChecksum: z.string().optional().describe('Expected checksum for validation'),
+  }),
+
+  clear_old_transaction_logs: z.object({
+    olderThanDays: z.number().int().positive().max(365).default(30).optional(),
+  }),
+
+  create_resilient_backup: z.object({
+    backupPath: z.string().describe('Path for the resilient backup file'),
+  }),
+
+  // Privacy and security tools
+  get_privacy_stats: z.object({}),
+  get_privacy_config: z.object({}),
+  update_privacy_config: z.object({
+    config: z.record(z.any()).describe('Privacy configuration to update'),
+  }),
+  check_access: z.object({
+    userId: z.string().describe('User ID to check access for'),
+    operation: z.string().describe('Operation to check access for'),
+    context: z.string().describe('Context to check access in'),
+  }),
+  set_access_control: z.object({
+    userId: z.string().describe('User ID to set access control for'),
+    permissions: z.array(z.string()).describe('Permissions to grant'),
+    contexts: z.array(z.string()).describe('Contexts to grant access to'),
+    expiresAt: z.string().optional().describe('Expiration date (ISO string)'),
+  }),
+  remove_access_control: z.object({
+    userId: z.string().describe('User ID to remove access control for'),
+  }),
+  unlock_account: z.object({
+    userId: z.string().describe('User ID to unlock'),
+  }),
+  check_compliance: z.object({}),
+  apply_retention_policy: z.object({}),
+  cleanup_audit_logs: z.object({}),
+  encrypt_data: z.object({
+    data: z.string().describe('Data to encrypt'),
+  }),
+  decrypt_data: z.object({
+    encryptedData: z.string().describe('Encrypted data to decrypt'),
+  }),
+  anonymize_data: z.object({
+    data: z.any().describe('Data to anonymize'),
+    level: z.enum(['none', 'partial', 'full']).default('partial').optional().describe('Anonymization level'),
+  }),
+  validate_input: z.object({
+    data: z.any().describe('Data to validate'),
+  }),
+  sanitize_output: z.object({
+    data: z.any().describe('Data to sanitize'),
   }),
 
   search_nodes_context_aware: z.object({
@@ -249,6 +315,32 @@ export type CreateBackupInput = z.infer<typeof toolSchemas.create_backup>;
 export type RestoreBackupInput = z.infer<typeof toolSchemas.restore_backup>;
 export type GetNeighborsInput = z.infer<typeof toolSchemas.get_neighbors>;
 export type FindShortestPathInput = z.infer<typeof toolSchemas.find_shortest_path>;
+
+// Resilience type exports
+export type GetResilienceStatsInput = z.infer<typeof toolSchemas.get_resilience_stats>;
+export type GetTransactionLogsInput = z.infer<typeof toolSchemas.get_transaction_logs>;
+export type GetRecoveryActionsInput = z.infer<typeof toolSchemas.get_recovery_actions>;
+export type DetectAndRepairCorruptionInput = z.infer<typeof toolSchemas.detect_and_repair_corruption>;
+export type ValidateDataIntegrityInput = z.infer<typeof toolSchemas.validate_data_integrity>;
+export type ClearOldTransactionLogsInput = z.infer<typeof toolSchemas.clear_old_transaction_logs>;
+export type CreateResilientBackupInput = z.infer<typeof toolSchemas.create_resilient_backup>;
+
+// Privacy and security type exports
+export type GetPrivacyStatsInput = z.infer<typeof toolSchemas.get_privacy_stats>;
+export type GetPrivacyConfigInput = z.infer<typeof toolSchemas.get_privacy_config>;
+export type UpdatePrivacyConfigInput = z.infer<typeof toolSchemas.update_privacy_config>;
+export type CheckAccessInput = z.infer<typeof toolSchemas.check_access>;
+export type SetAccessControlInput = z.infer<typeof toolSchemas.set_access_control>;
+export type RemoveAccessControlInput = z.infer<typeof toolSchemas.remove_access_control>;
+export type UnlockAccountInput = z.infer<typeof toolSchemas.unlock_account>;
+export type CheckComplianceInput = z.infer<typeof toolSchemas.check_compliance>;
+export type ApplyRetentionPolicyInput = z.infer<typeof toolSchemas.apply_retention_policy>;
+export type CleanupAuditLogsInput = z.infer<typeof toolSchemas.cleanup_audit_logs>;
+export type EncryptDataInput = z.infer<typeof toolSchemas.encrypt_data>;
+export type DecryptDataInput = z.infer<typeof toolSchemas.decrypt_data>;
+export type AnonymizeDataInput = z.infer<typeof toolSchemas.anonymize_data>;
+export type ValidateInputInput = z.infer<typeof toolSchemas.validate_input>;
+export type SanitizeOutputInput = z.infer<typeof toolSchemas.sanitize_output>;
 
 // Export content schemas for validation
 export {

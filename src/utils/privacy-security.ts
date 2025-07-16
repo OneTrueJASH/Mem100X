@@ -9,7 +9,6 @@
  * - Privacy compliance features
  */
 
-import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { config } from '../config.js';
@@ -142,10 +141,10 @@ export class PrivacySecurityManager {
   decryptData(data: string): string { return data; }
 
   // Stub/no-op for access controls (not needed for local-only)
-  checkAccess(): boolean { return true; }
-  setAccessControl(): void {}
-  removeAccessControl(): void {}
-  unlockAccount(): void {}
+  checkAccess(..._args: any[]): boolean { return true; }
+  setAccessControl(..._args: any[]): void {}
+  removeAccessControl(..._args: any[]): void {}
+  unlockAccount(..._args: any[]): void {}
 
   // Stub/no-op for audit trails (not needed for local-only)
   getPrivacyStats(): any { return { totalAuditEntries: 0, encryptionOperations: 0 }; }
@@ -158,7 +157,7 @@ export class PrivacySecurityManager {
   checkCompliance(): Record<string, boolean> { return { gdpr: false, ccpa: false, hipaa: false }; }
 
   // Stub/no-op for anonymization (not needed for local-only)
-  anonymizeData(data: any): any { return data; }
+  anonymizeData(data: any, ..._args: any[]): any { return data; }
 
   // Shutdown (no-op for local-only)
   shutdown(): void {}

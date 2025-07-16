@@ -39,6 +39,8 @@ import { parseSearchQuery, buildFTSQuery, calculateRelevance, generateHighlights
 import { analyzeSearchIntent, generateSearchSuggestions } from './utils/context-aware-search.js';
 import { needsFTSMigration, migrateFTSToPorterUnicode61 } from './utils/fts-migration.js';
 import { MemoryAgingSystem, MEMORY_AGING_PRESETS } from './utils/memory-aging.js';
+import { systemResilience } from './utils/system-resilience.js';
+import { PrivacySecurityManager, PRIVACY_PRESETS } from './utils/privacy-security.js';
 
 const LARGE_BATCH_THRESHOLD = 1000;
 
@@ -93,6 +95,9 @@ export class MemoryDatabase {
   // Memory aging system
   private memoryAging: MemoryAgingSystem;
 
+  // Privacy and security system
+  private privacySecurity: PrivacySecurityManager;
+
   // Prepared statements for maximum performance
   private statements: {
     createEntity?: Database.Statement;
@@ -116,6 +121,9 @@ export class MemoryDatabase {
 
     // Initialize memory aging system
     this.memoryAging = new MemoryAgingSystem(MEMORY_AGING_PRESETS.BALANCED);
+
+    // Initialize privacy and security system
+    this.privacySecurity = new PrivacySecurityManager(config.privacy);
 
     // Initialize caches
     this.entityCache = createStringCache<EntityResult>(
@@ -334,6 +342,13 @@ export class MemoryDatabase {
   // Transaction helpers
   transaction<T>(fn: () => T): T {
     return this.db.transaction(fn)();
+  }
+
+  // Resilient transaction with integrity checks
+  async resilientTransaction<T>(operation: string, fn: () => T, data?: any): Promise<T> {
+    return systemResilience.executeWithResilience(operation, async (transactionId) => {
+      return this.db.transaction(fn)();
+    }, data);
   }
 
   createEntities(entities: CreateEntityInput[]): EntityResult[] {
@@ -1861,6 +1876,9 @@ export class MemoryDatabase {
     this.db.prepare('BEGIN').run();
     this.isInTransaction = true;
     this.transactionDepth = 1;
+
+    // Log transaction start with resilience system
+    systemResilience.createTransaction('manual_transaction');
   }
 
   commitTransaction(): void {
@@ -1874,6 +1892,13 @@ export class MemoryDatabase {
     // Clear caches after successful commit
     this.entityCache.clear();
     this.searchCache.clear();
+
+    // Log successful commit with resilience system
+    try {
+      systemResilience.commitTransaction('manual_transaction');
+    } catch (error) {
+      logError('Failed to log transaction commit', error as Error);
+    }
   }
 
   rollbackTransaction(): void {
@@ -1887,6 +1912,13 @@ export class MemoryDatabase {
     // Clear caches after rollback
     this.entityCache.clear();
     this.searchCache.clear();
+
+    // Log rollback with resilience system
+    try {
+      systemResilience.rollbackTransaction('manual_transaction', 'Manual rollback');
+    } catch (error) {
+      logError('Failed to log transaction rollback', error as Error);
+    }
   }
 
   // Backup operations
@@ -1926,6 +1958,9 @@ export class MemoryDatabase {
 
     this.saveBloomFilter();
     this.db.close();
+
+    // Shutdown resilience system
+    systemResilience.shutdown();
   }
 
   // Memory aging methods
@@ -2189,5 +2224,189 @@ export class MemoryDatabase {
       entities: scoredEntities.slice(0, limit),
       relations: filteredRelations.slice(0, limit)
     };
+  }
+
+  // ===== System Resilience Methods =====
+
+  /**
+   * Get system resilience statistics
+   */
+  getResilienceStats(): any {
+    return systemResilience.getStats();
+  }
+
+  /**
+   * Get transaction logs for audit
+   */
+  getTransactionLogs(limit: number = 100): any[] {
+    return systemResilience.getTransactionLogs(limit);
+  }
+
+  /**
+   * Get recovery actions
+   */
+  getRecoveryActions(): any[] {
+    return systemResilience.getRecoveryActions();
+  }
+
+  /**
+   * Detect and repair data corruption
+   */
+  async detectAndRepairCorruption(): Promise<any[]> {
+    return systemResilience.detectAndRepairCorruption();
+  }
+
+  /**
+   * Validate data integrity
+   */
+  validateDataIntegrity(data: any, expectedChecksum?: string): any {
+    return systemResilience.validateIntegrity(data, expectedChecksum);
+  }
+
+  /**
+   * Clear old transaction logs
+   */
+  clearOldTransactionLogs(olderThanDays: number = 30): void {
+    systemResilience.clearOldLogs(olderThanDays);
+  }
+
+  /**
+   * Create resilient backup with integrity validation
+   */
+  async createResilientBackup(backupPath: string): Promise<void> {
+    const transactionId = systemResilience.createTransaction('resilient_backup');
+
+    try {
+      // Create backup
+      this.backup(backupPath);
+
+      // Validate backup integrity
+      const backupStats = this.getStats();
+      const integrityCheck = systemResilience.validateIntegrity(backupStats);
+
+      if (!integrityCheck.isValid) {
+        throw new Error('Backup integrity check failed');
+      }
+
+      systemResilience.commitTransaction(transactionId, backupStats);
+      logInfo('Resilient backup created successfully', { backupPath, transactionId });
+    } catch (error) {
+      systemResilience.rollbackTransaction(transactionId, error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  // ===== Privacy and Security Methods =====
+
+  /**
+   * Get privacy statistics
+   */
+  getPrivacyStats(): any {
+    return this.privacySecurity.getPrivacyStats();
+  }
+
+  /**
+   * Get privacy configuration
+   */
+  getPrivacyConfig(): any {
+    return this.privacySecurity.getPrivacyConfig();
+  }
+
+  /**
+   * Update privacy configuration
+   */
+  updatePrivacyConfig(newConfig: any): void {
+    this.privacySecurity.updatePrivacyConfig(newConfig);
+  }
+
+  /**
+   * Check access permissions
+   */
+  checkAccess(userId: string, operation: string, context: string): boolean {
+    return this.privacySecurity.checkAccess(userId, operation, context);
+  }
+
+  /**
+   * Set access control for a user
+   */
+  setAccessControl(userId: string, permissions: string[], contexts: string[], expiresAt?: string): void {
+    this.privacySecurity.setAccessControl(userId, permissions, contexts, expiresAt);
+  }
+
+  /**
+   * Remove access control for a user
+   */
+  removeAccessControl(userId: string): void {
+    this.privacySecurity.removeAccessControl(userId);
+  }
+
+  /**
+   * Unlock user account
+   */
+  unlockAccount(userId: string): void {
+    this.privacySecurity.unlockAccount(userId);
+  }
+
+  /**
+   * Check compliance status
+   */
+  checkCompliance(): Record<string, boolean> {
+    return this.privacySecurity.checkCompliance();
+  }
+
+  /**
+   * Apply data retention policy
+   */
+  applyRetentionPolicy(): { deletedCount: number; errors: string[] } {
+    return this.privacySecurity.applyRetentionPolicy();
+  }
+
+  /**
+   * Clean up old audit logs
+   */
+  cleanupAuditLogs(): { deletedCount: number } {
+    return this.privacySecurity.cleanupAuditLogs();
+  }
+
+  /**
+   * Encrypt sensitive data
+   */
+  encryptData(data: string): string {
+    return this.privacySecurity.encryptData(data);
+  }
+
+  /**
+   * Decrypt sensitive data
+   */
+  decryptData(encryptedData: string): string {
+    return this.privacySecurity.decryptData(encryptedData);
+  }
+
+  /**
+   * Anonymize data
+   */
+  anonymizeData(data: any, level: 'none' | 'partial' | 'full' = 'partial'): any {
+    return this.privacySecurity.anonymizeData(data, level);
+  }
+
+  /**
+   * Validate input data for security
+   */
+  validateInput(data: any): { isValid: boolean; errors: string[] } {
+    return this.privacySecurity.validateInput(data);
+  }
+
+  /**
+   * Sanitize output data
+   */
+  sanitizeOutput(data: any): any {
+    return this.privacySecurity.sanitizeOutput(data);
+  }
+
+  /**
+   * Shutdown privacy system
+   */
+  shutdownPrivacySystem(): void {
+    this.privacySecurity.shutdown();
   }
 }

@@ -464,6 +464,322 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
       required: ['entityName'],
     },
   },
+
+  // System resilience tools
+  get_resilience_stats: {
+    name: 'get_resilience_stats',
+    description: 'Get system resilience statistics including transaction success rates, recovery actions, and integrity checks',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  get_transaction_logs: {
+    name: 'get_transaction_logs',
+    description: 'Retrieve transaction logs for audit and debugging purposes',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: {
+          type: 'number',
+          description: 'Maximum number of logs to return (default: 100, max: 1000)',
+          default: 100,
+        },
+      },
+    },
+  },
+
+  get_recovery_actions: {
+    name: 'get_recovery_actions',
+    description: 'Get list of recovery actions taken by the system for data integrity and corruption repair',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  detect_and_repair_corruption: {
+    name: 'detect_and_repair_corruption',
+    description: 'Detect and automatically repair data corruption issues across the system',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  validate_data_integrity: {
+    name: 'validate_data_integrity',
+    description: 'Validate data integrity using checksums and consistency checks',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          description: 'Data to validate for integrity',
+        },
+        expectedChecksum: {
+          type: 'string',
+          description: 'Expected checksum for validation (optional)',
+        },
+      },
+      required: ['data'],
+    },
+  },
+
+  clear_old_transaction_logs: {
+    name: 'clear_old_transaction_logs',
+    description: 'Clear old transaction logs to free up storage space',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        olderThanDays: {
+          type: 'number',
+          description: 'Clear logs older than this many days (default: 30, max: 365)',
+          default: 30,
+        },
+      },
+    },
+  },
+
+  create_resilient_backup: {
+    name: 'create_resilient_backup',
+    description: 'Create a resilient backup with integrity validation and corruption detection',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        backupPath: {
+          type: 'string',
+          description: 'Path for the resilient backup file',
+        },
+      },
+      required: ['backupPath'],
+    },
+  },
+
+  // Privacy and Security Tools
+  get_privacy_stats: {
+    name: 'get_privacy_stats',
+    description: 'Get privacy and security statistics including audit entries, access attempts, and compliance status',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  get_privacy_config: {
+    name: 'get_privacy_config',
+    description: 'Get current privacy configuration settings including encryption, access controls, and compliance settings',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  update_privacy_config: {
+    name: 'update_privacy_config',
+    description: 'Update privacy configuration settings for encryption, access controls, audit trails, and compliance',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        config: {
+          type: 'object',
+          description: 'Privacy configuration to update',
+        },
+      },
+      required: ['config'],
+    },
+  },
+
+  check_access: {
+    name: 'check_access',
+    description: 'Check if a user has access to perform an operation in a specific context',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        userId: {
+          type: 'string',
+          description: 'User ID to check access for',
+        },
+        operation: {
+          type: 'string',
+          description: 'Operation to check access for',
+        },
+        context: {
+          type: 'string',
+          description: 'Context to check access in',
+        },
+      },
+      required: ['userId', 'operation', 'context'],
+    },
+  },
+
+  set_access_control: {
+    name: 'set_access_control',
+    description: 'Set access control permissions for a user across specified contexts',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        userId: {
+          type: 'string',
+          description: 'User ID to set access control for',
+        },
+        permissions: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Permissions to grant to the user',
+        },
+        contexts: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Contexts to grant access to',
+        },
+        expiresAt: {
+          type: 'string',
+          description: 'Expiration date for access control (ISO string)',
+        },
+      },
+      required: ['userId', 'permissions', 'contexts'],
+    },
+  },
+
+  remove_access_control: {
+    name: 'remove_access_control',
+    description: 'Remove access control for a user',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        userId: {
+          type: 'string',
+          description: 'User ID to remove access control for',
+        },
+      },
+      required: ['userId'],
+    },
+  },
+
+  unlock_account: {
+    name: 'unlock_account',
+    description: 'Unlock a user account that has been locked due to failed access attempts',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        userId: {
+          type: 'string',
+          description: 'User ID to unlock',
+        },
+      },
+      required: ['userId'],
+    },
+  },
+
+  check_compliance: {
+    name: 'check_compliance',
+    description: 'Check compliance status for GDPR, CCPA, and HIPAA regulations',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  apply_retention_policy: {
+    name: 'apply_retention_policy',
+    description: 'Apply data retention policy to clean up old data according to configured settings',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  cleanup_audit_logs: {
+    name: 'cleanup_audit_logs',
+    description: 'Clean up old audit log entries based on retention settings',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  encrypt_data: {
+    name: 'encrypt_data',
+    description: 'Encrypt sensitive data using configured encryption settings',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'string',
+          description: 'Data to encrypt',
+        },
+      },
+      required: ['data'],
+    },
+  },
+
+  decrypt_data: {
+    name: 'decrypt_data',
+    description: 'Decrypt previously encrypted data',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        encryptedData: {
+          type: 'string',
+          description: 'Encrypted data to decrypt',
+        },
+      },
+      required: ['encryptedData'],
+    },
+  },
+
+  anonymize_data: {
+    name: 'anonymize_data',
+    description: 'Anonymize data for privacy protection with configurable levels',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          description: 'Data to anonymize',
+        },
+        level: {
+          type: 'string',
+          enum: ['none', 'partial', 'full'],
+          description: 'Anonymization level (default: partial)',
+          default: 'partial',
+        },
+      },
+      required: ['data'],
+    },
+  },
+
+  validate_input: {
+    name: 'validate_input',
+    description: 'Validate input data for security threats and suspicious patterns',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          description: 'Data to validate for security threats',
+        },
+      },
+      required: ['data'],
+    },
+  },
+
+  sanitize_output: {
+    name: 'sanitize_output',
+    description: 'Sanitize output data to remove potentially dangerous content',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          description: 'Data to sanitize',
+        },
+      },
+      required: ['data'],
+    },
+  },
 };
 
 /**

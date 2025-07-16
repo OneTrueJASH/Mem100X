@@ -24,6 +24,28 @@ import {
   RestoreBackupInput,
   GetNeighborsInput,
   FindShortestPathInput,
+  GetResilienceStatsInput,
+  GetTransactionLogsInput,
+  GetRecoveryActionsInput,
+  DetectAndRepairCorruptionInput,
+  ValidateDataIntegrityInput,
+  ClearOldTransactionLogsInput,
+  CreateResilientBackupInput,
+  GetPrivacyStatsInput,
+  GetPrivacyConfigInput,
+  UpdatePrivacyConfigInput,
+  CheckAccessInput,
+  SetAccessControlInput,
+  RemoveAccessControlInput,
+  UnlockAccountInput,
+  CheckComplianceInput,
+  ApplyRetentionPolicyInput,
+  CleanupAuditLogsInput,
+  EncryptDataInput,
+  DecryptDataInput,
+  AnonymizeDataInput,
+  ValidateInputInput,
+  SanitizeOutputInput,
 } from './tool-schemas.js'
 import { createMCPToolResponse } from './mcp-types.js'
 import { createTextContent } from './utils/fast-json.js'
@@ -372,7 +394,6 @@ export function handleFindShortestPath(args: any, ctx: ToolContext) {
     bidirectional: validated.bidirectional !== false,
     relationType: validated.relationType,
     maxDepth: validated.maxDepth || 6,
-    context: validated.context,
   });
   const duration = performance.now() - ctx.startTime;
 
@@ -392,6 +413,229 @@ export function handleFindShortestPath(args: any, ctx: ToolContext) {
     : `No path found from "${validated.from}" to "${validated.to}"`;
 
   return createMCPToolResponse(response, message);
+}
+
+// Privacy and security handlers
+export function handleGetPrivacyStats(args: any, ctx: ToolContext) {
+  toolSchemas.get_privacy_stats.parse(args); // Validate empty object
+  const stats = ctx.manager.getPrivacyStats();
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    ...stats,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, 'Privacy statistics retrieved successfully');
+}
+
+export function handleGetPrivacyConfig(args: any, ctx: ToolContext) {
+  toolSchemas.get_privacy_config.parse(args); // Validate empty object
+  const config = ctx.manager.getPrivacyConfig();
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    config,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, 'Privacy configuration retrieved successfully');
+}
+
+export function handleUpdatePrivacyConfig(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.update_privacy_config.parse(args) as UpdatePrivacyConfigInput;
+  ctx.manager.updatePrivacyConfig(validated.config);
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    success: true,
+    message: 'Privacy configuration updated successfully',
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, 'Privacy configuration updated successfully');
+}
+
+export function handleCheckAccess(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.check_access.parse(args) as CheckAccessInput;
+  const hasAccess = ctx.manager.checkAccess(validated.userId, validated.operation, validated.context);
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    hasAccess,
+    userId: validated.userId,
+    operation: validated.operation,
+    context: validated.context,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  const message = hasAccess
+    ? `Access granted for user ${validated.userId} to ${validated.operation} in ${validated.context}`
+    : `Access denied for user ${validated.userId} to ${validated.operation} in ${validated.context}`;
+
+  return createMCPToolResponse(result, message);
+}
+
+export function handleSetAccessControl(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.set_access_control.parse(args) as SetAccessControlInput;
+  ctx.manager.setAccessControl(validated.userId, validated.permissions, validated.contexts, validated.expiresAt);
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    success: true,
+    userId: validated.userId,
+    permissions: validated.permissions,
+    contexts: validated.contexts,
+    expiresAt: validated.expiresAt,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, `Access control set for user ${validated.userId}`);
+}
+
+export function handleRemoveAccessControl(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.remove_access_control.parse(args) as RemoveAccessControlInput;
+  ctx.manager.removeAccessControl(validated.userId);
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    success: true,
+    userId: validated.userId,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, `Access control removed for user ${validated.userId}`);
+}
+
+export function handleUnlockAccount(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.unlock_account.parse(args) as UnlockAccountInput;
+  ctx.manager.unlockAccount(validated.userId);
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    success: true,
+    userId: validated.userId,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, `Account unlocked for user ${validated.userId}`);
+}
+
+export function handleCheckCompliance(args: any, ctx: ToolContext) {
+  toolSchemas.check_compliance.parse(args); // Validate empty object
+  const compliance = ctx.manager.checkCompliance();
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    compliance,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, 'Compliance status checked successfully');
+}
+
+export function handleApplyRetentionPolicy(args: any, ctx: ToolContext) {
+  toolSchemas.apply_retention_policy.parse(args); // Validate empty object
+  const result = ctx.manager.applyRetentionPolicy();
+  const duration = performance.now() - ctx.startTime;
+
+  const response = {
+    ...result,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  const message = `Retention policy applied: ${result.deletedCount} items deleted, ${result.errors.length} errors`;
+
+  return createMCPToolResponse(response, message);
+}
+
+export function handleCleanupAuditLogs(args: any, ctx: ToolContext) {
+  toolSchemas.cleanup_audit_logs.parse(args); // Validate empty object
+  const result = ctx.manager.cleanupAuditLogs();
+  const duration = performance.now() - ctx.startTime;
+
+  const response = {
+    ...result,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  const message = `Audit logs cleaned up: ${result.deletedCount} entries deleted`;
+
+  return createMCPToolResponse(response, message);
+}
+
+export function handleEncryptData(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.encrypt_data.parse(args) as EncryptDataInput;
+  const encryptedData = ctx.manager.encryptData(validated.data);
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    encryptedData,
+    originalLength: validated.data.length,
+    encryptedLength: encryptedData.length,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, 'Data encrypted successfully');
+}
+
+export function handleDecryptData(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.decrypt_data.parse(args) as DecryptDataInput;
+  const decryptedData = ctx.manager.decryptData(validated.encryptedData);
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    decryptedData,
+    encryptedLength: validated.encryptedData.length,
+    decryptedLength: decryptedData.length,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, 'Data decrypted successfully');
+}
+
+export function handleAnonymizeData(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.anonymize_data.parse(args) as AnonymizeDataInput;
+  const anonymizedData = ctx.manager.anonymizeData(validated.data, validated.level);
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    anonymizedData,
+    anonymizationLevel: validated.level,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, `Data anonymized with level: ${validated.level}`);
+}
+
+export function handleValidateInput(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.validate_input.parse(args) as ValidateInputInput;
+  const result = ctx.manager.validateInput(validated.data);
+  const duration = performance.now() - ctx.startTime;
+
+  const response = {
+    ...result,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  const message = result.isValid
+    ? 'Input validation passed'
+    : `Input validation failed: ${result.errors.join(', ')}`;
+
+  return createMCPToolResponse(response, message);
+}
+
+export function handleSanitizeOutput(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.sanitize_output.parse(args) as SanitizeOutputInput;
+  const sanitizedData = ctx.manager.sanitizeOutput(validated.data);
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    sanitizedData,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, 'Output sanitized successfully');
 }
 
 // Context-aware search handlers
@@ -440,6 +684,106 @@ export function handleSearchRelatedEntities(args: any, ctx: ToolContext) {
   );
 }
 
+// System resilience handlers
+export function handleGetResilienceStats(args: any, ctx: ToolContext) {
+  toolSchemas.get_resilience_stats.parse(args); // Validate empty object
+  const stats = ctx.manager.getResilienceStats();
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    ...stats,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, 'Resilience statistics retrieved successfully');
+}
+
+export function handleGetTransactionLogs(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.get_transaction_logs.parse(args) as GetTransactionLogsInput;
+  const logs = ctx.manager.getTransactionLogs(validated.limit);
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    logs,
+    count: logs.length,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, `Retrieved ${logs.length} transaction logs`);
+}
+
+export function handleGetRecoveryActions(args: any, ctx: ToolContext) {
+  toolSchemas.get_recovery_actions.parse(args); // Validate empty object
+  const actions = ctx.manager.getRecoveryActions();
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    actions,
+    count: actions.length,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, `Retrieved ${actions.length} recovery actions`);
+}
+
+export async function handleDetectAndRepairCorruption(args: any, ctx: ToolContext) {
+  toolSchemas.detect_and_repair_corruption.parse(args); // Validate empty object
+  const repairs = await ctx.manager.detectAndRepairCorruption();
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    repairs,
+    count: repairs.length,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, `Detected and repaired ${repairs.length} corruption issues`);
+}
+
+export function handleValidateDataIntegrity(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.validate_data_integrity.parse(args) as ValidateDataIntegrityInput;
+  const integrityCheck = ctx.manager.validateDataIntegrity(validated.data, validated.expectedChecksum);
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    ...integrityCheck,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(
+    result,
+    `Data integrity validation ${integrityCheck.isValid ? 'passed' : 'failed'}`
+  );
+}
+
+export function handleClearOldTransactionLogs(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.clear_old_transaction_logs.parse(args) as ClearOldTransactionLogsInput;
+  ctx.manager.clearOldTransactionLogs(validated.olderThanDays);
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    success: true,
+    olderThanDays: validated.olderThanDays,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, 'Old transaction logs cleared successfully');
+}
+
+export function handleCreateResilientBackup(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.create_resilient_backup.parse(args) as CreateResilientBackupInput;
+  ctx.manager.createResilientBackup(validated.backupPath);
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    success: true,
+    backupPath: validated.backupPath,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, `Resilient backup created successfully at ${validated.backupPath}`);
+}
+
 // Tool handler registry
 export const toolHandlers: Record<string, (args: any, ctx: ToolContext) => any> = {
   // Context management
@@ -479,4 +823,30 @@ export const toolHandlers: Record<string, (args: any, ctx: ToolContext) => any> 
   // Context-aware search
   search_nodes_context_aware: handleSearchNodesContextAware,
   search_related_entities: handleSearchRelatedEntities,
+
+  // System resilience
+  get_resilience_stats: handleGetResilienceStats,
+  get_transaction_logs: handleGetTransactionLogs,
+  get_recovery_actions: handleGetRecoveryActions,
+  detect_and_repair_corruption: handleDetectAndRepairCorruption,
+  validate_data_integrity: handleValidateDataIntegrity,
+  clear_old_transaction_logs: handleClearOldTransactionLogs,
+  create_resilient_backup: handleCreateResilientBackup,
+
+  // Privacy and security handlers
+  get_privacy_stats: handleGetPrivacyStats,
+  get_privacy_config: handleGetPrivacyConfig,
+  update_privacy_config: handleUpdatePrivacyConfig,
+  check_access: handleCheckAccess,
+  set_access_control: handleSetAccessControl,
+  remove_access_control: handleRemoveAccessControl,
+  unlock_account: handleUnlockAccount,
+  check_compliance: handleCheckCompliance,
+  apply_retention_policy: handleApplyRetentionPolicy,
+  cleanup_audit_logs: handleCleanupAuditLogs,
+  encrypt_data: handleEncryptData,
+  decrypt_data: handleDecryptData,
+  anonymize_data: handleAnonymizeData,
+  validate_input: handleValidateInput,
+  sanitize_output: handleSanitizeOutput,
 };

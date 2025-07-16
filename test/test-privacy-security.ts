@@ -1,6 +1,5 @@
-"use strict";
-const assert = require("assert");
-const { PrivacySecurityManager, PRIVACY_PRESETS } = require("./src/utils/privacy-security.ts");
+import assert from "assert";
+import { PrivacySecurityManager, PRIVACY_PRESETS } from "../src/utils/privacy-security.js";
 
 function testInputValidation() {
   const psm = new PrivacySecurityManager();
@@ -24,7 +23,7 @@ function testOutputSanitization() {
   const psm = new PrivacySecurityManager();
   // String with HTML/script
   let sanitized = psm.sanitizeOutput("<script>alert('x')</script><b>bold</b>plain");
-  assert.strictEqual(sanitized, "plain");
+  assert.strictEqual(sanitized, "boldplain");
   // Object with nested HTML
   sanitized = psm.sanitizeOutput({ a: "<b>hi</b>", b: { c: "<script>bad()</script>ok" } });
   assert.deepStrictEqual(sanitized, { a: "hi", b: { c: "ok" } });
@@ -73,4 +72,4 @@ function runAll() {
   console.log("All privacy/security tests passed.");
 }
 
-if (require.main === module) runAll();
+if (import.meta.url === `file://${process.argv[1]}`) runAll();

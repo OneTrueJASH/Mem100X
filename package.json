@@ -8,7 +8,8 @@
     "mem100x-single": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc",
     "dev": "tsx src/server-multi.ts",
     "start": "node dist/server-multi.js",
     "prepare": "npm run build",

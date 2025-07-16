@@ -624,4 +624,379 @@ export class MultiDatabaseManager {
       db.close();
     }
   }
+
+  // ===== System Resilience Methods =====
+
+  public getResilienceStats(): any {
+    // Aggregate resilience stats from all databases
+    const allStats: any = {
+      totalTransactions: 0,
+      activeTransactions: 0,
+      committedTransactions: 0,
+      rolledBackTransactions: 0,
+      failedTransactions: 0,
+      successRate: 100,
+      recoveryActions: 0,
+      integrityChecks: 0,
+      contexts: {},
+    };
+
+    for (const [ctx, db] of this.databases) {
+      const stats = db.getResilienceStats();
+      allStats.totalTransactions += stats.totalTransactions;
+      allStats.activeTransactions += stats.activeTransactions;
+      allStats.committedTransactions += stats.committedTransactions;
+      allStats.rolledBackTransactions += stats.rolledBackTransactions;
+      allStats.failedTransactions += stats.failedTransactions;
+      allStats.recoveryActions += stats.recoveryActions;
+      allStats.integrityChecks += stats.integrityChecks;
+      allStats.contexts[ctx] = stats;
+    }
+
+    // Calculate overall success rate
+    if (allStats.totalTransactions > 0) {
+      allStats.successRate = (allStats.committedTransactions / allStats.totalTransactions) * 100;
+    }
+
+    return allStats;
+  }
+
+  public getTransactionLogs(limit: number = 100): any[] {
+    // Aggregate transaction logs from all databases
+    const allLogs: any[] = [];
+
+    for (const [ctx, db] of this.databases) {
+      const logs = db.getTransactionLogs(limit);
+      allLogs.push(...logs.map(log => ({ ...log, context: ctx })));
+    }
+
+    // Sort by timestamp and limit
+    return allLogs
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, limit);
+  }
+
+  public getRecoveryActions(): any[] {
+    // Aggregate recovery actions from all databases
+    const allActions: any[] = [];
+
+    for (const [ctx, db] of this.databases) {
+      const actions = db.getRecoveryActions();
+      allActions.push(...actions.map(action => ({ ...action, context: ctx })));
+    }
+
+    // Sort by timestamp
+    return allActions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }
+
+  public async detectAndRepairCorruption(): Promise<any[]> {
+    // Detect and repair corruption across all databases
+    const allRepairs: any[] = [];
+
+    for (const [ctx, db] of this.databases) {
+      const repairs = await db.detectAndRepairCorruption();
+      allRepairs.push(...repairs.map(repair => ({ ...repair, context: ctx })));
+    }
+
+    return allRepairs;
+  }
+
+  public validateDataIntegrity(data: any, expectedChecksum?: string): any {
+    // Use the current context database for validation
+    const db = this.databases.get(this._currentContext);
+    if (!db) throw new Error(`No database found for context: ${this._currentContext}`);
+
+    return db.validateDataIntegrity(data, expectedChecksum);
+  }
+
+  public clearOldTransactionLogs(olderThanDays: number = 30): void {
+    // Clear old logs from all databases
+    for (const db of this.databases.values()) {
+      db.clearOldTransactionLogs(olderThanDays);
+    }
+  }
+
+  public async createResilientBackup(backupPath: string): Promise<void> {
+    // Create resilient backup for current context
+    const db = this.databases.get(this._currentContext);
+    if (!db) throw new Error(`No database found for context: ${this._currentContext}`);
+
+    await db.createResilientBackup(backupPath);
+  }
+
+  // ===== Privacy and Security Methods =====
+
+  /**
+   * Get privacy statistics
+   */
+  public getPrivacyStats(context?: string): any {
+    if (context) {
+      const db = this.databases.get(context);
+      if (!db) throw new Error(`Invalid context: ${context}`);
+      return db.getPrivacyStats();
+    }
+
+    // Aggregate stats from all contexts
+    const allStats: any = {
+      totalAuditEntries: 0,
+      totalAccessAttempts: 0,
+      failedAccessAttempts: 0,
+      encryptionOperations: 0,
+      anonymizationOperations: 0,
+      dataRetentionOperations: 0,
+      contexts: {},
+    };
+
+    for (const [ctx, db] of this.databases) {
+      const stats = db.getPrivacyStats();
+      allStats.totalAuditEntries += stats.totalAuditEntries || 0;
+      allStats.totalAccessAttempts += stats.totalAccessAttempts || 0;
+      allStats.failedAccessAttempts += stats.failedAccessAttempts || 0;
+      allStats.encryptionOperations += stats.encryptionOperations || 0;
+      allStats.anonymizationOperations += stats.anonymizationOperations || 0;
+      allStats.dataRetentionOperations += stats.dataRetentionOperations || 0;
+      allStats.contexts[ctx] = stats;
+    }
+
+    return allStats;
+  }
+
+  /**
+   * Get privacy configuration
+   */
+  public getPrivacyConfig(context?: string): any {
+    if (context) {
+      const db = this.databases.get(context);
+      if (!db) throw new Error(`Invalid context: ${context}`);
+      return db.getPrivacyConfig();
+    }
+
+    // Return config from first database (they should all be the same)
+    const firstDb = this.databases.values().next().value;
+    return firstDb ? firstDb.getPrivacyConfig() : {};
+  }
+
+  /**
+   * Update privacy configuration
+   */
+  public updatePrivacyConfig(newConfig: any, context?: string): void {
+    if (context) {
+      const db = this.databases.get(context);
+      if (!db) throw new Error(`Invalid context: ${context}`);
+      db.updatePrivacyConfig(newConfig);
+    } else {
+      // Update all contexts
+      for (const db of this.databases.values()) {
+        db.updatePrivacyConfig(newConfig);
+      }
+    }
+  }
+
+  /**
+   * Check access permissions
+   */
+  public checkAccess(userId: string, operation: string, context: string): boolean {
+    const db = this.databases.get(context);
+    if (!db) throw new Error(`Invalid context: ${context}`);
+    return db.checkAccess(userId, operation, context);
+  }
+
+  /**
+   * Set access control for a user
+   */
+  public setAccessControl(userId: string, permissions: string[], contexts: string[], expiresAt?: string): void {
+    // Set access control for all specified contexts
+    for (const context of contexts) {
+      const db = this.databases.get(context);
+      if (db) {
+        db.setAccessControl(userId, permissions, [context], expiresAt);
+      }
+    }
+  }
+
+  /**
+   * Remove access control for a user
+   */
+  public removeAccessControl(userId: string, context?: string): void {
+    if (context) {
+      const db = this.databases.get(context);
+      if (!db) throw new Error(`Invalid context: ${context}`);
+      db.removeAccessControl(userId);
+    } else {
+      // Remove from all contexts
+      for (const db of this.databases.values()) {
+        db.removeAccessControl(userId);
+      }
+    }
+  }
+
+  /**
+   * Unlock user account
+   */
+  public unlockAccount(userId: string, context?: string): void {
+    if (context) {
+      const db = this.databases.get(context);
+      if (!db) throw new Error(`Invalid context: ${context}`);
+      db.unlockAccount(userId);
+    } else {
+      // Unlock in all contexts
+      for (const db of this.databases.values()) {
+        db.unlockAccount(userId);
+      }
+    }
+  }
+
+  /**
+   * Check compliance status
+   */
+  public checkCompliance(context?: string): Record<string, boolean> {
+    if (context) {
+      const db = this.databases.get(context);
+      if (!db) throw new Error(`Invalid context: ${context}`);
+      return db.checkCompliance();
+    }
+
+    // Aggregate compliance from all contexts
+    const allCompliance: Record<string, boolean> = {};
+    for (const [ctx, db] of this.databases) {
+      const compliance = db.checkCompliance();
+      for (const [key, value] of Object.entries(compliance)) {
+        allCompliance[`${ctx}_${key}`] = value;
+      }
+    }
+
+    return allCompliance;
+  }
+
+  /**
+   * Apply data retention policy
+   */
+  public applyRetentionPolicy(context?: string): { deletedCount: number; errors: string[] } {
+    if (context) {
+      const db = this.databases.get(context);
+      if (!db) throw new Error(`Invalid context: ${context}`);
+      return db.applyRetentionPolicy();
+    }
+
+    // Apply to all contexts
+    let totalDeleted = 0;
+    const allErrors: string[] = [];
+
+    for (const [ctx, db] of this.databases) {
+      const result = db.applyRetentionPolicy();
+      totalDeleted += result.deletedCount;
+      allErrors.push(...result.errors.map(error => `${ctx}: ${error}`));
+    }
+
+    return { deletedCount: totalDeleted, errors: allErrors };
+  }
+
+  /**
+   * Clean up old audit logs
+   */
+  public cleanupAuditLogs(context?: string): { deletedCount: number } {
+    if (context) {
+      const db = this.databases.get(context);
+      if (!db) throw new Error(`Invalid context: ${context}`);
+      return db.cleanupAuditLogs();
+    }
+
+    // Clean up all contexts
+    let totalDeleted = 0;
+    for (const db of this.databases.values()) {
+      const result = db.cleanupAuditLogs();
+      totalDeleted += result.deletedCount;
+    }
+
+    return { deletedCount: totalDeleted };
+  }
+
+  /**
+   * Encrypt sensitive data
+   */
+  public encryptData(data: string, context?: string): string {
+    if (context) {
+      const db = this.databases.get(context);
+      if (!db) throw new Error(`Invalid context: ${context}`);
+      return db.encryptData(data);
+    }
+
+    // Use first database for encryption
+    const firstDb = this.databases.values().next().value;
+    if (!firstDb) throw new Error('No database available for encryption');
+    return firstDb.encryptData(data);
+  }
+
+  /**
+   * Decrypt sensitive data
+   */
+  public decryptData(encryptedData: string, context?: string): string {
+    if (context) {
+      const db = this.databases.get(context);
+      if (!db) throw new Error(`Invalid context: ${context}`);
+      return db.decryptData(encryptedData);
+    }
+
+    // Use first database for decryption
+    const firstDb = this.databases.values().next().value;
+    if (!firstDb) throw new Error('No database available for decryption');
+    return firstDb.decryptData(encryptedData);
+  }
+
+  /**
+   * Anonymize data
+   */
+  public anonymizeData(data: any, level: 'none' | 'partial' | 'full' = 'partial', context?: string): any {
+    if (context) {
+      const db = this.databases.get(context);
+      if (!db) throw new Error(`Invalid context: ${context}`);
+      return db.anonymizeData(data, level);
+    }
+
+    // Use first database for anonymization
+    const firstDb = this.databases.values().next().value;
+    if (!firstDb) throw new Error('No database available for anonymization');
+    return firstDb.anonymizeData(data, level);
+  }
+
+  /**
+   * Validate input data for security
+   */
+  public validateInput(data: any, context?: string): { isValid: boolean; errors: string[] } {
+    if (context) {
+      const db = this.databases.get(context);
+      if (!db) throw new Error(`Invalid context: ${context}`);
+      return db.validateInput(data);
+    }
+
+    // Use first database for validation
+    const firstDb = this.databases.values().next().value;
+    if (!firstDb) throw new Error('No database available for validation');
+    return firstDb.validateInput(data);
+  }
+
+  /**
+   * Sanitize output data
+   */
+  public sanitizeOutput(data: any, context?: string): any {
+    if (context) {
+      const db = this.databases.get(context);
+      if (!db) throw new Error(`Invalid context: ${context}`);
+      return db.sanitizeOutput(data);
+    }
+
+    // Use first database for sanitization
+    const firstDb = this.databases.values().next().value;
+    if (!firstDb) throw new Error('No database available for sanitization');
+    return firstDb.sanitizeOutput(data);
+  }
+
+  /**
+   * Shutdown privacy system
+   */
+  public shutdownPrivacySystem(): void {
+    for (const db of this.databases.values()) {
+      db.shutdownPrivacySystem();
+    }
+  }
 }

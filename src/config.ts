@@ -63,6 +63,43 @@ const configSchema = z.object({
     port: z.number().default(3000),
     host: z.string().default('localhost'),
   }),
+
+  // System Resilience Configuration
+  resilience: z.object({
+    enableIntegrityChecks: z.boolean().default(true),
+    enableAutoRollback: z.boolean().default(true),
+    enableGracefulDegradation: z.boolean().default(true),
+    maxTransactionRetries: z.number().default(3),
+    integrityCheckInterval: z.number().default(300000), // 5 minutes
+    backupBeforeOperations: z.boolean().default(false),
+    logAllTransactions: z.boolean().default(true),
+  }),
+
+  // Privacy & Security Configuration
+  privacy: z.object({
+    encryptionLevel: z.enum(['none', 'basic', 'strong', 'enterprise']).default('none'),
+    encryptionKey: z.string().optional(),
+    autoEncryptSensitiveData: z.boolean().default(false),
+    enableAccessControls: z.boolean().default(false),
+    requireAuthentication: z.boolean().default(false),
+    sessionTimeout: z.number().default(60),
+    maxFailedAttempts: z.number().default(5),
+    enableAuditTrails: z.boolean().default(false),
+    auditLogRetention: z.number().default(90),
+    logSensitiveOperations: z.boolean().default(false),
+    anonymizeAuditLogs: z.boolean().default(false),
+    enableDataAnonymization: z.boolean().default(false),
+    anonymizationLevel: z.enum(['none', 'partial', 'full']).default('none'),
+    dataRetentionPolicy: z.enum(['keep_forever', 'auto_delete', 'manual_delete']).default('keep_forever'),
+    retentionPeriod: z.number().default(365),
+    gdprCompliance: z.boolean().default(false),
+    ccpaCompliance: z.boolean().default(false),
+    hipaaCompliance: z.boolean().default(false),
+    enableRateLimiting: z.boolean().default(false),
+    enableInputValidation: z.boolean().default(false),
+    enableOutputSanitization: z.boolean().default(false),
+    blockSuspiciousPatterns: z.boolean().default(false),
+  }),
 });
 
 // Parse configuration from environment
@@ -141,6 +178,89 @@ function loadConfig() {
     server: {
       port: process.env.SERVER_PORT ? parseInt(process.env.SERVER_PORT, 10) : undefined,
       host: process.env.SERVER_HOST,
+    },
+    resilience: {
+      enableIntegrityChecks: process.env.ENABLE_INTEGRITY_CHECKS
+        ? process.env.ENABLE_INTEGRITY_CHECKS === 'true'
+        : undefined,
+      enableAutoRollback: process.env.ENABLE_AUTO_ROLLBACK
+        ? process.env.ENABLE_AUTO_ROLLBACK === 'true'
+        : undefined,
+      enableGracefulDegradation: process.env.ENABLE_GRACEFUL_DEGRADATION
+        ? process.env.ENABLE_GRACEFUL_DEGRADATION === 'true'
+        : undefined,
+      maxTransactionRetries: process.env.MAX_TRANSACTION_RETRIES
+        ? parseInt(process.env.MAX_TRANSACTION_RETRIES, 10)
+        : undefined,
+      integrityCheckInterval: process.env.INTEGRITY_CHECK_INTERVAL
+        ? parseInt(process.env.INTEGRITY_CHECK_INTERVAL, 10)
+        : undefined,
+      backupBeforeOperations: process.env.BACKUP_BEFORE_OPERATIONS
+        ? process.env.BACKUP_BEFORE_OPERATIONS === 'true'
+        : undefined,
+      logAllTransactions: process.env.LOG_ALL_TRANSACTIONS
+        ? process.env.LOG_ALL_TRANSACTIONS === 'true'
+        : undefined,
+    },
+    privacy: {
+      encryptionLevel: process.env.ENCRYPTION_LEVEL as 'none' | 'basic' | 'strong' | 'enterprise' | undefined,
+      encryptionKey: process.env.ENCRYPTION_KEY,
+      autoEncryptSensitiveData: process.env.AUTO_ENCRYPT_SENSITIVE_DATA
+        ? process.env.AUTO_ENCRYPT_SENSITIVE_DATA === 'true'
+        : undefined,
+      enableAccessControls: process.env.ENABLE_ACCESS_CONTROLS
+        ? process.env.ENABLE_ACCESS_CONTROLS === 'true'
+        : undefined,
+      requireAuthentication: process.env.REQUIRE_AUTHENTICATION
+        ? process.env.REQUIRE_AUTHENTICATION === 'true'
+        : undefined,
+      sessionTimeout: process.env.SESSION_TIMEOUT
+        ? parseInt(process.env.SESSION_TIMEOUT, 10)
+        : undefined,
+      maxFailedAttempts: process.env.MAX_FAILED_ATTEMPTS
+        ? parseInt(process.env.MAX_FAILED_ATTEMPTS, 10)
+        : undefined,
+      enableAuditTrails: process.env.ENABLE_AUDIT_TRAILS
+        ? process.env.ENABLE_AUDIT_TRAILS === 'true'
+        : undefined,
+      auditLogRetention: process.env.AUDIT_LOG_RETENTION
+        ? parseInt(process.env.AUDIT_LOG_RETENTION, 10)
+        : undefined,
+      logSensitiveOperations: process.env.LOG_SENSITIVE_OPERATIONS
+        ? process.env.LOG_SENSITIVE_OPERATIONS === 'true'
+        : undefined,
+      anonymizeAuditLogs: process.env.ANONYMIZE_AUDIT_LOGS
+        ? process.env.ANONYMIZE_AUDIT_LOGS === 'true'
+        : undefined,
+      enableDataAnonymization: process.env.ENABLE_DATA_ANONYMIZATION
+        ? process.env.ENABLE_DATA_ANONYMIZATION === 'true'
+        : undefined,
+      anonymizationLevel: process.env.ANONYMIZATION_LEVEL as 'none' | 'partial' | 'full' | undefined,
+      dataRetentionPolicy: process.env.DATA_RETENTION_POLICY as 'keep_forever' | 'auto_delete' | 'manual_delete' | undefined,
+      retentionPeriod: process.env.RETENTION_PERIOD
+        ? parseInt(process.env.RETENTION_PERIOD, 10)
+        : undefined,
+      gdprCompliance: process.env.GDPR_COMPLIANCE
+        ? process.env.GDPR_COMPLIANCE === 'true'
+        : undefined,
+      ccpaCompliance: process.env.CCPA_COMPLIANCE
+        ? process.env.CCPA_COMPLIANCE === 'true'
+        : undefined,
+      hipaaCompliance: process.env.HIPAA_COMPLIANCE
+        ? process.env.HIPAA_COMPLIANCE === 'true'
+        : undefined,
+      enableRateLimiting: process.env.ENABLE_RATE_LIMITING
+        ? process.env.ENABLE_RATE_LIMITING === 'true'
+        : undefined,
+      enableInputValidation: process.env.ENABLE_INPUT_VALIDATION
+        ? process.env.ENABLE_INPUT_VALIDATION === 'true'
+        : undefined,
+      enableOutputSanitization: process.env.ENABLE_OUTPUT_SANITIZATION
+        ? process.env.ENABLE_OUTPUT_SANITIZATION === 'true'
+        : undefined,
+      blockSuspiciousPatterns: process.env.BLOCK_SUSPICIOUS_PATTERNS
+        ? process.env.BLOCK_SUSPICIOUS_PATTERNS === 'true'
+        : undefined,
     },
   };
 
