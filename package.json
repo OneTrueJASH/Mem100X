@@ -16,6 +16,8 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest watch",
+    "benchmark": "node scripts/benchmark.js",
+    "benchmark:quick": "node benchmarks/bulk-operations-benchmark.ts",
     "format": "prettier --write \"src/**/*.ts\" \"benchmark/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"benchmark/**/*.ts\""
   },

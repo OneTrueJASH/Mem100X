@@ -50,24 +50,41 @@ export function handleGetContextInfo(args: any, ctx: ToolContext) {
 
 // Entity operation handlers
 export function handleCreateEntities(args: any, ctx: ToolContext) {
+  // Debug: print raw args
+  process.stderr.write('DEBUG: handleCreateEntities raw args: ' + JSON.stringify(args) + '\n');
+  // Direct Zod validation for failing test case
+  try {
+    const testInput = { entities: [{ name: 'MissingType', content: [] }] };
+    toolSchemas.create_entities.parse(testInput);
+    process.stderr.write('DEBUG: Zod validation for testInput PASSED (should not pass)\n');
+  } catch (e) {
+    process.stderr.write('DEBUG: Zod validation for testInput ERROR: ' + String(e) + '\n');
+  }
+  try {
+    // Validate raw input first to catch missing required fields
+    toolSchemas.create_entities.parse(args);
+    process.stderr.write('DEBUG: Zod validation passed\n');
+  } catch (e) {
+    process.stderr.write('DEBUG: Zod validation error: ' + String(e) + '\n');
+    throw e;
+  }
   // Map MCP-standard 'content' to internal 'observations'
   const entities = args.entities.map((entity: any) => ({
     ...entity,
     observations: entity.content,
   }));
-  const validated = toolSchemas.create_entities.parse({ ...args, entities });
   ctx.manager.createEntities(entities);
   const duration = performance.now() - ctx.startTime;
 
   const result = {
     success: true,
-    entitiesCreated: validated.entities.length,
+    entitiesCreated: entities.length,
     performance: { duration: `${duration.toFixed(2)}ms` },
   };
 
   return createMCPToolResponse(
     result,
-    `Created ${validated.entities.length} entities successfully`
+    `Created ${entities.length} entities successfully`
   );
 }
 
@@ -377,6 +394,52 @@ export function handleFindShortestPath(args: any, ctx: ToolContext) {
   return createMCPToolResponse(response, message);
 }
 
+// Context-aware search handlers
+export function handleSearchNodesContextAware(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.search_nodes_context_aware.parse(args) as any;
+  const results = ctx.manager.searchNodesContextAware(validated);
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    ...results,
+    performance: {
+      duration: `${duration.toFixed(2)}ms`,
+      resultCount: results.entities.length,
+      suggestionsCount: results.suggestions.length,
+      intentConfidence: results.intent.confidence,
+    },
+  };
+
+  return createMCPToolResponse(
+    result,
+    `Found ${results.entities.length} entities matching "${validated.query}" with ${results.suggestions.length} suggestions`
+  );
+}
+
+export function handleSearchRelatedEntities(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.search_related_entities.parse(args) as any;
+  const results = ctx.manager.searchRelatedEntities(validated.entityName, {
+    limit: validated.limit,
+    relationTypes: validated.relationTypes,
+    searchContext: validated.searchContext,
+  });
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    ...results,
+    performance: {
+      duration: `${duration.toFixed(2)}ms`,
+      resultCount: results.entities.length,
+      relationCount: results.relations.length,
+    },
+  };
+
+  return createMCPToolResponse(
+    result,
+    `Found ${results.entities.length} entities related to "${validated.entityName}"`
+  );
+}
+
 // Tool handler registry
 export const toolHandlers: Record<string, (args: any, ctx: ToolContext) => any> = {
   // Context management
@@ -412,4 +475,8 @@ export const toolHandlers: Record<string, (args: any, ctx: ToolContext) => any> 
   // Graph traversal
   get_neighbors: handleGetNeighbors,
   find_shortest_path: handleFindShortestPath,
+
+  // Context-aware search
+  search_nodes_context_aware: handleSearchNodesContextAware,
+  search_related_entities: handleSearchRelatedEntities,
 };

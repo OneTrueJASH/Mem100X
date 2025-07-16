@@ -202,6 +202,32 @@ export const toolSchemas = {
       .describe('Maximum path length to search (1-10)'),
     context: z.string().optional().describe('Specific context to search in'),
   }),
+
+  search_nodes_context_aware: z.object({
+    query: z.string().min(1, 'Search query cannot be empty'),
+    limit: z.number().int().positive().default(20).optional(),
+    searchContext: z.object({
+      currentEntities: z.array(z.string()).optional(),
+      recentSearches: z.array(z.string()).optional(),
+      userContext: z.enum(['work', 'personal', 'neutral']).optional(),
+      conversationContext: z.string().optional(),
+    }).optional(),
+    searchMode: z.enum(['exact', 'semantic', 'fuzzy', 'hybrid']).optional(),
+    contentTypes: z.array(z.enum(['text', 'image', 'audio', 'resource'])).optional(),
+    intent: z.enum(['find', 'browse', 'explore', 'verify']).optional(),
+  }),
+
+  search_related_entities: z.object({
+    entityName: z.string().min(1, 'Entity name is required'),
+    limit: z.number().int().positive().default(10).optional(),
+    relationTypes: z.array(z.string()).optional(),
+    searchContext: z.object({
+      currentEntities: z.array(z.string()).optional(),
+      recentSearches: z.array(z.string()).optional(),
+      userContext: z.enum(['work', 'personal', 'neutral']).optional(),
+      conversationContext: z.string().optional(),
+    }).optional(),
+  }),
 };
 
 // Type exports for use in handlers

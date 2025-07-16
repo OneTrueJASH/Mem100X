@@ -21,6 +21,11 @@ export interface EntityRow {
   observations: string;
   created_at: number;
   updated_at: number;
+  access_count: number;
+  last_accessed: number;
+  prominence_score: number;
+  decay_rate: number;
+  importance_weight: number;
 }
 
 export interface RelationRow {
@@ -29,6 +34,9 @@ export interface RelationRow {
   to_entity: string;
   relation_type: string;
   created_at: number;
+  access_count: number;
+  last_accessed: number;
+  prominence_score: number;
 }
 
 export interface GraphResult {
@@ -88,6 +96,16 @@ export interface SearchOptions {
   query: string;
   limit?: number;
   context?: string;
+  // Context-aware search enhancements
+  searchContext?: {
+    currentEntities?: string[];
+    recentSearches?: string[];
+    userContext?: 'work' | 'personal' | 'neutral';
+    conversationContext?: string;
+  };
+  searchMode?: 'exact' | 'semantic' | 'fuzzy' | 'hybrid';
+  contentTypes?: ('text' | 'image' | 'audio' | 'resource')[];
+  intent?: 'find' | 'browse' | 'explore' | 'verify';
 }
 
 export interface GetNeighborsOptions {

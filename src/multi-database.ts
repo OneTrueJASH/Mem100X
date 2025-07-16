@@ -137,9 +137,14 @@ export class MultiDatabaseManager {
   }
 
   public setContext(context: string): string {
-    if (this.databases.has(context)) {
-      this._currentContext = context;
-      return `Switched to ${context} context`;
+    const ctxKey = context.toLowerCase();
+    const available = Array.from(this.databases.keys());
+    console.error(`[DEBUG] setContext called with: '${context}', available contexts: ${JSON.stringify(available)}`);
+    for (const key of available) {
+      if (key.toLowerCase() === ctxKey) {
+        this._currentContext = key;
+        return `Switched to ${key} context`;
+      }
     }
     throw new Error(`Unknown context: ${context}.`);
   }
@@ -195,6 +200,67 @@ export class MultiDatabaseManager {
     }
 
     return { entities: allEntities, relations: allRelations };
+  }
+
+  public searchNodesContextAware(options: SearchOptions): GraphResult & {
+    suggestions: string[];
+    intent: { type: string; confidence: number; hints: string[] };
+    searchStats: { queryComplexity: string; semanticTerms: string[]; contextHints: string[] };
+  } {
+    if (options.context) {
+      const db = this.databases.get(options.context);
+      if (!db) throw new Error(`Invalid context: ${options.context}`);
+      const results = db.searchNodesContextAware(options);
+      return {
+        ...results,
+        entities: results.entities.map((e) => ({ ...e, _context: options.context })),
+        relations: results.relations.map((r) => ({ ...r, _context: options.context })),
+      };
+    }
+
+    // Search across all contexts
+    const allEntities: EntityResult[] = [];
+    const allRelations: RelationResult[] = [];
+    let suggestions: string[] = [];
+    let intent: { type: string; confidence: number; hints: string[] } = { type: 'find', confidence: 0.5, hints: [] };
+    let searchStats: { queryComplexity: string; semanticTerms: string[]; contextHints: string[] } = { queryComplexity: 'simple', semanticTerms: [], contextHints: [] };
+
+    for (const [context, db] of this.databases) {
+      const results = db.searchNodesContextAware(options);
+      allEntities.push(...results.entities.map((e) => ({ ...e, _context: context })));
+      allRelations.push(...results.relations.map((r) => ({ ...r, _context: context })));
+
+      // Merge suggestions and intent (take highest confidence)
+      suggestions = [...new Set([...suggestions, ...results.suggestions])];
+      if (results.intent.confidence > intent.confidence) {
+        intent = results.intent;
+      }
+      searchStats = results.searchStats;
+    }
+
+    return {
+      entities: allEntities,
+      relations: allRelations,
+      suggestions,
+      intent,
+      searchStats
+    };
+  }
+
+  public searchRelatedEntities(
+    entityName: string,
+    options: {
+      limit?: number;
+      relationTypes?: string[];
+      searchContext?: SearchOptions['searchContext'];
+    } = {}
+  ): GraphResult {
+    // Find which context the entity belongs to
+    const entityContext = this.entityContextMap.get(entityName.toLowerCase()) || this._currentContext;
+    const db = this.databases.get(entityContext);
+    if (!db) throw new Error(`Invalid context: ${entityContext}`);
+
+    return db.searchRelatedEntities(entityName, options);
   }
 
   public readGraph(limit?: number, offset: number = 0, context?: string): GraphResult {
@@ -503,8 +569,11 @@ export class MultiDatabaseManager {
     const db = this.databases.get(targetContext);
     if (!db) throw new Error(`Invalid context: ${targetContext}`);
 
-    // For now, return empty result as this would require implementing graph traversal
-    return { entities: [], relations: [] };
+    const result = db.getNeighbors(entityName, options);
+    return {
+      entities: result.entities.map((e) => ({ ...e, _context: targetContext })),
+      relations: result.relations.map((r) => ({ ...r, _context: targetContext })),
+    };
   }
 
   public findShortestPath(
@@ -515,16 +584,16 @@ export class MultiDatabaseManager {
     const fromContext = this.entityContextMap.get(from.toLowerCase());
     const toContext = this.entityContextMap.get(to.toLowerCase());
 
-    if (fromContext !== toContext) {
-      return { found: false, path: [], distance: -1 };
+    // If entities are in different contexts, we can't find a path between them
+    if (fromContext && toContext && fromContext !== toContext) {
+      return { found: false, path: [], distance: -1, nodesExplored: 0 };
     }
 
-    const targetContext = options.context || fromContext || this._currentContext;
+    const targetContext = options.context || fromContext || toContext || this._currentContext;
     const db = this.databases.get(targetContext);
     if (!db) throw new Error(`Invalid context: ${targetContext}`);
 
-    // For now, return not found as this would require implementing graph algorithms
-    return { found: false, path: [], distance: -1 };
+    return db.findShortestPath(from, to, options);
   }
 
   public getEntity(name: string, context?: string): EntityResult | null {

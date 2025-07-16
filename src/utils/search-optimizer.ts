@@ -3,6 +3,15 @@
  * Provides better query parsing, ranking, and semantic search capabilities
  */
 
+import { SearchOptions } from '../types.js';
+import {
+  analyzeSearchIntent,
+  generateSearchSuggestions,
+  calculateContextAwareRelevance,
+  generateContextAwareHighlights,
+  analyzeQueryComplexity as analyzeQueryComplexityEnhanced
+} from './context-aware-search.js';
+
 export interface SearchQuery {
   original: string;
   terms: string[];
@@ -11,6 +20,11 @@ export interface SearchQuery {
   prefix: boolean;
   complexity: 'simple' | 'complex';
   estimatedCost: number;
+  // Context-aware search enhancements
+  semanticTerms: string[];
+  contextHints: string[];
+  searchMode: 'exact' | 'semantic' | 'fuzzy' | 'hybrid';
+  contentTypes: ('text' | 'image' | 'audio' | 'resource')[];
 }
 
 export interface SearchResult {
@@ -81,11 +95,149 @@ export function parseSearchQuery(query: string): SearchQuery {
     }
   }
 
-  // Analyze query complexity
-  const complexity = analyzeQueryComplexity(original);
+  // Analyze query complexity with enhanced analysis
+  const complexityAnalysis = analyzeQueryComplexityEnhanced(original);
+  const complexity = complexityAnalysis.complexity === 'moderate' ? 'complex' : complexityAnalysis.complexity;
   const estimatedCost = estimateQueryCost(original, terms.length, phrases.length);
 
-  return { original, terms, phrases, fuzzy, prefix, complexity, estimatedCost };
+  // Context-aware search enhancements
+  const semanticTerms = extractSemanticTerms(original);
+  const contextHints = extractContextHints(original);
+  const searchMode = determineSearchMode(original, terms, phrases);
+  const contentTypes = detectContentTypes(original);
+
+  return {
+    original,
+    terms,
+    phrases,
+    fuzzy,
+    prefix,
+    complexity,
+    estimatedCost,
+    semanticTerms,
+    contextHints,
+    searchMode,
+    contentTypes
+  };
+}
+
+/**
+ * Extract semantic terms for context-aware search
+ */
+function extractSemanticTerms(query: string): string[] {
+  const semanticTerms: string[] = [];
+  const lowerQuery = query.toLowerCase();
+
+  // Common semantic patterns
+  const semanticPatterns = [
+    // Person-related terms
+    { pattern: /\b(person|people|contact|friend|colleague|team)\b/g, weight: 2.0 },
+    // Project-related terms
+    { pattern: /\b(project|task|work|assignment|deliverable)\b/g, weight: 1.5 },
+    // Time-related terms
+    { pattern: /\b(recent|recently|today|yesterday|last week|this month)\b/g, weight: 1.3 },
+    // Action-related terms
+    { pattern: /\b(meeting|call|discussion|conversation|email)\b/g, weight: 1.4 },
+    // Technology-related terms
+    { pattern: /\b(technology|software|code|system|platform)\b/g, weight: 1.2 },
+    // Importance indicators
+    { pattern: /\b(important|critical|urgent|priority|key)\b/g, weight: 1.6 }
+  ];
+
+  for (const { pattern, weight } of semanticPatterns) {
+    const matches = lowerQuery.match(pattern);
+    if (matches) {
+      semanticTerms.push(...matches);
+    }
+  }
+
+  return [...new Set(semanticTerms)]; // Remove duplicates
+}
+
+/**
+ * Extract context hints from search query
+ */
+function extractContextHints(query: string): string[] {
+  const hints: string[] = [];
+  const lowerQuery = query.toLowerCase();
+
+  // Context indicators
+  const contextPatterns = [
+    // Work context
+    { pattern: /\b(work|office|job|professional|business)\b/g, context: 'work' },
+    // Personal context
+    { pattern: /\b(personal|family|home|private|life)\b/g, context: 'personal' },
+    // Technical context
+    { pattern: /\b(technical|code|programming|development|engineering)\b/g, context: 'technical' },
+    // Time context
+    { pattern: /\b(recent|old|new|current|past|future)\b/g, context: 'temporal' }
+  ];
+
+  for (const { pattern, context } of contextPatterns) {
+    if (pattern.test(lowerQuery)) {
+      hints.push(context);
+    }
+  }
+
+  return hints;
+}
+
+/**
+ * Determine search mode based on query characteristics
+ */
+function determineSearchMode(
+  query: string,
+  terms: string[],
+  phrases: string[]
+): 'exact' | 'semantic' | 'fuzzy' | 'hybrid' {
+  const lowerQuery = query.toLowerCase();
+
+  // Exact mode for quoted phrases or specific names
+  if (phrases.length > 0 || /^[A-Z][a-z]+ [A-Z][a-z]+$/.test(query)) {
+    return 'exact';
+  }
+
+  // Fuzzy mode for short queries or typos
+  if (query.length <= 3 || terms.some(term => term.length <= 2)) {
+    return 'fuzzy';
+  }
+
+  // Semantic mode for descriptive queries
+  if (lowerQuery.includes('about') || lowerQuery.includes('related to') ||
+      lowerQuery.includes('similar to') || terms.length > 3) {
+    return 'semantic';
+  }
+
+  // Default to hybrid mode
+  return 'hybrid';
+}
+
+/**
+ * Detect content types from search query
+ */
+function detectContentTypes(query: string): ('text' | 'image' | 'audio' | 'resource')[] {
+  const types: ('text' | 'image' | 'audio' | 'resource')[] = ['text']; // Default
+  const lowerQuery = query.toLowerCase();
+
+  // Image content indicators
+  if (lowerQuery.includes('image') || lowerQuery.includes('photo') ||
+      lowerQuery.includes('picture') || lowerQuery.includes('screenshot')) {
+    types.push('image');
+  }
+
+  // Audio content indicators
+  if (lowerQuery.includes('audio') || lowerQuery.includes('sound') ||
+      lowerQuery.includes('recording') || lowerQuery.includes('voice')) {
+    types.push('audio');
+  }
+
+  // Resource content indicators
+  if (lowerQuery.includes('file') || lowerQuery.includes('document') ||
+      lowerQuery.includes('link') || lowerQuery.includes('url')) {
+    types.push('resource');
+  }
+
+  return [...new Set(types)]; // Remove duplicates
 }
 
 /**
@@ -171,92 +323,138 @@ export function buildFTSQuery(searchQuery: SearchQuery): string {
 }
 
 /**
- * Calculate relevance score for search results with enhanced scoring
+ * Calculate context-aware relevance score for search results
  */
 export function calculateRelevance(
   entity: any,
   searchQuery: SearchQuery,
-  rank: number
+  rank: number,
+  searchContext?: SearchOptions['searchContext']
 ): number {
-  let score = 1.0 / (rank + 1); // Base score from FTS5 rank
-
-  // Boost exact name matches
-  const nameLower = entity.name.toLowerCase();
-  const queryLower = searchQuery.original.toLowerCase();
-
-  if (nameLower === queryLower) {
-    score *= 10.0; // Exact name match
-  } else if (nameLower.startsWith(queryLower)) {
-    score *= 5.0; // Name starts with query
-  } else if (nameLower.includes(queryLower)) {
-    score *= 3.0; // Name contains query
-  }
-
-  // Boost entity type matches
-  if (entity.entity_type.toLowerCase().includes(queryLower)) {
-    score *= 2.0;
-  }
-
-  // Boost recent entities
-  const daysSinceUpdate = (Date.now() / 1000 / 86400) - entity.updated_at;
-  if (daysSinceUpdate < 7) {
-    score *= 1.2; // Recent entities get slight boost
-  }
-
-  // Penalize very old entities
-  if (daysSinceUpdate > 365) {
-    score *= 0.8;
-  }
-
-  // Boost entities with more observations (more content)
-  if (entity.observations && Array.isArray(entity.observations)) {
-    const observationCount = entity.observations.length;
-    if (observationCount > 5) {
-      score *= 1.1; // Entities with more content get slight boost
-    }
-  }
-
-  return Math.min(score, 100.0); // Cap at 100
+  // Use the enhanced context-aware relevance calculation
+  return calculateContextAwareRelevance(entity, searchQuery, rank, searchContext);
 }
 
 /**
- * Generate search highlights for results with improved formatting
+ * Detect entity context (work vs personal)
  */
-export function generateHighlights(
-  entity: any,
-  searchQuery: SearchQuery
-): string[] {
-  const highlights: string[] = [];
-  const queryLower = searchQuery.original.toLowerCase();
+function detectEntityContext(entity: any): string {
+  const entityText = [
+    entity.name,
+    entity.entity_type,
+    ...(entity.observations || []).map((obs: any) =>
+      obs.type === 'text' ? obs.text : ''
+    )
+  ].join(' ').toLowerCase();
 
-  // Highlight name matches
-  if (entity.name.toLowerCase().includes(queryLower)) {
-    highlights.push(`Name: ${entity.name}`);
-  }
+  const workIndicators = ['work', 'office', 'job', 'professional', 'business', 'project', 'meeting'];
+  const personalIndicators = ['personal', 'family', 'home', 'private', 'life', 'friend', 'hobby'];
 
-  // Highlight entity type matches
-  if (entity.entity_type.toLowerCase().includes(queryLower)) {
-    highlights.push(`Type: ${entity.entity_type}`);
-  }
+  const workScore = workIndicators.filter(indicator => entityText.includes(indicator)).length;
+  const personalScore = personalIndicators.filter(indicator => entityText.includes(indicator)).length;
 
-  // Highlight observation matches with better context
+  if (workScore > personalScore) return 'work';
+  if (personalScore > workScore) return 'personal';
+  return 'neutral';
+}
+
+/**
+ * Get content types present in entity
+ */
+function getEntityContentTypes(entity: any): ('text' | 'image' | 'audio' | 'resource')[] {
+  const types: ('text' | 'image' | 'audio' | 'resource')[] = ['text']; // Default
+
   if (entity.observations && Array.isArray(entity.observations)) {
     for (const obs of entity.observations) {
-      if (obs.type === 'text' && obs.text) {
-        const textLower = obs.text.toLowerCase();
-        if (textLower.includes(queryLower)) {
-          const matchIndex = textLower.indexOf(queryLower);
-          const start = Math.max(0, matchIndex - 50);
-          const end = Math.min(obs.text.length, matchIndex + queryLower.length + 50);
-          const snippet = obs.text.slice(start, end);
-          highlights.push(`Content: ...${snippet}...`);
-          break; // Only show first match
-        }
-      }
+      if (obs.type === 'image') types.push('image');
+      if (obs.type === 'audio') types.push('audio');
+      if (obs.type === 'resource' || obs.type === 'resource_link') types.push('resource');
     }
   }
 
-  return highlights;
+  return [...new Set(types)]; // Remove duplicates
+}
+
+/**
+ * Generate context-aware search highlights with enhanced formatting
+ */
+export function generateHighlights(
+  entity: any,
+  searchQuery: SearchQuery,
+  searchContext?: SearchOptions['searchContext']
+): string[] {
+  // Use the enhanced context-aware highlights generation
+  return generateContextAwareHighlights(entity, searchQuery, searchContext);
+}
+
+/**
+ * Find observations most relevant to the search query
+ */
+function findRelevantObservations(observations: any[], searchQuery: SearchQuery): any[] {
+  const scoredObservations = observations.map(obs => {
+    let score = 0;
+
+    if (obs.type === 'text' && obs.text) {
+      const textLower = obs.text.toLowerCase();
+
+      // Exact query match
+      if (textLower.includes(searchQuery.original.toLowerCase())) {
+        score += 10;
+      }
+
+      // Semantic term matches
+      for (const semanticTerm of searchQuery.semanticTerms) {
+        if (textLower.includes(semanticTerm)) {
+          score += 5;
+        }
+      }
+
+      // Content type preference
+      if (searchQuery.contentTypes.includes('text')) {
+        score += 2;
+      }
+    } else {
+      // Non-text content type matching
+      if (searchQuery.contentTypes.includes(obs.type)) {
+        score += 3;
+      }
+    }
+
+    return { observation: obs, score };
+  });
+
+  // Sort by relevance and return top observations
+  return scoredObservations
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map(item => item.observation);
+}
+
+/**
+ * Create context-aware text snippets with smart boundaries
+ */
+function createContextSnippet(text: string, query: string, maxLength: number): string {
+  const queryLower = query.toLowerCase();
+  const textLower = text.toLowerCase();
+  const matchIndex = textLower.indexOf(queryLower);
+
+  if (matchIndex === -1) return text.slice(0, maxLength) + '...';
+
+  // Calculate snippet boundaries
+  const halfLength = Math.floor(maxLength / 2);
+  let start = Math.max(0, matchIndex - halfLength);
+  let end = Math.min(text.length, matchIndex + query.length + halfLength);
+
+  // Adjust boundaries to word boundaries
+  while (start > 0 && !/\s/.test(text[start - 1])) start--;
+  while (end < text.length && !/\s/.test(text[end])) end++;
+
+  // Add ellipsis if needed
+  let snippet = text.slice(start, end);
+  if (start > 0) snippet = '...' + snippet;
+  if (end < text.length) snippet = snippet + '...';
+
+  return snippet;
 }
 
 /**

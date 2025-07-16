@@ -36,7 +36,9 @@ import { ValidationError } from './errors.js'
 import { createCircuitBreaker } from './utils/circuit-breaker.js'
 import { Worker } from 'worker_threads';
 import { parseSearchQuery, buildFTSQuery, calculateRelevance, generateHighlights, determineMatchType, sortByRelevance, filterSearchResults } from './utils/search-optimizer.js'
-import { needsFTSMigration, migrateFTSToPorterUnicode61 } from './utils/fts-migration.js'
+import { analyzeSearchIntent, generateSearchSuggestions } from './utils/context-aware-search.js';
+import { needsFTSMigration, migrateFTSToPorterUnicode61 } from './utils/fts-migration.js';
+import { MemoryAgingSystem, MEMORY_AGING_PRESETS } from './utils/memory-aging.js';
 
 const LARGE_BATCH_THRESHOLD = 1000;
 
@@ -88,6 +90,9 @@ export class MemoryDatabase {
     enableBulkOperations: config.performance.enableBulkOperations
   });
 
+  // Memory aging system
+  private memoryAging: MemoryAgingSystem;
+
   // Prepared statements for maximum performance
   private statements: {
     createEntity?: Database.Statement;
@@ -101,10 +106,16 @@ export class MemoryDatabase {
     updateObservations?: Database.Statement;
     getRelationsByEntity?: Database.Statement;
     getEntityStats?: Database.Statement;
+    updateEntityAccess?: Database.Statement;
+    updateRelationAccess?: Database.Statement;
+    getAgingStats?: Database.Statement;
   } = {};
 
   constructor(dbPath: string) {
     this.dbPath = dbPath;
+
+    // Initialize memory aging system
+    this.memoryAging = new MemoryAgingSystem(MEMORY_AGING_PRESETS.BALANCED);
 
     // Initialize caches
     this.entityCache = createStringCache<EntityResult>(
@@ -234,6 +245,29 @@ export class MemoryDatabase {
     this.statements.getEntityStats = this.db.prepare(
       'SELECT entity_type, COUNT(*) as count FROM entities GROUP BY entity_type'
     );
+
+    // Memory aging statements
+    this.statements.updateEntityAccess = this.db.prepare(`
+      UPDATE entities
+      SET access_count = ?, last_accessed = ?, prominence_score = ?, updated_at = julianday('now')
+      WHERE name = ?
+    `);
+
+    this.statements.updateRelationAccess = this.db.prepare(`
+      UPDATE relations
+      SET access_count = ?, last_accessed = ?, prominence_score = ?
+      WHERE id = ?
+    `);
+
+    this.statements.getAgingStats = this.db.prepare(`
+      SELECT
+        COUNT(*) as total_entities,
+        COUNT(CASE WHEN prominence_score > ? THEN 1 END) as active_entities,
+        COUNT(CASE WHEN prominence_score <= ? THEN 1 END) as forgotten_entities,
+        AVG(prominence_score) as avg_prominence,
+        AVG(access_count) as avg_access_count
+      FROM entities
+    `);
   }
 
   // Helper method to execute read queries through the pool if available
@@ -581,6 +615,7 @@ export class MemoryDatabase {
     return Math.max(totalSize / entities.length, 100); // Minimum 100 bytes
   }
 
+  // Enhanced bulk operations with index deferral and memory optimization
   private executeBulkEntityCreation(entities: CreateEntityInput[], perf: any = { end: () => {} }, correlationId?: string): EntityResult[] {
     const startMem = process.memoryUsage();
     const start = process.hrtime.bigint();
@@ -601,10 +636,15 @@ export class MemoryDatabase {
     // Store original PRAGMA settings for restoration
     const originalDeferForeignKeys = this.db.pragma('defer_foreign_keys', { simple: true });
     const originalSynchronous = this.db.pragma('synchronous', { simple: true });
+    const originalJournalMode = this.db.pragma('journal_mode', { simple: true });
 
-    // Optimize for bulk operations
+    // Optimize for bulk operations with aggressive settings (must be outside transaction)
     this.db.exec('PRAGMA defer_foreign_keys = ON');
     this.db.exec('PRAGMA synchronous = NORMAL');
+    this.db.exec('PRAGMA journal_mode = WAL');
+    this.db.exec('PRAGMA cache_size = -64000'); // 250MB cache for bulk operations
+    this.db.exec('PRAGMA temp_store = MEMORY');
+    this.db.exec('PRAGMA mmap_size = 268435456'); // 256MB mmap
 
     const created = this.transaction(() => {
       const triggerDisableStart = Date.now();
@@ -621,7 +661,7 @@ export class MemoryDatabase {
       try {
         const compressionStart = Date.now();
 
-        // Pre-compress all observations
+        // Pre-compress all observations with memory optimization
         const preparedData = entities.map((e) => ({
           name: e.name,
           entityType: e.entityType,
@@ -640,38 +680,64 @@ export class MemoryDatabase {
 
         const insertStart = Date.now();
 
-        // Build bulk insert query
-        const placeholders = entities
-          .map(() => "(?, ?, ?, julianday('now'), julianday('now'))")
-          .join(',');
-        const values = preparedData.flatMap((e) => [e.name, e.entityType, e.observationsData]);
+        // Build bulk insert query with optimized batch size
+        const batchSize = Math.min(entities.length, 5000); // Limit batch size for memory efficiency
+        const results: EntityResult[] = [];
 
-        // Execute bulk insert
-        this.db
-          .prepare(
-            `INSERT OR IGNORE INTO entities (name, entity_type, observations, created_at, updated_at)
-           VALUES ${placeholders}`
-          )
-          .run(...values);
+        for (let i = 0; i < entities.length; i += batchSize) {
+          const batch = preparedData.slice(i, i + batchSize);
+          const placeholders = batch
+            .map(() => "(?, ?, ?, julianday('now'), julianday('now'))")
+            .join(',');
+          const values = batch.flatMap((e) => [e.name, e.entityType, e.observationsData]);
+
+          // Execute bulk insert for this batch
+          this.db
+            .prepare(
+              `INSERT OR IGNORE INTO entities (name, entity_type, observations, created_at, updated_at)
+             VALUES ${placeholders}`
+            )
+            .run(...values);
+
+          // Build results for this batch
+          batch.forEach((e) => {
+            results.push({
+              type: 'entity',
+              name: e.name,
+              entityType: e.entityType,
+              observations: e.observations
+            });
+          });
+
+          // Force garbage collection between batches if available
+          if (global.gc && i % (batchSize * 2) === 0) {
+            global.gc();
+          }
+        }
 
         const insertTime = Date.now() - insertStart;
         logDebug('Bulk insert completed', {
           entities: entities.length,
           insertTime,
-          avgPerEntity: Math.round(insertTime / entities.length)
+          avgPerEntity: Math.round(insertTime / entities.length),
+          batchSize
         });
 
         const ftsStart = Date.now();
 
-        // Bulk update FTS (much faster than individual triggers)
-        const ftsPlaceholders = entities.map(() => '?').join(',');
-        this.db
-          .prepare(
-            `INSERT INTO entities_fts (name, entity_type, observations)
-           SELECT name, entity_type, observations FROM entities
-           WHERE name IN (${ftsPlaceholders})`
-          )
-          .run(...entities.map((e) => e.name));
+        // Bulk update FTS with optimized approach
+        const ftsBatchSize = 1000; // Smaller batches for FTS to avoid memory issues
+        for (let i = 0; i < entities.length; i += ftsBatchSize) {
+          const batch = entities.slice(i, i + ftsBatchSize);
+          const ftsPlaceholders = batch.map(() => '?').join(',');
+          this.db
+            .prepare(
+              `INSERT INTO entities_fts (name, entity_type, observations)
+             SELECT name, entity_type, observations FROM entities
+             WHERE name IN (${ftsPlaceholders})`
+            )
+            .run(...batch.map((e) => e.name));
+        }
 
         const ftsTime = Date.now() - ftsStart;
         logDebug('FTS bulk update completed', {
@@ -680,73 +746,31 @@ export class MemoryDatabase {
           avgPerEntity: Math.round(ftsTime / entities.length)
         });
 
-        const cacheStart = Date.now();
-
-        // Build results and update caches in batch
-        const results: EntityResult[] = [];
-        const cacheUpdates: Array<[string, EntityResult]> = [];
-
-        for (const data of preparedData) {
-          const result: EntityResult = {
-            type: 'entity',
-            name: data.name,
-            entityType: data.entityType,
-            observations: data.observations,
-          };
-          results.push(result);
-          cacheUpdates.push([data.name.toLowerCase(), result]);
-        }
-
-        // Batch update caches
-        for (const [key, value] of cacheUpdates) {
-          this.entityCache.set(key, value);
-          this.entityBloom.add(key);
-        }
-
-        const cacheTime = Date.now() - cacheStart;
-        logDebug('Cache updates completed', {
-          entities: entities.length,
-          cacheTime,
-          avgPerEntity: Math.round(cacheTime / entities.length)
-        });
-
-        const triggerRestoreStart = Date.now();
-
-        // Re-enable FTS trigger (ALWAYS executes, even on error)
+        // Recreate FTS trigger
         this.db.exec(`
           CREATE TRIGGER IF NOT EXISTS entities_fts_insert AFTER INSERT ON entities
           BEGIN
             INSERT INTO entities_fts(name, entity_type, observations)
             VALUES (new.name, new.entity_type, new.observations);
-          END;
+          END
         `);
 
-        const triggerRestoreTime = Date.now() - triggerRestoreStart;
-        logDebug('FTS trigger restored', {
-          duration: triggerRestoreTime,
-          optimization: 'completed'
-        });
+        // Rebuild FTS index to ensure sync after bulk insert
+        this.db.exec(`INSERT INTO entities_fts(entities_fts) VALUES('rebuild');`);
 
         return results;
-      } catch (error) {
-        // Re-enable FTS trigger even on error
-        this.db.exec(`
-          CREATE TRIGGER IF NOT EXISTS entities_fts_insert AFTER INSERT ON entities
-          BEGIN
-            INSERT INTO entities_fts(name, entity_type, observations)
-            VALUES (new.name, new.entity_type, new.observations);
-          END;
-        `);
-        throw error;
+
+      } finally {
+        // No PRAGMA changes here
       }
     });
 
-    // Restore original PRAGMA settings
+    // Restore original PRAGMA settings (must be outside transaction)
     this.db.exec(`PRAGMA defer_foreign_keys = ${originalDeferForeignKeys}`);
     this.db.exec(`PRAGMA synchronous = ${originalSynchronous}`);
-
-    // Clear search cache as new entities were added
-    this.searchCache.clear();
+    this.db.exec(`PRAGMA journal_mode = ${originalJournalMode}`);
+    this.db.exec('PRAGMA cache_size = -16384'); // Restore default cache size
+    this.db.exec('PRAGMA mmap_size = 268435456'); // Keep mmap for performance
 
     // Monitor memory usage after bulk operations
     const memoryAfter = process.memoryUsage();
@@ -759,27 +783,40 @@ export class MemoryDatabase {
       heapDelta: Math.round((memoryAfter.heapUsed - memoryBefore.heapUsed) / 1024 / 1024)
     });
 
-    if (perf && typeof perf.end === 'function') {
-      perf.end({
-        created: created.length,
-        memoryDelta: Math.round((memoryAfter.heapUsed - memoryBefore.heapUsed) / 1024 / 1024),
-        optimization: 'bulk'
-      });
+    // Update bloom filter
+    entities.forEach(entity => {
+      this.entityBloom.add(entity.name);
+    });
+
+    // Batch update caches
+    created.forEach(entity => {
+      this.entityCache.set(entity.name, entity);
+    });
+
+    // Clear search cache if needed
+    if (this.searchCacheClearPending) {
+      this.searchCache.clear();
+      this.searchCacheClearPending = false;
     }
-    const endMem = process.memoryUsage();
-    const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
+
+    const end = process.hrtime.bigint();
+    const durationMs = Number(end - start) / 1_000_000;
+
+    perf.end({
+      count: entities.length,
+      durationMs,
+      avgPerEntity: durationMs / entities.length,
+      optimization: 'bulk'
+    });
+
     logProfile('executeBulkEntityCreation_end', {
       count: entities.length,
       durationMs,
       avgPerEntity: durationMs / entities.length,
       created: created.length,
-      memoryBefore: startMem,
-      memoryAfter: endMem,
-      memoryDelta: {
-        rss: endMem.rss - startMem.rss,
-        heapUsed: endMem.heapUsed - startMem.heapUsed
-      }
+      memoryDelta: Math.round((memoryAfter.rss - memoryBefore.rss) / 1024 / 1024)
     }, correlationId);
+
     return created;
   }
 
@@ -825,34 +862,40 @@ export class MemoryDatabase {
     }
 
     const created: RelationResult[] = [];
+    const batchSize = 1000; // SQLite limit is 999 parameters, so use 1000 relations max per batch (3000 params)
 
     this.transaction(() => {
-      // Build bulk insert query
-      const placeholders = relations.map(() => '(?, ?, ?)').join(', ');
-      const bulkQuery = `
-        INSERT OR IGNORE INTO relations (from_entity, to_entity, relation_type)
-        VALUES ${placeholders}
-      `;
+      // Process relations in batches to avoid SQLite parameter limit
+      for (let i = 0; i < relations.length; i += batchSize) {
+        const batch = relations.slice(i, i + batchSize);
 
-      // Flatten parameters
-      const params = relations.flatMap((relation) => [
-        relation.from,
-        relation.to,
-        relation.relationType,
-      ]);
+        // Build bulk insert query for this batch
+        const placeholders = batch.map(() => '(?, ?, ?)').join(', ');
+        const bulkQuery = `
+          INSERT OR IGNORE INTO relations (from_entity, to_entity, relation_type)
+          VALUES ${placeholders}
+        `;
 
-      // Execute bulk insert
-      const result = this.db.prepare(bulkQuery).run(...params);
+        // Flatten parameters for this batch
+        const params = batch.flatMap((relation) => [
+          relation.from,
+          relation.to,
+          relation.relationType,
+        ]);
 
-      // Build results (all relations are considered created due to OR IGNORE)
-      relations.forEach((relation) => {
-        created.push({
-          type: 'relation',
-          from: relation.from,
-          to: relation.to,
-          relationType: relation.relationType,
+        // Execute bulk insert for this batch
+        const result = this.db.prepare(bulkQuery).run(...params);
+
+        // Build results for this batch
+        batch.forEach((relation) => {
+          created.push({
+            type: 'relation',
+            from: relation.from,
+            to: relation.to,
+            relationType: relation.relationType,
+          });
         });
-      });
+      }
     });
 
     perf.end({ status: 'success', created: created.length });
@@ -888,15 +931,29 @@ export class MemoryDatabase {
   }
 
   searchNodes(options: SearchOptions): GraphResult {
-    const { query, limit = 20 } = options;
-    const cacheKey = `search:${query}:${limit}`;
+    const { query, limit = 20, searchContext, searchMode, contentTypes, intent } = options;
+
+    // Create enhanced cache key with context
+    const contextHash = searchContext ? JSON.stringify(searchContext) : '';
+    const cacheKey = `search:${query}:${limit}:${contextHash}:${searchMode || 'hybrid'}`;
 
     // Check cache
     const cached = this.searchCache.get(cacheKey);
     if (cached) return cached;
 
-    // Parse and optimize the search query
+    // Parse and optimize the search query with context awareness
     const searchQuery = parseSearchQuery(query);
+
+    // Override search mode if specified
+    if (searchMode) {
+      searchQuery.searchMode = searchMode;
+    }
+
+    // Override content types if specified
+    if (contentTypes) {
+      searchQuery.contentTypes = contentTypes;
+    }
+
     const ftsQuery = buildFTSQuery(searchQuery);
 
     // Use read pool if available for better concurrency
@@ -1043,8 +1100,8 @@ export class MemoryDatabase {
           : parseObservations(row.observations),
       };
 
-      const relevance = calculateRelevance(row, searchQuery, row.fts_rank || 0);
-      const highlights = generateHighlights(row, searchQuery);
+      const relevance = calculateRelevance(row, searchQuery, row.fts_rank || 0, searchContext);
+      const highlights = generateHighlights(row, searchQuery, searchContext);
       const matchType = determineMatchType(row, searchQuery);
 
       return {
@@ -1172,6 +1229,157 @@ export class MemoryDatabase {
       to: row.to_entity,
       relationType: row.relation_type,
     }));
+  }
+
+  getNeighbors(entityName: string, options: GetNeighborsOptions): GraphResult {
+    const { direction = 'both', relationType, depth = 1, includeRelations = true } = options;
+
+    if (depth < 1 || depth > 5) {
+      throw new Error('Depth must be between 1 and 5');
+    }
+
+    // Get all relations for the entity
+    const allRelations = this.getRelationsForEntities([entityName]);
+
+    // Filter relations based on direction and type
+    const filteredRelations = allRelations.filter(relation => {
+      // Filter by direction
+      if (direction === 'outgoing' && relation.from !== entityName) return false;
+      if (direction === 'incoming' && relation.to !== entityName) return false;
+
+      // Filter by relation type if specified
+      if (relationType && relation.relationType !== relationType) return false;
+
+      return true;
+    });
+
+    // Get connected entity names
+    const connectedNames = new Set<string>();
+    for (const relation of filteredRelations) {
+      if (relation.from === entityName) {
+        connectedNames.add(relation.to);
+      } else {
+        connectedNames.add(relation.from);
+      }
+    }
+
+    // If depth > 1, recursively get neighbors
+    if (depth > 1) {
+      const visited = new Set<string>([entityName]);
+      const queue: Array<{ name: string; currentDepth: number }> = [];
+
+      // Add immediate neighbors to queue
+      for (const name of connectedNames) {
+        queue.push({ name, currentDepth: 1 });
+        visited.add(name);
+      }
+
+      // BFS to get neighbors at deeper levels
+      while (queue.length > 0) {
+        const { name, currentDepth } = queue.shift()!;
+
+        if (currentDepth >= depth) continue;
+
+        // Get relations for this entity
+        const entityRelations = this.getRelationsForEntities([name]);
+        const entityFilteredRelations = entityRelations.filter(relation => {
+          if (direction === 'outgoing' && relation.from !== name) return false;
+          if (direction === 'incoming' && relation.to !== name) return false;
+          if (relationType && relation.relationType !== relationType) return false;
+          return true;
+        });
+
+        // Add new neighbors to queue
+        for (const relation of entityFilteredRelations) {
+          const neighborName = relation.from === name ? relation.to : relation.from;
+          if (!visited.has(neighborName)) {
+            visited.add(neighborName);
+            queue.push({ name: neighborName, currentDepth: currentDepth + 1 });
+            connectedNames.add(neighborName);
+
+            // Add relation to filtered relations if includeRelations is true
+            if (includeRelations) {
+              filteredRelations.push(relation);
+            }
+          }
+        }
+      }
+    }
+
+    // Get entity details for all connected entities
+    const entities = Array.from(connectedNames).map(name => {
+      const entity = this.getEntity(name);
+      return entity || {
+        type: 'entity' as const,
+        name,
+        entityType: 'unknown',
+        observations: [],
+      };
+    });
+
+    return {
+      entities,
+      relations: includeRelations ? filteredRelations : [],
+    };
+  }
+
+  findShortestPath(from: string, to: string, options: FindShortestPathOptions): ShortestPathResult {
+    const { bidirectional = true, relationType, maxDepth = 6 } = options;
+
+    if (maxDepth < 1 || maxDepth > 10) {
+      throw new Error('Max depth must be between 1 and 10');
+    }
+
+    // Check if entities exist
+    const fromEntity = this.getEntity(from);
+    const toEntity = this.getEntity(to);
+
+    if (!fromEntity || !toEntity) {
+      return { found: false, path: [], distance: -1, nodesExplored: 0 };
+    }
+
+    // BFS to find shortest path
+    const visited = new Set<string>();
+    const queue: Array<{ name: string; path: string[]; distance: number }> = [];
+    const parentMap = new Map<string, string>();
+
+    queue.push({ name: from, path: [from], distance: 0 });
+    visited.add(from);
+
+    let nodesExplored = 0;
+
+    while (queue.length > 0) {
+      const { name, path, distance } = queue.shift()!;
+      nodesExplored++;
+
+      if (name === to) {
+        return { found: true, path, distance, nodesExplored };
+      }
+
+      if (distance >= maxDepth) continue;
+
+      // Get relations for current entity
+      const relations = this.getRelationsForEntities([name]);
+
+      // Filter relations based on options
+      const filteredRelations = relations.filter(relation => {
+        if (relationType && relation.relationType !== relationType) return false;
+        return true;
+      });
+
+      // Add neighbors to queue
+      for (const relation of filteredRelations) {
+        const neighborName = relation.from === name ? relation.to : relation.from;
+
+        if (!visited.has(neighborName)) {
+          visited.add(neighborName);
+          const newPath = [...path, neighborName];
+          queue.push({ name: neighborName, path: newPath, distance: distance + 1 });
+        }
+      }
+    }
+
+    return { found: false, path: [], distance: -1, nodesExplored };
   }
 
   addObservations(updates: ObservationUpdate[]): void {
@@ -1304,6 +1512,17 @@ export class MemoryDatabase {
   }
 
   deleteEntities(entityNames: string[]): void {
+    if (entityNames.length === 0) return;
+
+    // Use batch method if enabled and above threshold
+    if (
+      config.performance.enableBulkOperations &&
+      entityNames.length >= config.performance.batchSize
+    ) {
+      this.deleteEntitiesBatch(entityNames);
+      return;
+    }
+
     this.transaction(() => {
       for (const name of entityNames) {
         this.statements.deleteEntity!.run(name);
@@ -1313,6 +1532,151 @@ export class MemoryDatabase {
     });
 
     this.searchCache.clear();
+  }
+
+  // Enhanced bulk delete operations with optimized performance
+  deleteEntitiesBatch(entityNames: string[]): void {
+    const correlationId = uuidv4();
+    const start = process.hrtime.bigint();
+    logProfile('deleteEntitiesBatch_start', { count: entityNames.length }, correlationId);
+
+    if (entityNames.length === 0) return;
+
+    const perf = { end: () => {} };
+
+    // Use regular method for small batches
+    if (entityNames.length < 10) {
+      this.deleteEntities(entityNames);
+      return;
+    }
+
+    const results = this.bulkOperationCircuitBreaker.executeSync(
+      () => this.executeBulkEntityDeletion(entityNames, perf, correlationId),
+      'deleteEntitiesBatch'
+    );
+
+    const end = process.hrtime.bigint();
+    const durationMs = Number(end - start) / 1_000_000;
+    logProfile('deleteEntitiesBatch_end', {
+      count: entityNames.length,
+      durationMs,
+      avgPerEntity: durationMs / entityNames.length,
+      deleted: results
+    }, correlationId);
+  }
+
+  private executeBulkEntityDeletion(entityNames: string[], perf: any = { end: () => {} }, correlationId?: string): number {
+    const startMem = process.memoryUsage();
+    const start = process.hrtime.bigint();
+    logProfile('executeBulkEntityDeletion_start', {
+      count: entityNames.length,
+      memory: startMem
+    }, correlationId);
+
+    // Store original PRAGMA settings for restoration
+    const originalDeferForeignKeys = this.db.pragma('defer_foreign_keys', { simple: true });
+    const originalSynchronous = this.db.pragma('synchronous', { simple: true });
+
+    // Optimize for bulk operations (must be outside transaction)
+    this.db.exec('PRAGMA defer_foreign_keys = ON');
+    this.db.exec('PRAGMA synchronous = NORMAL');
+
+    const deletedCount = this.transaction(() => {
+      const triggerDisableStart = Date.now();
+
+      // Temporarily disable FTS triggers for bulk delete
+      this.db.exec('DROP TRIGGER IF EXISTS entities_fts_delete');
+
+      const triggerDisableTime = Date.now() - triggerDisableStart;
+      logDebug('FTS trigger disabled for delete', {
+        duration: triggerDisableTime,
+        optimization: 'enabled'
+      });
+
+      try {
+        const deleteStart = Date.now();
+
+        // Build bulk delete query with optimized batch size
+        const batchSize = Math.min(entityNames.length, 5000);
+        let totalDeleted = 0;
+
+        for (let i = 0; i < entityNames.length; i += batchSize) {
+          const batch = entityNames.slice(i, i + batchSize);
+          const placeholders = batch.map(() => '?').join(',');
+
+          // Delete from entities table
+          const result = this.db
+            .prepare(`DELETE FROM entities WHERE name IN (${placeholders})`)
+            .run(...batch);
+
+          totalDeleted += result.changes;
+
+          // Delete from FTS table
+          this.db
+            .prepare(`DELETE FROM entities_fts WHERE name IN (${placeholders})`)
+            .run(...batch);
+
+          // Force garbage collection between batches if available
+          if (global.gc && i % (batchSize * 2) === 0) {
+            global.gc();
+          }
+        }
+
+        const deleteTime = Date.now() - deleteStart;
+        logDebug('Bulk delete completed', {
+          entities: entityNames.length,
+          deleted: totalDeleted,
+          deleteTime,
+          avgPerEntity: Math.round(deleteTime / entityNames.length)
+        });
+
+        // Recreate FTS trigger
+        this.db.exec(`
+          CREATE TRIGGER IF NOT EXISTS entities_fts_delete AFTER DELETE ON entities
+          BEGIN
+            DELETE FROM entities_fts WHERE name = old.name;
+          END
+        `);
+
+        return totalDeleted;
+
+      } finally {
+        // No PRAGMA changes here
+      }
+    });
+
+    // Restore original PRAGMA settings (must be outside transaction)
+    this.db.exec(`PRAGMA defer_foreign_keys = ${originalDeferForeignKeys}`);
+    this.db.exec(`PRAGMA synchronous = ${originalSynchronous}`);
+
+    // Update caches and bloom filter
+    entityNames.forEach(name => {
+      this.entityCache.delete(name.toLowerCase());
+      this.entityBloom.remove(name.toLowerCase());
+    });
+
+    // Clear search cache
+    this.searchCache.clear();
+
+    const end = process.hrtime.bigint();
+    const durationMs = Number(end - start) / 1_000_000;
+
+    perf.end({
+      count: entityNames.length,
+      durationMs,
+      avgPerEntity: durationMs / entityNames.length,
+      deleted: deletedCount,
+      optimization: 'bulk'
+    });
+
+    logProfile('executeBulkEntityDeletion_end', {
+      count: entityNames.length,
+      durationMs,
+      avgPerEntity: durationMs / entityNames.length,
+      deleted: deletedCount
+    }, correlationId);
+
+    return deletedCount;
   }
 
   deleteObservations(deletions: ObservationDeletion[]): void {
@@ -1562,5 +1926,268 @@ export class MemoryDatabase {
 
     this.saveBloomFilter();
     this.db.close();
+  }
+
+  // Memory aging methods
+
+  /**
+   * Update entity access tracking and recalculate prominence
+   */
+  updateEntityAccess(entityName: string): void {
+    const entity = this.getEntity(entityName);
+    if (!entity) return;
+
+    // Get current aging data from database
+    const row = this.db.prepare(`
+      SELECT access_count, last_accessed, prominence_score, importance_weight
+      FROM entities WHERE name = ?
+    `).get(entityName) as EntityRow;
+
+    if (!row) return;
+
+    // Calculate new prominence using memory aging system
+    const agingResult = this.memoryAging.updateEntityAccess(
+      row.access_count,
+      row.last_accessed,
+      row.prominence_score,
+      row.importance_weight
+    );
+
+    // Update database
+    this.statements.updateEntityAccess!.run(
+      agingResult.newAccessCount,
+      agingResult.newLastAccessed,
+      agingResult.newProminence,
+      entityName
+    );
+
+    // Update cache
+    this.entityCache.delete(entityName.toLowerCase());
+  }
+
+  /**
+   * Get aging-aware search results with prominence boost
+   */
+  searchNodesWithAging(options: SearchOptions): GraphResult {
+    const baseResults = this.searchNodes(options);
+
+    // Apply aging-aware boost to search results
+    const boostedResults = baseResults.entities.map(entity => {
+      const row = this.db.prepare(`
+        SELECT prominence_score FROM entities WHERE name = ?
+      `).get(entity.name) as EntityRow;
+
+      if (row) {
+        const searchBoost = this.memoryAging.getSearchBoost(row.prominence_score);
+        return {
+          ...entity,
+          _searchBoost: searchBoost
+        };
+      }
+      return entity;
+    });
+
+    // Sort by prominence (higher prominence first)
+    boostedResults.sort((a, b) => {
+      const aBoost = (a as any)._searchBoost || 1.0;
+      const bBoost = (b as any)._searchBoost || 1.0;
+      return bBoost - aBoost;
+    });
+
+    return {
+      entities: boostedResults,
+      relations: baseResults.relations,
+      pagination: baseResults.pagination
+    };
+  }
+
+  /**
+   * Run memory aging calculations for all entities
+   */
+  runMemoryAging(): void {
+    if (!this.memoryAging.shouldRunAging()) {
+      return;
+    }
+
+    const entities = this.db.prepare(`
+      SELECT name, access_count, last_accessed, prominence_score, importance_weight
+      FROM entities
+    `).all() as EntityRow[];
+
+    const agingResults = this.memoryAging.calculateAgingForEntities(
+      entities.map(row => ({
+        name: row.name,
+        accessCount: row.access_count,
+        lastAccessed: row.last_accessed,
+        prominenceScore: row.prominence_score,
+        importanceWeight: row.importance_weight
+      }))
+    );
+
+    // Update prominence scores in database
+    this.transaction(() => {
+      for (const result of agingResults) {
+        this.db.prepare(`
+          UPDATE entities
+          SET prominence_score = ?
+          WHERE name = ?
+        `).run(result.newProminence, result.name);
+      }
+    });
+
+    // Clear caches to reflect new prominence scores
+    this.entityCache.clear();
+    this.searchCache.clear();
+
+    this.memoryAging.markAgingCompleted();
+
+    logInfo('Memory aging completed', {
+      totalEntities: entities.length,
+      updatedEntities: agingResults.length,
+      forgottenEntities: agingResults.filter(r => r.isForgotten).length
+    });
+  }
+
+  /**
+   * Get memory aging statistics
+   */
+  getMemoryAgingStats(): any {
+    const config = this.memoryAging.getConfig();
+    const threshold = config.minProminenceThreshold;
+
+    const stats = this.statements.getAgingStats!.get(threshold, threshold) as any;
+
+    return {
+      ...stats,
+      config: this.memoryAging.getConfig(),
+      lastAgingRun: this.memoryAging['lastAgingRun'],
+      agingCycles: this.memoryAging['agingCycles']
+    };
+  }
+
+  /**
+   * Set entity importance weight
+   */
+  setEntityImportance(entityName: string, importanceWeight: number): void {
+    this.db.prepare(`
+      UPDATE entities
+      SET importance_weight = ?, updated_at = julianday('now')
+      WHERE name = ?
+    `).run(importanceWeight, entityName);
+
+    // Recalculate prominence with new importance
+    this.updateEntityAccess(entityName);
+  }
+
+  /**
+   * Get recommended importance weight for an entity
+   */
+  getRecommendedImportance(entityName: string): number {
+    const entity = this.getEntity(entityName);
+    if (!entity) return 1.0;
+
+    const relations = this.getRelationsForEntities([entityName]);
+    const contentLength = entity.observations.reduce((sum, obs) => {
+      if (obs.type === 'text') return sum + obs.text.length;
+      return sum;
+    }, 0);
+
+    return this.memoryAging.getRecommendedImportanceWeight(
+      entity.entityType,
+      contentLength,
+      relations.length
+    );
+  }
+
+  /**
+   * Enhanced context-aware search with semantic understanding and suggestions
+   */
+  searchNodesContextAware(options: SearchOptions): GraphResult & {
+    suggestions: string[];
+    intent: { type: string; confidence: number; hints: string[] };
+    searchStats: { queryComplexity: string; semanticTerms: string[]; contextHints: string[] };
+  } {
+    const { query, limit = 20, searchContext, searchMode, contentTypes, intent } = options;
+
+    // Analyze search intent
+    const intentAnalysis = analyzeSearchIntent(query);
+
+    // Generate search suggestions
+    const suggestions = generateSearchSuggestions(query, searchContext);
+
+    // Perform the search
+    const searchResults = this.searchNodes(options);
+
+    // Get search statistics
+    const searchQuery = parseSearchQuery(query);
+    const searchStats = {
+      queryComplexity: searchQuery.complexity,
+      semanticTerms: searchQuery.semanticTerms,
+      contextHints: searchQuery.contextHints
+    };
+
+    return {
+      ...searchResults,
+      suggestions,
+      intent: {
+        type: intent || intentAnalysis.intent,
+        confidence: intentAnalysis.confidence,
+        hints: intentAnalysis.suggestions
+      },
+      searchStats
+    };
+  }
+
+  /**
+   * Semantic search for related entities
+   */
+  searchRelatedEntities(
+    entityName: string,
+    options: {
+      limit?: number;
+      relationTypes?: string[];
+      searchContext?: SearchOptions['searchContext'];
+    } = {}
+  ): GraphResult {
+    const { limit = 10, relationTypes, searchContext } = options;
+
+    // Get direct relations
+    const relations = this.getRelationsForEntities([entityName]);
+
+    // Filter by relation types if specified
+    const filteredRelations = relationTypes
+      ? relations.filter(r => relationTypes.includes(r.relationType))
+      : relations;
+
+    // Get related entity names
+    const relatedNames = filteredRelations.map(r =>
+      r.from === entityName ? r.to : r.from
+    );
+
+    // Get the actual entities
+    const entities = this.openNodes(relatedNames).entities;
+
+    // Apply context-aware relevance scoring
+    const scoredEntities = entities.map(entity => {
+      const relevance = calculateRelevance(
+        entity,
+        { original: entityName, terms: [entityName], phrases: [], fuzzy: false, prefix: false, complexity: 'simple', estimatedCost: 1, semanticTerms: [], contextHints: [], searchMode: 'semantic', contentTypes: ['text'] },
+        1,
+        searchContext
+      );
+
+      return {
+        ...entity,
+        _relevance: relevance
+      };
+    });
+
+    // Sort by relevance
+    scoredEntities.sort((a, b) => (b as any)._relevance - (a as any)._relevance);
+
+    return {
+      entities: scoredEntities.slice(0, limit),
+      relations: filteredRelations.slice(0, limit)
+    };
   }
 }

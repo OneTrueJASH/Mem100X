@@ -21,13 +21,19 @@ export const PRAGMAS = `
 `;
 
 export const TABLES = `
-  -- Entities table with full-text search support
+  -- Entities table with full-text search support and memory aging
   CREATE TABLE IF NOT EXISTS entities (
     name TEXT PRIMARY KEY COLLATE NOCASE,
     entity_type TEXT NOT NULL,
     observations TEXT NOT NULL,
     created_at REAL DEFAULT (julianday('now')),
-    updated_at REAL DEFAULT (julianday('now'))
+    updated_at REAL DEFAULT (julianday('now')),
+    -- Memory aging fields
+    access_count INTEGER DEFAULT 0,
+    last_accessed REAL DEFAULT (julianday('now')),
+    prominence_score REAL DEFAULT 1.0,
+    decay_rate REAL DEFAULT 0.1,
+    importance_weight REAL DEFAULT 1.0
   );
 
   -- Relations table with efficient indexing
@@ -37,9 +43,20 @@ export const TABLES = `
     to_entity TEXT NOT NULL COLLATE NOCASE,
     relation_type TEXT NOT NULL,
     created_at REAL DEFAULT (julianday('now')),
+    -- Memory aging fields for relations
+    access_count INTEGER DEFAULT 0,
+    last_accessed REAL DEFAULT (julianday('now')),
+    prominence_score REAL DEFAULT 1.0,
     UNIQUE(from_entity, to_entity, relation_type),
     FOREIGN KEY (from_entity) REFERENCES entities(name) ON DELETE CASCADE,
     FOREIGN KEY (to_entity) REFERENCES entities(name) ON DELETE CASCADE
+  );
+
+  -- Memory aging configuration table
+  CREATE TABLE IF NOT EXISTS memory_aging_config (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at REAL DEFAULT (julianday('now'))
   );
 `;
 
@@ -49,11 +66,21 @@ export const INDEXES = `
   CREATE INDEX IF NOT EXISTS idx_entity_updated ON entities(updated_at DESC);
   CREATE INDEX IF NOT EXISTS idx_observations ON entities(observations);
 
+  -- Memory aging indexes
+  CREATE INDEX IF NOT EXISTS idx_entity_prominence ON entities(prominence_score DESC);
+  CREATE INDEX IF NOT EXISTS idx_entity_last_accessed ON entities(last_accessed DESC);
+  CREATE INDEX IF NOT EXISTS idx_entity_access_count ON entities(access_count DESC);
+  CREATE INDEX IF NOT EXISTS idx_entity_aging_composite ON entities(prominence_score DESC, last_accessed DESC);
+
   -- Relation indexes for efficient queries
   CREATE INDEX IF NOT EXISTS idx_from_entity ON relations(from_entity);
   CREATE INDEX IF NOT EXISTS idx_to_entity ON relations(to_entity);
   CREATE INDEX IF NOT EXISTS idx_relation_type ON relations(relation_type);
   CREATE INDEX IF NOT EXISTS idx_relation_composite ON relations(from_entity, to_entity);
+
+  -- Memory aging indexes for relations
+  CREATE INDEX IF NOT EXISTS idx_relation_prominence ON relations(prominence_score DESC);
+  CREATE INDEX IF NOT EXISTS idx_relation_last_accessed ON relations(last_accessed DESC);
 `;
 
 // Enhanced FTS configurations for different use cases

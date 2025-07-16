@@ -83,7 +83,7 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
   search_nodes: {
     name: 'search_nodes',
     description:
-      'Search for nodes in the knowledge graph based on a query. Uses FTS5 for 88x faster performance (8,829 searches/sec)',
+      'Search for nodes in the knowledge graph based on a query. Uses FTS5 for 88x faster performance (8,829 searches/sec) with context-aware ranking',
     inputSchema: {
       type: 'object',
       properties: {
@@ -100,6 +100,47 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
           type: 'string',
           description: 'Optional: specific context to use (overrides auto-detection)',
         },
+        searchContext: {
+          type: 'object',
+          description: 'Enhanced search context for context-aware search',
+          properties: {
+            currentEntities: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Currently active entities for context boost'
+            },
+            recentSearches: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Recent search queries for relevance boost'
+            },
+            userContext: {
+              type: 'string',
+              enum: ['work', 'personal', 'neutral'],
+              description: 'User context for relevance scoring'
+            },
+            conversationContext: {
+              type: 'string',
+              description: 'Current conversation context for semantic matching'
+            }
+          }
+        },
+        searchMode: {
+          type: 'string',
+          enum: ['exact', 'semantic', 'fuzzy', 'hybrid'],
+          description: 'Search mode for different query types',
+          default: 'hybrid'
+        },
+        contentTypes: {
+          type: 'array',
+          items: { type: 'string', enum: ['text', 'image', 'audio', 'resource'] },
+          description: 'Content types to search for'
+        },
+        intent: {
+          type: 'string',
+          enum: ['find', 'browse', 'explore', 'verify'],
+          description: 'Search intent for better result ranking'
+        }
       },
       required: ['query'],
     },
@@ -312,6 +353,115 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
         },
       },
       required: ['entityNames'],
+    },
+  },
+
+  search_nodes_context_aware: {
+    name: 'search_nodes_context_aware',
+    description: 'Enhanced context-aware search with semantic understanding, suggestions, and intent analysis',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The search query to analyze and search for',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of results to return (default: 20)',
+        },
+        searchContext: {
+          type: 'object',
+          description: 'Enhanced search context for context-aware search',
+          properties: {
+            currentEntities: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Currently active entities for context boost'
+            },
+            recentSearches: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Recent search queries for relevance boost'
+            },
+            userContext: {
+              type: 'string',
+              enum: ['work', 'personal', 'neutral'],
+              description: 'User context for relevance scoring'
+            },
+            conversationContext: {
+              type: 'string',
+              description: 'Current conversation context for semantic matching'
+            }
+          }
+        },
+        searchMode: {
+          type: 'string',
+          enum: ['exact', 'semantic', 'fuzzy', 'hybrid'],
+          description: 'Search mode for different query types',
+          default: 'hybrid'
+        },
+        contentTypes: {
+          type: 'array',
+          items: { type: 'string', enum: ['text', 'image', 'audio', 'resource'] },
+          description: 'Content types to search for'
+        },
+        intent: {
+          type: 'string',
+          enum: ['find', 'browse', 'explore', 'verify'],
+          description: 'Search intent for better result ranking'
+        }
+      },
+      required: ['query'],
+    },
+  },
+
+  search_related_entities: {
+    name: 'search_related_entities',
+    description: 'Find entities related to a specific entity with context-aware relevance scoring',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entityName: {
+          type: 'string',
+          description: 'The name of the entity to find related entities for',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of related entities to return (default: 10)',
+        },
+        relationTypes: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Filter by specific relation types',
+        },
+        searchContext: {
+          type: 'object',
+          description: 'Enhanced search context for context-aware search',
+          properties: {
+            currentEntities: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Currently active entities for context boost'
+            },
+            recentSearches: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Recent search queries for relevance boost'
+            },
+            userContext: {
+              type: 'string',
+              enum: ['work', 'personal', 'neutral'],
+              description: 'User context for relevance scoring'
+            },
+            conversationContext: {
+              type: 'string',
+              description: 'Current conversation context for semantic matching'
+            }
+          }
+        }
+      },
+      required: ['entityName'],
     },
   },
 };
