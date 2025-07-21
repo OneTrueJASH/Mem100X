@@ -134,6 +134,11 @@ export interface CreateEntityInput {
   name: string;
   entityType: string;
   observations: RichContent[];
+  // Optional ranking/aging fields
+  last_accessed?: number;
+  updated_at?: number;
+  access_count?: number;
+  prominence_score?: number;
 }
 
 export interface CreateRelationInput {

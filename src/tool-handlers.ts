@@ -8,6 +8,10 @@ import {
   toolSchemas,
   SetContextInput,
   GetContextInfoInput,
+  CreateContextInput,
+  DeleteContextInput,
+  UpdateContextInput,
+  ListContextsInput,
   CreateEntitiesInput,
   SearchNodesInput,
   ReadGraphInput,
@@ -70,6 +74,75 @@ export function handleGetContextInfo(args: any, ctx: ToolContext) {
   return createMCPToolResponse(contextInfo, `Current context: ${contextInfo.currentContext}`);
 }
 
+// Context management handlers
+export function handleCreateContext(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.create_context.parse(args) as CreateContextInput;
+  const message = ctx.manager.createContext(validated.name, {
+    path: validated.path,
+    patterns: validated.patterns,
+    entityTypes: validated.entityTypes,
+    description: validated.description,
+  });
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    success: true,
+    contextName: validated.name,
+    message,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, message);
+}
+
+export function handleDeleteContext(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.delete_context.parse(args) as DeleteContextInput;
+  const message = ctx.manager.deleteContext(validated.name, validated.force);
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    success: true,
+    contextName: validated.name,
+    message,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, message);
+}
+
+export function handleUpdateContext(args: any, ctx: ToolContext) {
+  const validated = toolSchemas.update_context.parse(args) as UpdateContextInput;
+  const message = ctx.manager.updateContext(validated.name, {
+    patterns: validated.patterns,
+    entityTypes: validated.entityTypes,
+    description: validated.description,
+  });
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    success: true,
+    contextName: validated.name,
+    message,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, message);
+}
+
+export function handleListContexts(args: any, ctx: ToolContext) {
+  toolSchemas.list_contexts.parse(args); // Validate empty object
+  const contexts = ctx.manager.listContexts();
+  const duration = performance.now() - ctx.startTime;
+
+  const result = {
+    contexts,
+    count: contexts.length,
+    performance: { duration: `${duration.toFixed(2)}ms` },
+  };
+
+  return createMCPToolResponse(result, `Retrieved ${contexts.length} contexts`);
+}
+
 // Entity operation handlers
 export function handleCreateEntities(args: any, ctx: ToolContext) {
   // Debug: print raw args
@@ -90,10 +163,15 @@ export function handleCreateEntities(args: any, ctx: ToolContext) {
     process.stderr.write('DEBUG: Zod validation error: ' + String(e) + '\n');
     throw e;
   }
-  // Map MCP-standard 'content' to internal 'observations'
+  // Map MCP-standard 'content' to internal 'observations' and pass through ranking fields
   const entities = args.entities.map((entity: any) => ({
     ...entity,
     observations: entity.content,
+    // Pass through ranking/aging fields if present
+    ...(entity.last_accessed !== undefined ? { last_accessed: entity.last_accessed } : {}),
+    ...(entity.updated_at !== undefined ? { updated_at: entity.updated_at } : {}),
+    ...(entity.access_count !== undefined ? { access_count: entity.access_count } : {}),
+    ...(entity.prominence_score !== undefined ? { prominence_score: entity.prominence_score } : {}),
   }));
   ctx.manager.createEntities(entities);
   const duration = performance.now() - ctx.startTime;
@@ -113,20 +191,8 @@ export function handleCreateEntities(args: any, ctx: ToolContext) {
 export function handleSearchNodes(args: any, ctx: ToolContext) {
   const validated = toolSchemas.search_nodes.parse(args) as SearchNodesInput;
   const results = ctx.manager.searchNodes(validated);
-  const duration = performance.now() - ctx.startTime;
-
-  const result = {
-    ...results,
-    performance: {
-      duration: `${duration.toFixed(2)}ms`,
-      resultCount: results.entities.length,
-    },
-  };
-
-  return createMCPToolResponse(
-    result,
-    `Found ${results.entities.length} entities matching "${validated.query}"`
-  );
+  // Return the raw result object directly
+  return results;
 }
 
 export function handleReadGraph(args: any, ctx: ToolContext) {
@@ -789,6 +855,10 @@ export const toolHandlers: Record<string, (args: any, ctx: ToolContext) => any> 
   // Context management
   set_context: handleSetContext,
   get_context_info: handleGetContextInfo,
+  create_context: handleCreateContext,
+  delete_context: handleDeleteContext,
+  update_context: handleUpdateContext,
+  list_contexts: handleListContexts,
 
   // Entity operations
   create_entities: handleCreateEntities,

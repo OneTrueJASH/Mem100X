@@ -14,7 +14,7 @@ loadEnv({ quiet: true });
 const configSchema = z.object({
   // Database Configuration
   database: z.object({
-    path: z.string().default('./data/memory.db'),
+    path: z.string().default(process.env.MEM100X_DB_PATH || './data/memory.db'),
     cacheSizeMb: z.number().default(256), // Increased from 64MB to 256MB
     mmapSizeMb: z.number().default(1024), // Increased from 256MB to 1GB
     pageSizeKb: z.number().default(16), // 16KB pages for better I/O
@@ -40,6 +40,22 @@ const configSchema = z.object({
     profilingEnabled: z.boolean().default(false), // <-- add this line
   }),
 
+  // Memory Aging Configuration
+  memoryAging: z.object({
+    enabled: z.boolean().default(true),
+    preset: z.enum(['conservative', 'balanced', 'aggressive', 'work_focused', 'personal_focused']).default('balanced'),
+    customConfig: z.object({
+      baseDecayRate: z.number().default(0.1),
+      recencyBoostFactor: z.number().default(0.3),
+      frequencyBoostFactor: z.number().default(0.2),
+      halfLifeDays: z.number().default(30),
+      minProminenceThreshold: z.number().default(0.1),
+      maxProminence: z.number().default(10.0),
+      agingIntervalHours: z.number().default(24),
+      importanceWeightMultiplier: z.number().default(2.0),
+    }).optional(),
+  }),
+
   // Bloom Filter Configuration
   bloomFilter: z.object({
     expectedItems: z.number().default(50000),
@@ -48,8 +64,8 @@ const configSchema = z.object({
 
   // Multi-Context Configuration
   multiContext: z.object({
-    personalDbPath: z.string().default('./data/personal.db'),
-    workDbPath: z.string().default('./data/work.db'),
+    personalDbPath: z.string().default(process.env.MEM100X_PERSONAL_DB_PATH || './data/personal.db'),
+    workDbPath: z.string().default(process.env.MEM100X_WORK_DB_PATH || './data/work.db'),
     defaultContext: z.enum(['personal', 'work']).default('personal'),
   }),
 
@@ -157,6 +173,15 @@ function loadConfig() {
         : undefined,
       profilingEnabled: process.env.PROFILING_ENABLED
         ? process.env.PROFILING_ENABLED === 'true'
+        : undefined,
+    },
+    memoryAging: {
+      enabled: process.env.MEMORY_AGING_ENABLED
+        ? process.env.MEMORY_AGING_ENABLED === 'true'
+        : undefined,
+      preset: process.env.MEMORY_AGING_PRESET as 'conservative' | 'balanced' | 'aggressive' | 'work_focused' | 'personal_focused' | undefined,
+      customConfig: process.env.MEMORY_AGING_CUSTOM_CONFIG
+        ? JSON.parse(process.env.MEMORY_AGING_CUSTOM_CONFIG)
         : undefined,
     },
     bloomFilter: {

@@ -79,6 +79,28 @@ export const toolSchemas = {
 
   get_context_info: z.object({}),
 
+  create_context: z.object({
+    name: z.string().min(1, 'Context name cannot be empty').regex(/^[a-z0-9_-]+$/, 'Context name must contain only lowercase letters, numbers, hyphens, and underscores'),
+    path: z.string().optional().describe('Custom database path for the context'),
+    patterns: z.array(z.string()).optional().describe('Patterns to match for automatic context detection'),
+    entityTypes: z.array(z.string()).optional().describe('Entity types commonly found in this context'),
+    description: z.string().optional().describe('Human-readable description of the context'),
+  }),
+
+  delete_context: z.object({
+    name: z.string().min(1, 'Context name cannot be empty'),
+    force: z.boolean().default(false).describe('Force deletion even if context contains entities'),
+  }),
+
+  update_context: z.object({
+    name: z.string().min(1, 'Context name cannot be empty'),
+    patterns: z.array(z.string()).optional().describe('New patterns for context detection'),
+    entityTypes: z.array(z.string()).optional().describe('New entity types for this context'),
+    description: z.string().optional().describe('Updated description of the context'),
+  }),
+
+  list_contexts: z.object({}),
+
   // Entity operations
   create_entities: z.object({
     entities: z.array(EntitySchema).min(1, 'At least one entity is required'),
@@ -90,6 +112,31 @@ export const toolSchemas = {
     limit: z.number().int().positive().default(20).optional(),
     context: z.string().optional(),
     allContexts: z.boolean().default(false).optional(),
+    searchMode: z.enum(['exact', 'semantic', 'fuzzy', 'hybrid']).default('hybrid').optional(),
+    contentTypes: z.array(z.enum(['text', 'image', 'audio', 'resource'])).optional(),
+    intent: z.enum(['find', 'browse', 'explore', 'verify']).optional(),
+    searchContext: z.object({
+      currentEntities: z.array(z.string()).optional(),
+      recentSearches: z.array(z.string()).optional(),
+      userContext: z.enum(['work', 'personal', 'neutral']).optional(),
+      conversationContext: z.string().optional(),
+    }).optional(),
+  }),
+
+  search_nodes_context_aware: z.object({
+    query: z.string().min(1, 'Search query cannot be empty'),
+    limit: z.number().int().positive().default(20).optional(),
+    context: z.string().optional(),
+    allContexts: z.boolean().default(false).optional(),
+    searchMode: z.enum(['exact', 'semantic', 'fuzzy', 'hybrid']).default('hybrid').optional(),
+    contentTypes: z.array(z.enum(['text', 'image', 'audio', 'resource'])).optional(),
+    intent: z.enum(['find', 'browse', 'explore', 'verify']).optional(),
+    searchContext: z.object({
+      currentEntities: z.array(z.string()).optional(),
+      recentSearches: z.array(z.string()).optional(),
+      userContext: z.enum(['work', 'personal', 'neutral']).optional(),
+      conversationContext: z.string().optional(),
+    }).optional(),
   }),
 
   read_graph: z.object({
@@ -269,20 +316,6 @@ export const toolSchemas = {
     data: z.any().describe('Data to sanitize'),
   }),
 
-  search_nodes_context_aware: z.object({
-    query: z.string().min(1, 'Search query cannot be empty'),
-    limit: z.number().int().positive().default(20).optional(),
-    searchContext: z.object({
-      currentEntities: z.array(z.string()).optional(),
-      recentSearches: z.array(z.string()).optional(),
-      userContext: z.enum(['work', 'personal', 'neutral']).optional(),
-      conversationContext: z.string().optional(),
-    }).optional(),
-    searchMode: z.enum(['exact', 'semantic', 'fuzzy', 'hybrid']).optional(),
-    contentTypes: z.array(z.enum(['text', 'image', 'audio', 'resource'])).optional(),
-    intent: z.enum(['find', 'browse', 'explore', 'verify']).optional(),
-  }),
-
   search_related_entities: z.object({
     entityName: z.string().min(1, 'Entity name is required'),
     limit: z.number().int().positive().default(10).optional(),
@@ -299,8 +332,13 @@ export const toolSchemas = {
 // Type exports for use in handlers
 export type SetContextInput = z.infer<typeof toolSchemas.set_context>;
 export type GetContextInfoInput = z.infer<typeof toolSchemas.get_context_info>;
+export type CreateContextInput = z.infer<typeof toolSchemas.create_context>;
+export type DeleteContextInput = z.infer<typeof toolSchemas.delete_context>;
+export type UpdateContextInput = z.infer<typeof toolSchemas.update_context>;
+export type ListContextsInput = z.infer<typeof toolSchemas.list_contexts>;
 export type CreateEntitiesInput = z.infer<typeof toolSchemas.create_entities>;
 export type SearchNodesInput = z.infer<typeof toolSchemas.search_nodes>;
+export type SearchNodesContextAwareInput = z.infer<typeof toolSchemas.search_nodes_context_aware>;
 export type ReadGraphInput = z.infer<typeof toolSchemas.read_graph>;
 export type OpenNodesInput = z.infer<typeof toolSchemas.open_nodes>;
 export type CreateRelationsInput = z.infer<typeof toolSchemas.create_relations>;

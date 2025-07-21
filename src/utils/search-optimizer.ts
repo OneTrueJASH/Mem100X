@@ -329,10 +329,11 @@ export function calculateRelevance(
   entity: any,
   searchQuery: SearchQuery,
   rank: number,
-  searchContext?: SearchOptions['searchContext']
+  searchContext?: SearchOptions['searchContext'],
+  intent?: 'find' | 'browse' | 'explore' | 'verify'
 ): number {
   // Use the enhanced context-aware relevance calculation
-  return calculateContextAwareRelevance(entity, searchQuery, rank, searchContext);
+  return calculateContextAwareRelevance(entity, searchQuery, rank, searchContext, intent);
 }
 
 /**

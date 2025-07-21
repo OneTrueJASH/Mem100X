@@ -139,7 +139,8 @@ export function calculateContextAwareRelevance(
   entity: any,
   searchQuery: any,
   ftsRank: number,
-  searchContext?: SearchOptions['searchContext']
+  searchContext?: SearchOptions['searchContext'],
+  intent?: 'find' | 'browse' | 'explore' | 'verify'
 ): number {
   let relevance = ftsRank;
 
@@ -223,6 +224,42 @@ export function calculateContextAwareRelevance(
 
     if (hasMatchingContent) {
       relevance *= 1.2;
+    }
+  }
+
+  // --- Recency and usage boosting ---
+  // Boost by recency (last_accessed, updated_at)
+  if ('last_accessed' in entity && typeof entity.last_accessed === 'number') {
+    const now = Date.now() / 1000;
+    const age = now - entity.last_accessed;
+    relevance *= (1 + Math.max(0, 1 - age / (60 * 60 * 24 * 30))); // 1 month decay
+  }
+  if ('updated_at' in entity && typeof entity.updated_at === 'number') {
+    const now = Date.now() / 1000;
+    const age = now - entity.updated_at;
+    relevance *= (1 + Math.max(0, 1 - age / (60 * 60 * 24 * 30)));
+  }
+  // Boost by usage (access_count, prominence_score)
+  if ('access_count' in entity && typeof entity.access_count === 'number') {
+    relevance *= (1 + Math.min(0.5, entity.access_count / 100));
+  }
+  if ('prominence_score' in entity && typeof entity.prominence_score === 'number') {
+    relevance *= (1 + Math.min(0.5, entity.prominence_score / 100));
+  }
+
+  // --- Intent boosting ---
+  if (intent) {
+    if (intent === 'find' && entityName.toLowerCase() === (searchQuery.original || '').toLowerCase()) {
+      relevance *= 1.5;
+    }
+    if (intent === 'browse') {
+      relevance *= 1 + 0.1 * (observations.length || 1);
+    }
+    if (intent === 'explore') {
+      relevance *= 1 + 0.1 * (observations.length || 1);
+    }
+    if (intent === 'verify' && entityName.toLowerCase().includes((searchQuery.original || '').toLowerCase())) {
+      relevance *= 1.3;
     }
   }
 

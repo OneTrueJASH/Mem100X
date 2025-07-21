@@ -31,6 +31,97 @@ export const TOOL_DEFINITIONS: Record<string, MCPToolDefinition> = {
     },
   },
 
+  create_context: {
+    name: 'create_context',
+    description: 'Create a new memory context for organizing different types of information (e.g., projects, hobbies, studies)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Name of the new context (lowercase letters, numbers, hyphens, underscores only)',
+        },
+        path: {
+          type: 'string',
+          description: 'Optional: Custom database path for the context',
+        },
+        patterns: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional: Patterns to match for automatic context detection',
+        },
+        entityTypes: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional: Entity types commonly found in this context',
+        },
+        description: {
+          type: 'string',
+          description: 'Optional: Human-readable description of the context',
+        },
+      },
+      required: ['name'],
+    },
+  },
+
+  delete_context: addDestructiveSafetyInfo({
+    name: 'delete_context',
+    description: 'Delete a memory context and its associated database',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Name of the context to delete',
+        },
+        force: {
+          type: 'boolean',
+          description: 'Force deletion even if context contains entities',
+          default: false,
+        },
+      },
+      required: ['name'],
+    },
+  }, 'delete_context'),
+
+  update_context: {
+    name: 'update_context',
+    description: 'Update the configuration of an existing memory context',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Name of the context to update',
+        },
+        patterns: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'New patterns for context detection',
+        },
+        entityTypes: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'New entity types for this context',
+        },
+        description: {
+          type: 'string',
+          description: 'Updated description of the context',
+        },
+      },
+      required: ['name'],
+    },
+  },
+
+  list_contexts: {
+    name: 'list_contexts',
+    description: 'List all available memory contexts with their statistics and configuration',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
   create_entities: {
     name: 'create_entities',
     description:

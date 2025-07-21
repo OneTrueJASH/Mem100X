@@ -18,8 +18,9 @@ import {
   GetNeighborsOptions,
   FindShortestPathOptions,
   ShortestPathResult,
+  DatabaseConfig,
 } from './types.js'
-import { existsSync, mkdirSync, copyFileSync, statSync } from 'fs';
+import { existsSync, mkdirSync, copyFileSync, statSync, writeFileSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { config as appConfig } from './config.js'
 import { logInfo } from './utils/logger.js'
@@ -30,6 +31,7 @@ export class MultiDatabaseManager {
   protected entityContextMap: Map<string, string> = new Map();
   protected confidenceScorer!: ContextConfidenceScorer;
   protected config!: MemoryConfig;
+  private readonly contextConfigPath: string;
 
   public get currentContext(): string {
     return this._currentContext;
@@ -37,6 +39,7 @@ export class MultiDatabaseManager {
 
   constructor(config: typeof appConfig) {
     this._currentContext = config.multiContext.defaultContext;
+    this.contextConfigPath = join(dirname(config.multiContext.personalDbPath), 'contexts.json');
     this.initialize(config);
   }
 
@@ -61,7 +64,30 @@ export class MultiDatabaseManager {
   }
 
   private loadConfig(config: typeof appConfig): MemoryConfig {
-    return {
+    // Try to load existing context configuration
+    if (existsSync(this.contextConfigPath)) {
+      try {
+        const savedConfig = JSON.parse(readFileSync(this.contextConfigPath, 'utf8'));
+        logInfo('Loaded context configuration from file', { path: this.contextConfigPath });
+        return {
+          ...savedConfig,
+          defaultContext: config.multiContext.defaultContext,
+          autoDetect: true,
+          detectionSettings: {
+            entityWeight: 0.4,
+            typeWeight: 0.25,
+            patternWeight: 0.15,
+            relationWeight: 0.1,
+            existingEntityWeight: 0.1,
+          },
+        };
+      } catch (error) {
+        logInfo('Failed to load context configuration, using defaults', { error: String(error) });
+      }
+    }
+
+    // Default configuration
+    const defaultConfig: MemoryConfig = {
       databases: {
         personal: {
           path: config.multiContext.personalDbPath,
@@ -84,6 +110,23 @@ export class MultiDatabaseManager {
         existingEntityWeight: 0.1,
       },
     };
+
+    // Save default configuration
+    this.saveContextConfig(defaultConfig);
+    return defaultConfig;
+  }
+
+  private saveContextConfig(config: MemoryConfig): void {
+    try {
+      const dir = dirname(this.contextConfigPath);
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+      }
+      writeFileSync(this.contextConfigPath, JSON.stringify(config, null, 2));
+      logInfo('Saved context configuration to file', { path: this.contextConfigPath });
+    } catch (error) {
+      logInfo('Failed to save context configuration', { error: String(error) });
+    }
   }
 
   protected initializeDatabases(): void {
@@ -147,6 +190,216 @@ export class MultiDatabaseManager {
       }
     }
     throw new Error(`Unknown context: ${context}.`);
+  }
+
+  /**
+   * Create a new context dynamically
+   */
+  public createContext(
+    name: string,
+    options: {
+      path?: string;
+      patterns?: string[];
+      entityTypes?: string[];
+      description?: string;
+    } = {}
+  ): string {
+    const contextName = name.toLowerCase();
+
+    // Validate context name
+    if (!/^[a-z0-9_-]+$/.test(contextName)) {
+      throw new Error('Context name must contain only lowercase letters, numbers, hyphens, and underscores');
+    }
+
+    if (this.databases.has(contextName)) {
+      throw new Error(`Context '${contextName}' already exists`);
+    }
+
+    // Generate default path if not provided
+    const defaultPath = options.path || join(
+      dirname(this.contextConfigPath),
+      `${contextName}.db`
+    );
+
+    // Create context configuration
+    const contextConfig: DatabaseConfig = {
+      path: defaultPath,
+      patterns: options.patterns || [contextName],
+      entityTypes: options.entityTypes || [],
+    };
+
+    // Add to configuration
+    this.config.databases[contextName] = contextConfig;
+
+    // Create database directory if needed
+    const dbDir = dirname(defaultPath);
+    if (!existsSync(dbDir)) {
+      mkdirSync(dbDir, { recursive: true });
+    }
+
+    // Initialize new database
+    const newDb = new MemoryDatabase(defaultPath);
+    this.databases.set(contextName, newDb);
+
+    // Update confidence scorer
+    this.updateConfidenceScorer();
+
+    // Save updated configuration
+    this.saveContextConfig(this.config);
+
+    logInfo('Created new context', {
+      name: contextName,
+      path: defaultPath,
+      patterns: contextConfig.patterns,
+      entityTypes: contextConfig.entityTypes,
+    });
+
+    return `Created context '${contextName}' with ${contextConfig.patterns.length} patterns and ${contextConfig.entityTypes.length} entity types`;
+  }
+
+  /**
+   * Delete a context and its database
+   */
+  public deleteContext(name: string, force: boolean = false): string {
+    const contextName = name.toLowerCase();
+
+    if (!this.databases.has(contextName)) {
+      throw new Error(`Context '${contextName}' does not exist`);
+    }
+
+    if (contextName === this._currentContext) {
+      throw new Error(`Cannot delete current context '${contextName}'. Switch to another context first.`);
+    }
+
+    const db = this.databases.get(contextName)!;
+    const stats = db.getStats();
+
+    if (!force && stats.totalEntities > 0) {
+      throw new Error(
+        `Context '${contextName}' contains ${stats.totalEntities} entities. Use force=true to delete anyway.`
+      );
+    }
+
+    // Close database
+    db.close();
+
+    // Remove from configuration
+    delete this.config.databases[contextName];
+
+    // Remove from databases map
+    this.databases.delete(contextName);
+
+    // Remove entity mappings for this context
+    for (const [entityName, context] of this.entityContextMap.entries()) {
+      if (context === contextName) {
+        this.entityContextMap.delete(entityName);
+      }
+    }
+
+    // Update confidence scorer
+    this.updateConfidenceScorer();
+
+    // Save updated configuration
+    this.saveContextConfig(this.config);
+
+    logInfo('Deleted context', {
+      name: contextName,
+      entitiesRemoved: stats.totalEntities,
+      relationsRemoved: stats.totalRelations,
+    });
+
+    return `Deleted context '${contextName}' and removed ${stats.totalEntities} entities`;
+  }
+
+  /**
+   * Update context configuration
+   */
+  public updateContext(
+    name: string,
+    updates: {
+      patterns?: string[];
+      entityTypes?: string[];
+      description?: string;
+    }
+  ): string {
+    const contextName = name.toLowerCase();
+
+    if (!this.databases.has(contextName)) {
+      throw new Error(`Context '${contextName}' does not exist`);
+    }
+
+    const contextConfig = this.config.databases[contextName];
+
+    if (updates.patterns) {
+      contextConfig.patterns = updates.patterns;
+    }
+
+    if (updates.entityTypes) {
+      contextConfig.entityTypes = updates.entityTypes;
+    }
+
+    // Update confidence scorer
+    this.updateConfidenceScorer();
+
+    // Save updated configuration
+    this.saveContextConfig(this.config);
+
+    logInfo('Updated context configuration', {
+      name: contextName,
+      updates,
+    });
+
+    return `Updated context '${contextName}' configuration`;
+  }
+
+  /**
+   * Get list of all available contexts
+   */
+  public listContexts(): Array<{
+    name: string;
+    path: string;
+    patterns: string[];
+    entityTypes: string[];
+    entityCount: number;
+    relationCount: number;
+    isCurrent: boolean;
+  }> {
+    const contexts = [];
+
+    for (const [name, db] of this.databases) {
+      const stats = db.getStats();
+      const config = this.config.databases[name];
+
+      contexts.push({
+        name,
+        path: config.path,
+        patterns: config.patterns,
+        entityTypes: config.entityTypes,
+        entityCount: stats.totalEntities,
+        relationCount: stats.totalRelations,
+        isCurrent: name === this._currentContext,
+      });
+    }
+
+    return contexts.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /**
+   * Update confidence scorer with current context configuration
+   */
+  private updateConfidenceScorer(): void {
+    const scorerConfigs: Record<string, any> = {};
+    for (const [context, dbConfig] of Object.entries(this.config.databases)) {
+      scorerConfigs[context] = {
+        enabled: true,
+        dbPath: dbConfig.path,
+        patterns: dbConfig.patterns,
+        entityTypes: dbConfig.entityTypes,
+        autoDetect: this.config.autoDetect,
+      };
+    }
+
+    this.confidenceScorer = new ContextConfidenceScorer(scorerConfigs, this.entityContextMap);
   }
 
   public createEntities(entities: CreateEntityInput[], context?: string): EntityResult[] {

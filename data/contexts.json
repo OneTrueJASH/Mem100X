@@ -1,0 +1,56 @@
+{
+  "databases": {
+    "personal": {
+      "path": "./data/personal.db",
+      "patterns": [
+        "personal",
+        "family",
+        "health",
+        "hobby"
+      ],
+      "entityTypes": [
+        "person",
+        "family_member",
+        "friend"
+      ]
+    },
+    "work": {
+      "path": "./data/work.db",
+      "patterns": [
+        "work",
+        "project",
+        "colleague",
+        "meeting"
+      ],
+      "entityTypes": [
+        "project",
+        "company",
+        "colleague"
+      ]
+    },
+    "test-project": {
+      "path": "data/test-project.db",
+      "patterns": [
+        "test",
+        "project",
+        "experiment",
+        "development"
+      ],
+      "entityTypes": [
+        "test_case",
+        "feature",
+        "bug",
+        "requirement"
+      ]
+    }
+  },
+  "defaultContext": "personal",
+  "autoDetect": true,
+  "detectionSettings": {
+    "entityWeight": 0.4,
+    "typeWeight": 0.25,
+    "patternWeight": 0.15,
+    "relationWeight": 0.1,
+    "existingEntityWeight": 0.1
+  }
+}

@@ -22,6 +22,7 @@ import { formatErrorForUser } from './utils/error-messages.js';
 import { validateToolInput } from './utils/input-validation.js'
 import { validateDestructiveOperation } from './utils/destructive-ops.js'
 import { createRateLimiters, getRateLimiterForTool } from './utils/rate-limiter.js'
+import * as fs from 'fs';
 
 export async function main() {
   logInfo('Starting Mem100x Multi-Context MCP server...');
@@ -177,6 +178,11 @@ export async function main() {
 
         requestSuccess = true;
 
+        // General debug print for all tool calls
+        fs.appendFileSync('debug-server-multi.log',
+          `DEBUG: tool name: ${name}\n` +
+          'DEBUG: result: ' + JSON.stringify(result, null, 2) + '\n'
+        );
         // Extract content and structuredContent from the result
         // Handle case where result might be undefined
         if (!result) {
@@ -206,16 +212,28 @@ export async function main() {
           if (Array.isArray(result)) {
             structuredContent = { items: result };
           } else if (typeof result === 'object' && result !== null) {
-            // Check if any properties are arrays and wrap them
-            const processed: any = {};
-            for (const [key, value] of Object.entries(result)) {
-              if (Array.isArray(value)) {
-                processed[key] = { items: value };
-              } else {
-                processed[key] = value;
-              }
+            // Debug print for result shape
+            if (name === 'search_nodes') {
+              fs.appendFileSync('debug-server-multi.log',
+                'DEBUG: server-multi.ts result for search_nodes: ' + JSON.stringify(result, null, 2) + '\n' +
+                'DEBUG: typeof result.entities: ' + typeof result.entities + ' ' + Array.isArray(result.entities) + '\n'
+              );
             }
-            structuredContent = processed;
+            // Special-case: if this is a search_nodes or similar result, return arrays directly
+            if (result.entities && Array.isArray(result.entities)) {
+              structuredContent = result;
+            } else {
+              // Check if any properties are arrays and wrap them
+              const processed: any = {};
+              for (const [key, value] of Object.entries(result)) {
+                if (Array.isArray(value)) {
+                  processed[key] = { items: value };
+                } else {
+                  processed[key] = value;
+                }
+              }
+              structuredContent = processed;
+            }
           } else {
             structuredContent = { value: result };
           }

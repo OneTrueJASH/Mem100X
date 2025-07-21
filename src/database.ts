@@ -119,8 +119,54 @@ export class MemoryDatabase {
   constructor(dbPath: string) {
     this.dbPath = dbPath;
 
-    // Initialize memory aging system
-    this.memoryAging = new MemoryAgingSystem(MEMORY_AGING_PRESETS.BALANCED);
+    // Initialize memory aging system based on configuration
+    if (config.memoryAging.enabled) {
+      let agingConfig;
+
+      // Use preset configuration
+      switch (config.memoryAging.preset) {
+        case 'conservative':
+          agingConfig = MEMORY_AGING_PRESETS.CONSERVATIVE;
+          break;
+        case 'aggressive':
+          agingConfig = MEMORY_AGING_PRESETS.AGGRESSIVE;
+          break;
+        case 'work_focused':
+          agingConfig = MEMORY_AGING_PRESETS.WORK_FOCUSED;
+          break;
+        case 'personal_focused':
+          agingConfig = MEMORY_AGING_PRESETS.PERSONAL_FOCUSED;
+          break;
+        case 'balanced':
+        default:
+          agingConfig = MEMORY_AGING_PRESETS.BALANCED;
+          break;
+      }
+
+      // Override with custom config if provided
+      if (config.memoryAging.customConfig) {
+        agingConfig = { ...agingConfig, ...config.memoryAging.customConfig };
+      }
+
+      this.memoryAging = new MemoryAgingSystem(agingConfig);
+      logInfo('Memory aging system initialized', {
+        preset: config.memoryAging.preset,
+        enabled: true
+      });
+    } else {
+      // Create a no-op memory aging system when disabled
+      this.memoryAging = new MemoryAgingSystem({
+        baseDecayRate: 0,
+        recencyBoostFactor: 0,
+        frequencyBoostFactor: 0,
+        halfLifeDays: 999999,
+        minProminenceThreshold: 0,
+        maxProminence: 1.0,
+        agingIntervalHours: 999999,
+        importanceWeightMultiplier: 1.0,
+      });
+      logInfo('Memory aging system disabled');
+    }
 
     // Initialize privacy and security system
     this.privacySecurity = new PrivacySecurityManager(config.privacy);
@@ -202,18 +248,21 @@ export class MemoryDatabase {
 
   private prepareStatements(): void {
     this.statements.createEntity = this.db.prepare(`
-      INSERT INTO entities (name, entity_type, observations)
-      VALUES (?, ?, ?)
+      INSERT INTO entities (name, entity_type, observations, last_accessed, updated_at, access_count, prominence_score)
+      VALUES (?, ?, ?, COALESCE(?, julianday('now')), COALESCE(?, julianday('now')), COALESCE(?, 0), COALESCE(?, 1.0))
       ON CONFLICT(name) DO UPDATE SET
         entity_type = excluded.entity_type,
         observations = excluded.observations,
-        updated_at = julianday('now')
+        last_accessed = excluded.last_accessed,
+        updated_at = excluded.updated_at,
+        access_count = excluded.access_count,
+        prominence_score = excluded.prominence_score
     `);
 
     // Fast insert without conflict handling for new entities
     this.statements.createEntityFast = this.db.prepare(`
-      INSERT INTO entities (name, entity_type, observations, created_at, updated_at)
-      VALUES (?, ?, ?, julianday('now'), julianday('now'))
+      INSERT INTO entities (name, entity_type, observations, created_at, updated_at, last_accessed, access_count, prominence_score)
+      VALUES (?, ?, ?, julianday('now'), julianday('now'), COALESCE(?, julianday('now')), COALESCE(?, 0), COALESCE(?, 1.0))
     `);
 
     this.statements.getEntity = this.db.prepare('SELECT * FROM entities WHERE name = ?');
@@ -396,7 +445,15 @@ export class MemoryDatabase {
           ? CompressionUtils.compressObservations(entity.observations)
           : stringifyObservations(entity.observations);
 
-        this.statements.createEntity!.run(entity.name, entity.entityType, observationsData);
+        this.statements.createEntity!.run(
+          entity.name,
+          entity.entityType,
+          observationsData,
+          entity.last_accessed,
+          entity.updated_at,
+          entity.access_count,
+          entity.prominence_score
+        );
 
         const result: EntityResult = {
           type: 'entity',
@@ -455,7 +512,14 @@ export class MemoryDatabase {
     if (!exists) {
       try {
         // Use fast insert without ON CONFLICT
-        this.statements.createEntityFast!.run(entity.name, entity.entityType, observationsData);
+        this.statements.createEntityFast!.run(
+          entity.name,
+          entity.entityType,
+          observationsData,
+          entity.last_accessed,
+          entity.access_count,
+          entity.prominence_score
+        );
 
         const result: EntityResult = {
           type: 'entity',
@@ -489,7 +553,15 @@ export class MemoryDatabase {
     this.db.exec('BEGIN DEFERRED');
 
     try {
-      this.statements.createEntity!.run(entity.name, entity.entityType, observationsData);
+      this.statements.createEntity!.run(
+        entity.name,
+        entity.entityType,
+        observationsData,
+        entity.last_accessed,
+        entity.updated_at,
+        entity.access_count,
+        entity.prominence_score
+      );
       this.db.exec('COMMIT');
 
       const result: EntityResult = {
@@ -702,14 +774,14 @@ export class MemoryDatabase {
         for (let i = 0; i < entities.length; i += batchSize) {
           const batch = preparedData.slice(i, i + batchSize);
           const placeholders = batch
-            .map(() => "(?, ?, ?, julianday('now'), julianday('now'))")
+            .map(() => "(?, ?, ?, julianday('now'), julianday('now'), julianday('now'), 0, 1.0)")
             .join(',');
           const values = batch.flatMap((e) => [e.name, e.entityType, e.observationsData]);
 
           // Execute bulk insert for this batch
           this.db
             .prepare(
-              `INSERT OR IGNORE INTO entities (name, entity_type, observations, created_at, updated_at)
+              `INSERT OR IGNORE INTO entities (name, entity_type, observations, created_at, updated_at, last_accessed, access_count, prominence_score)
              VALUES ${placeholders}`
             )
             .run(...values);
@@ -922,7 +994,13 @@ export class MemoryDatabase {
 
     // Check cache first
     const cached = this.entityCache.get(lowerName);
-    if (cached) return cached;
+    if (cached) {
+      // Track access even for cached entities when memory aging is enabled
+      if (config.memoryAging.enabled) {
+        this.updateEntityAccess(name);
+      }
+      return cached;
+    }
 
     // Check bloom filter
     if (!this.entityBloom.contains(lowerName)) return undefined;
@@ -942,6 +1020,12 @@ export class MemoryDatabase {
 
     // Cache the result
     this.entityCache.set(lowerName, entity);
+
+    // Track access when memory aging is enabled
+    if (config.memoryAging.enabled) {
+      this.updateEntityAccess(name);
+    }
+
     return entity;
   }
 
@@ -970,6 +1054,9 @@ export class MemoryDatabase {
     }
 
     const ftsQuery = buildFTSQuery(searchQuery);
+
+    // Debug: log the FTS query string and original query
+    process.stderr.write(`DEBUG: FTS search - original query: ${query}, ftsQuery: ${ftsQuery}\n`);
 
     // Use read pool if available for better concurrency
     const executeSearch = async () => {
@@ -1104,6 +1191,9 @@ export class MemoryDatabase {
       }
     }
 
+    // Debug: log the FTS raw rows
+    process.stderr.write(`DEBUG: FTS raw rows: ${JSON.stringify(rows, null, 2)}\n`);
+
     // Convert rows to entities with enhanced relevance scoring
     const searchResults = rows.map((row) => {
       const entity = {
@@ -1115,16 +1205,41 @@ export class MemoryDatabase {
           : parseObservations(row.observations),
       };
 
-      const relevance = calculateRelevance(row, searchQuery, row.fts_rank || 0, searchContext);
-      const highlights = generateHighlights(row, searchQuery, searchContext);
-      const matchType = determineMatchType(row, searchQuery);
+      // --- Advanced content type filtering ---
+      let matchesContentType = true;
+      // Ensure observations is always an array
+      let observations = entity.observations;
+      if (!Array.isArray(observations)) {
+        try {
+          observations = JSON.parse(observations);
+        } catch {
+          observations = [];
+        }
+      }
+      if (contentTypes && contentTypes.length > 0) {
+        // Only consider allowed types (exclude 'resource_link')
+        const allowedTypes = ['text', 'image', 'audio', 'resource'];
+        matchesContentType = observations.some((obs: any) =>
+          allowedTypes.includes(obs.type) && contentTypes.includes(obs.type as any)
+        );
+      }
+
+      // Centralized contextual, recency, usage, and intent boosting in calculateRelevance
+      const baseRelevance = calculateRelevance({ ...row, observations }, searchQuery, row.fts_rank || 0, searchContext, intent);
+      const highlights = generateHighlights({ ...row, observations }, searchQuery, searchContext);
+      const matchType = determineMatchType({ ...row, observations }, searchQuery);
+      const rankingExplanation = generateRankingExplanation({ ...row, observations }, searchQuery, searchContext, intent, matchesContentType, contentTypes);
 
       return {
-        entity,
-        relevance,
+        entity: {
+          ...entity,
+          observations, // always an array
+        },
+        relevance: baseRelevance * (matchesContentType ? 1 : 0),
         highlights,
         matchType,
-        score: relevance, // Add score property for compatibility
+        score: baseRelevance * (matchesContentType ? 1 : 0),
+        rankingExplanation,
       };
     });
 
@@ -1136,7 +1251,13 @@ export class MemoryDatabase {
     });
 
     // Extract entities for final result
-    const entities: EntityResult[] = filteredResults.map(result => result.entity);
+    const entities: EntityResult[] = filteredResults.map(result => ({
+      ...(result.entity as any),
+      rankingExplanation: (result as any).rankingExplanation
+    }));
+
+    // Debug: log the filtered entities
+    process.stderr.write(`DEBUG: Filtered search entities: ${JSON.stringify(entities, null, 2)}\n`);
 
     // Update entity cache
     entities.forEach((entity) => this.entityCache.set(entity.name.toLowerCase(), entity));
@@ -1145,6 +1266,7 @@ export class MemoryDatabase {
     const entityNames = entities.map((e) => e.name);
     const relations = entityNames.length > 0 ? this.getRelationsForEntities(entityNames) : [];
 
+    // Return entities as a direct array, not as { items: [] }
     const result = { entities, relations };
     this.searchCache.set(cacheKey, result);
     return result;
@@ -1969,6 +2091,11 @@ export class MemoryDatabase {
    * Update entity access tracking and recalculate prominence
    */
   updateEntityAccess(entityName: string): void {
+    // Skip if memory aging is disabled
+    if (!config.memoryAging.enabled) {
+      return;
+    }
+
     const entity = this.getEntity(entityName);
     if (!entity) return;
 
@@ -2006,6 +2133,11 @@ export class MemoryDatabase {
   searchNodesWithAging(options: SearchOptions): GraphResult {
     const baseResults = this.searchNodes(options);
 
+    // Skip aging-aware boost if memory aging is disabled
+    if (!config.memoryAging.enabled) {
+      return baseResults;
+    }
+
     // Apply aging-aware boost to search results
     const boostedResults = baseResults.entities.map(entity => {
       const row = this.db.prepare(`
@@ -2040,6 +2172,11 @@ export class MemoryDatabase {
    * Run memory aging calculations for all entities
    */
   runMemoryAging(): void {
+    // Skip if memory aging is disabled
+    if (!config.memoryAging.enabled) {
+      return;
+    }
+
     if (!this.memoryAging.shouldRunAging()) {
       return;
     }
@@ -2409,4 +2546,29 @@ export class MemoryDatabase {
   shutdownPrivacySystem(): void {
     this.privacySecurity.shutdown();
   }
+}
+
+// Helper to generate ranking explanations for transparency/debugging
+function generateRankingExplanation(
+  row: any,
+  searchQuery: any,
+  searchContext: any,
+  intent: 'find' | 'browse' | 'explore' | 'verify' | undefined,
+  matchesContentType: boolean,
+  contentTypes: string[] | undefined
+): string {
+  const explanations: string[] = [];
+  if (searchContext?.currentEntities?.includes(row.name)) explanations.push('Boost: current entity context');
+  if (searchContext?.recentSearches?.some((q: string) => row.name.toLowerCase().includes(q.toLowerCase()))) explanations.push('Boost: recent search match');
+  if (searchContext?.userContext && row.entity_type && row.entity_type.toLowerCase().includes(searchContext.userContext)) explanations.push(`Boost: userContext (${searchContext.userContext})`);
+  if (searchContext?.conversationContext && (row.name.toLowerCase().includes(searchContext.conversationContext.toLowerCase()) || (row.observations && row.observations.some((obs: any) => obs.type === 'text' && typeof obs.text === 'string' && obs.text.toLowerCase().includes((searchContext.conversationContext ?? '').toLowerCase()))))) explanations.push('Boost: conversation context');
+  if ('last_accessed' in row && typeof row.last_accessed === 'number') explanations.push('Boost: recency (last_accessed)');
+  if ('updated_at' in row && typeof row.updated_at === 'number') explanations.push('Boost: recency (updated_at)');
+  if ('access_count' in row && typeof row.access_count === 'number') explanations.push('Boost: usage (access_count)');
+  if ('prominence_score' in row && typeof row.prominence_score === 'number') explanations.push('Boost: usage (prominence_score)');
+  if (intent) explanations.push(`Boost: intent (${intent})`);
+  if (contentTypes && matchesContentType) explanations.push('Boost: content type match');
+  if (!matchesContentType) explanations.push('Filtered: content type mismatch');
+  if (explanations.length === 0) return 'No special boosts applied.';
+  return explanations.join('; ');
 }

@@ -11,6 +11,7 @@ export const DESTRUCTIVE_OPERATIONS = [
   'delete_relations',
   'delete_observations',
   'rollback_transaction',
+  'delete_context',
 ];
 
 /**
