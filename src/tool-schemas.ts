@@ -75,9 +75,9 @@ export const toolSchemas = {
   // Context management
   set_context: z.object({
     context: z.string().min(1, 'Context name cannot be empty'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
-  get_context_info: z.object({}),
+  get_context_info: z.object({}).extend({ _meta: z.any().optional() }),
 
   create_context: z.object({
     name: z.string().min(1, 'Context name cannot be empty').regex(/^[a-z0-9_-]+$/, 'Context name must contain only lowercase letters, numbers, hyphens, and underscores'),
@@ -85,27 +85,27 @@ export const toolSchemas = {
     patterns: z.array(z.string()).optional().describe('Patterns to match for automatic context detection'),
     entityTypes: z.array(z.string()).optional().describe('Entity types commonly found in this context'),
     description: z.string().optional().describe('Human-readable description of the context'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   delete_context: z.object({
     name: z.string().min(1, 'Context name cannot be empty'),
     force: z.boolean().default(false).describe('Force deletion even if context contains entities'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   update_context: z.object({
     name: z.string().min(1, 'Context name cannot be empty'),
     patterns: z.array(z.string()).optional().describe('New patterns for context detection'),
     entityTypes: z.array(z.string()).optional().describe('New entity types for this context'),
     description: z.string().optional().describe('Updated description of the context'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
-  list_contexts: z.object({}),
+  list_contexts: z.object({}).extend({ _meta: z.any().optional() }),
 
   // Entity operations
   create_entities: z.object({
     entities: z.array(EntitySchema).min(1, 'At least one entity is required'),
     context: z.string().optional(),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   search_nodes: z.object({
     query: z.string().min(1, 'Search query cannot be empty'),
@@ -121,7 +121,7 @@ export const toolSchemas = {
       userContext: z.enum(['work', 'personal', 'neutral']).optional(),
       conversationContext: z.string().optional(),
     }).optional(),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   search_nodes_context_aware: z.object({
     query: z.string().min(1, 'Search query cannot be empty'),
@@ -137,50 +137,50 @@ export const toolSchemas = {
       userContext: z.enum(['work', 'personal', 'neutral']).optional(),
       conversationContext: z.string().optional(),
     }).optional(),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   read_graph: z.object({
     limit: z.number().int().positive().optional(),
     offset: z.number().int().min(0).default(0).optional(),
     context: z.string().optional(),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   open_nodes: z.object({
     names: z.array(z.string()).min(1, 'At least one entity name is required'),
     context: z.string().optional(),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   // Relation operations
   create_relations: z.object({
     relations: z.array(RelationSchema).min(1, 'At least one relation is required'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   delete_relations: z.object({
     relations: z.array(RelationSchema).min(1, 'At least one relation is required'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   // Observation operations
   add_observations: z.object({
     updates: z.array(ObservationUpdateSchema).min(1, 'At least one observation update is required'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   delete_observations: z.object({
     deletions: z.array(ObservationDeletionSchema).min(1, 'At least one deletion is required'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   // Entity deletion
   delete_entities: z.object({
     entityNames: z.array(z.string()).min(1, 'At least one entity name is required'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   // Transaction management
   begin_transaction: z.object({
     name: z.string().optional().describe('Optional transaction name for debugging'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
-  commit_transaction: z.object({}),
+  commit_transaction: z.object({}).extend({ _meta: z.any().optional() }),
 
-  rollback_transaction: z.object({}),
+  rollback_transaction: z.object({}).extend({ _meta: z.any().optional() }),
 
   // Backup and restore
   create_backup: z.object({
@@ -194,7 +194,7 @@ export const toolSchemas = {
       .string()
       .optional()
       .describe('Specific context to backup. If not provided, backs up current context'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   restore_backup: z.object({
     backupPath: z.string().describe('Path to the backup file to restore'),
@@ -203,7 +203,7 @@ export const toolSchemas = {
       .optional()
       .describe('Context to restore to. If not provided, restores to current context'),
     confirmRestore: z.boolean().describe('Must be true to confirm the restore operation'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   // Graph traversal operations
   get_neighbors: z.object({
@@ -228,7 +228,7 @@ export const toolSchemas = {
       .optional()
       .describe('Include relation details in response'),
     context: z.string().optional().describe('Specific context to search in'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   find_shortest_path: z.object({
     from: z.string().min(1, 'Source entity name is required'),
@@ -247,74 +247,74 @@ export const toolSchemas = {
       .default(6)
       .optional()
       .describe('Maximum depth to search (1-10)'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   // System resilience operations
-  get_resilience_stats: z.object({}),
+  get_resilience_stats: z.object({}).extend({ _meta: z.any().optional() }),
 
   get_transaction_logs: z.object({
     limit: z.number().int().positive().max(1000).default(100).optional(),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
-  get_recovery_actions: z.object({}),
+  get_recovery_actions: z.object({}).extend({ _meta: z.any().optional() }),
 
-  detect_and_repair_corruption: z.object({}),
+  detect_and_repair_corruption: z.object({}).extend({ _meta: z.any().optional() }),
 
   validate_data_integrity: z.object({
     data: z.any().describe('Data to validate'),
     expectedChecksum: z.string().optional().describe('Expected checksum for validation'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   clear_old_transaction_logs: z.object({
     olderThanDays: z.number().int().positive().max(365).default(30).optional(),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   create_resilient_backup: z.object({
     backupPath: z.string().describe('Path for the resilient backup file'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   // Privacy and security tools
-  get_privacy_stats: z.object({}),
-  get_privacy_config: z.object({}),
+  get_privacy_stats: z.object({}).extend({ _meta: z.any().optional() }),
+  get_privacy_config: z.object({}).extend({ _meta: z.any().optional() }),
   update_privacy_config: z.object({
     config: z.record(z.any()).describe('Privacy configuration to update'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
   check_access: z.object({
     userId: z.string().describe('User ID to check access for'),
     operation: z.string().describe('Operation to check access for'),
     context: z.string().describe('Context to check access in'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
   set_access_control: z.object({
     userId: z.string().describe('User ID to set access control for'),
     permissions: z.array(z.string()).describe('Permissions to grant'),
     contexts: z.array(z.string()).describe('Contexts to grant access to'),
     expiresAt: z.string().optional().describe('Expiration date (ISO string)'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
   remove_access_control: z.object({
     userId: z.string().describe('User ID to remove access control for'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
   unlock_account: z.object({
     userId: z.string().describe('User ID to unlock'),
-  }),
-  check_compliance: z.object({}),
-  apply_retention_policy: z.object({}),
-  cleanup_audit_logs: z.object({}),
+  }).extend({ _meta: z.any().optional() }),
+  check_compliance: z.object({}).extend({ _meta: z.any().optional() }),
+  apply_retention_policy: z.object({}).extend({ _meta: z.any().optional() }),
+  cleanup_audit_logs: z.object({}).extend({ _meta: z.any().optional() }),
   encrypt_data: z.object({
     data: z.string().describe('Data to encrypt'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
   decrypt_data: z.object({
     encryptedData: z.string().describe('Encrypted data to decrypt'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
   anonymize_data: z.object({
     data: z.any().describe('Data to anonymize'),
     level: z.enum(['none', 'partial', 'full']).default('partial').optional().describe('Anonymization level'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
   validate_input: z.object({
     data: z.any().describe('Data to validate'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
   sanitize_output: z.object({
     data: z.any().describe('Data to sanitize'),
-  }),
+  }).extend({ _meta: z.any().optional() }),
 
   search_related_entities: z.object({
     entityName: z.string().min(1, 'Entity name is required'),
@@ -326,7 +326,12 @@ export const toolSchemas = {
       userContext: z.enum(['work', 'personal', 'neutral']).optional(),
       conversationContext: z.string().optional(),
     }).optional(),
-  }),
+  }).extend({ _meta: z.any().optional() }),
+
+  list_files: z.object({
+    path: z.string().optional().describe('Directory path to list files from (default: workspace root)'),
+    pattern: z.string().optional().describe('Optional glob or substring pattern to filter files'),
+  }).extend({ _meta: z.any().optional() }),
 };
 
 // Type exports for use in handlers

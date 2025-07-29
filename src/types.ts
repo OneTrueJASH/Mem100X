@@ -261,3 +261,147 @@ export enum ErrorCode {
   NotFound = 'not_found',
   PermissionDenied = 'permission_denied'
 }
+
+// Memory Export/Import Types
+export interface MemoryExport {
+  version: string;
+  exportDate: string;
+  sourceServer: string;
+  sourceVersion: string;
+  metadata: {
+    totalEntities: number;
+    totalRelations: number;
+    totalObservations: number;
+    contexts: string[];
+    entityTypes: string[];
+    relationTypes: string[];
+    dateRange?: {
+      from: string;
+      to: string;
+    };
+  };
+  contexts: Record<string, ContextExport>;
+  checksum: string;
+}
+
+export interface ContextExport {
+  name: string;
+  entities: EntityExport[];
+  relations: RelationExport[];
+  metadata: {
+    entityCount: number;
+    relationCount: number;
+    observationCount: number;
+  };
+}
+
+export interface EntityExport {
+  id?: string;
+  name: string;
+  entityType: string;
+  content: RichContent[];
+  metadata?: {
+    createdAt?: string;
+    updatedAt?: string;
+    prominence?: number;
+    accessCount?: number;
+    lastAccessed?: string;
+  };
+}
+
+export interface RelationExport {
+  id?: string;
+  from: string;
+  to: string;
+  relationType: string;
+  metadata?: {
+    createdAt?: string;
+    strength?: number;
+  };
+}
+
+export interface ImportOptions {
+  context?: string;
+  importMode: 'merge' | 'replace' | 'update' | 'append';
+  conflictResolution: 'skip' | 'overwrite' | 'rename' | 'merge';
+  validateBeforeImport: boolean;
+  dryRun: boolean;
+  sourceVersion?: string;
+  sourceServer?: string;
+  migrationOptions?: MigrationOptions;
+  batchSize: number;
+  progressCallback: boolean;
+}
+
+export interface MigrationOptions {
+  preserveIds?: boolean;
+  updateTimestamps?: boolean;
+  remapEntityTypes?: Record<string, string>;
+  remapRelationTypes?: Record<string, string>;
+  filterContent?: {
+    includeText: boolean;
+    includeImages: boolean;
+    includeAudio: boolean;
+    includeResources: boolean;
+  };
+}
+
+export interface ImportResult {
+  success: boolean;
+  summary: {
+    entitiesImported: number;
+    entitiesSkipped: number;
+    entitiesUpdated: number;
+    relationsImported: number;
+    relationsSkipped: number;
+    observationsImported: number;
+    contextsCreated: number;
+    errors: ImportError[];
+  };
+  details: {
+    entityMapping: Record<string, string>;
+    relationMapping: Record<string, string>;
+    contextMapping: Record<string, string>;
+  };
+  warnings: string[];
+  duration: number;
+}
+
+export interface ImportError {
+  type: 'entity' | 'relation' | 'observation' | 'context' | 'validation';
+  message: string;
+  data?: any;
+  entityName?: string;
+  relationId?: string;
+}
+
+export interface ExportOptions {
+  context?: string;
+  format: 'json' | 'jsonl' | 'compressed';
+  includeMetadata: boolean;
+  includeObservations: boolean;
+  includeRelations: boolean;
+  filterByDate?: {
+    from: string;
+    to: string;
+  };
+  filterByEntityType?: string[];
+  exportVersion: string;
+  targetServer?: string;
+  compressionLevel: number;
+}
+
+export interface ExportResult {
+  success: boolean;
+  data: MemoryExport;
+  summary: {
+    totalEntities: number;
+    totalRelations: number;
+    totalObservations: number;
+    contexts: string[];
+    size: number;
+    compressionRatio?: number;
+  };
+  duration: number;
+  warnings: string[];
+}

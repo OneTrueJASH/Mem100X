@@ -18,6 +18,7 @@ The dynamic context creation system extends the existing `MultiDatabaseManager` 
 ### 2. New Methods in MultiDatabaseManager
 
 #### `createContext(name, options)`
+
 Creates a new memory context with the specified configuration:
 
 ```typescript
@@ -33,6 +34,7 @@ createContext(
 ```
 
 **Parameters:**
+
 - `name`: Context name (lowercase letters, numbers, hyphens, underscores only)
 - `path`: Optional custom database path
 - `patterns`: Patterns for automatic context detection
@@ -42,6 +44,7 @@ createContext(
 **Returns:** Success message with context details
 
 #### `deleteContext(name, force)`
+
 Deletes a context and its associated database:
 
 ```typescript
@@ -49,15 +52,18 @@ deleteContext(name: string, force: boolean = false): string
 ```
 
 **Parameters:**
+
 - `name`: Context name to delete
 - `force`: Force deletion even if context contains entities
 
 **Safety Features:**
+
 - Cannot delete current context (must switch first)
 - Requires confirmation for contexts with entities
 - Properly closes database connections
 
 #### `updateContext(name, updates)`
+
 Updates the configuration of an existing context:
 
 ```typescript
@@ -72,6 +78,7 @@ updateContext(
 ```
 
 #### `listContexts()`
+
 Returns detailed information about all available contexts:
 
 ```typescript
@@ -98,6 +105,7 @@ listContexts(): Array<{
 #### Tool Schemas
 
 All new tools include proper validation:
+
 - Context name validation (lowercase, alphanumeric, hyphens, underscores)
 - Required confirmation for destructive operations
 - Comprehensive error handling
@@ -133,16 +141,19 @@ Context configurations are automatically saved to `data/contexts.json`:
 ### 5. Safety Features
 
 #### Destructive Operation Protection
+
 - `delete_context` requires explicit confirmation (`force: true`)
 - Cannot delete current context (must switch first)
 - Validation prevents deletion of contexts with entities unless forced
 
 #### Data Integrity
+
 - Automatic database directory creation
 - Proper connection cleanup
 - Transaction safety during context operations
 
 #### Error Handling
+
 - Comprehensive validation of context names
 - Graceful handling of missing configuration files
 - Clear error messages for all failure cases
@@ -150,6 +161,7 @@ Context configurations are automatically saved to `data/contexts.json`:
 ### 6. Usage Examples
 
 #### Creating a Project Context
+
 ```json
 {
   "name": "my-project",
@@ -160,6 +172,7 @@ Context configurations are automatically saved to `data/contexts.json`:
 ```
 
 #### Creating a Study Context
+
 ```json
 {
   "name": "study-notes",
@@ -170,6 +183,7 @@ Context configurations are automatically saved to `data/contexts.json`:
 ```
 
 #### Creating a Hobby Context
+
 ```json
 {
   "name": "photography",
@@ -189,16 +203,19 @@ Context configurations are automatically saved to `data/contexts.json`:
 ### 8. Integration with Existing Features
 
 #### Context Detection
+
 - New contexts automatically participate in context detection
 - Confidence scoring includes patterns and entity types from new contexts
 - Seamless integration with existing personal/work contexts
 
 #### Search and Retrieval
+
 - All existing search functionality works with new contexts
 - Cross-context search capabilities maintained
 - Context-aware search enhancements apply to all contexts
 
 #### Memory Aging
+
 - Memory aging system works across all contexts
 - Each context maintains its own aging statistics
 - Prominence scoring is context-aware
@@ -215,8 +232,9 @@ Context configurations are automatically saved to `data/contexts.json`:
 ## Future Enhancements
 
 Potential future improvements:
+
 - Context templates for common use cases
 - Context sharing and collaboration features
 - Advanced context merging and splitting
 - Context-specific privacy and security settings
-- Context backup and restore functionality 
+- Context backup and restore functionality

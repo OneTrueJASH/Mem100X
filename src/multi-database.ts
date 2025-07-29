@@ -130,7 +130,20 @@ export class MultiDatabaseManager {
   }
 
   protected initializeDatabases(): void {
+    // Warn users if they're using default database paths (potentially ephemeral)
+    const defaultPersonalPath = './data/personal.db';
+    const defaultWorkPath = './data/work.db';
+
     for (const [context, dbConfig] of Object.entries(this.config.databases)) {
+      if (dbConfig.path === defaultPersonalPath || dbConfig.path === defaultWorkPath) {
+        logInfo('⚠️  WARNING: Using default database path for context', {
+          context,
+          path: dbConfig.path,
+          warning: 'This database may be ephemeral and data could be lost. Consider setting custom database paths.',
+          recommendation: `Set MEM100X_PERSONAL_DB_PATH and MEM100X_WORK_DB_PATH environment variables to persistent locations`
+        });
+      }
+
       const db = new MemoryDatabase(dbConfig.path);
       this.databases.set(context, db);
     }

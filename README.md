@@ -86,6 +86,36 @@ Then in Claude:
 - "Store these API keys: production: sk-123, staging: sk-456"
 - "Switch to personal context and remember my mom's birthday is June 15"
 
+## ⚠️ Important: Database Persistence
+
+**By default, Mem100x uses local database files that may be ephemeral depending on your environment.** To ensure your data persists:
+
+### For Single-Context Usage
+
+```bash
+# Set a persistent database path
+export DATABASE_PATH="/path/to/persistent/memory.db"
+```
+
+### For Multi-Context Usage
+
+```bash
+# Set persistent paths for both contexts
+export MEM100X_PERSONAL_DB_PATH="/path/to/persistent/personal.db"
+export MEM100X_WORK_DB_PATH="/path/to/persistent/work.db"
+```
+
+### Docker Users
+
+```bash
+# Mount persistent volumes
+docker run -v /host/path:/app/data mem100x
+```
+
+**Why this matters:** Default database paths (`./data/memory.db`, `./data/personal.db`, `./data/work.db`) may be in temporary directories that get cleared on system restarts or container recreations, causing **permanent data loss**.
+
+The server will log warnings if you're using default paths, but it's your responsibility to configure persistent storage.
+
 ## Installation
 
 ### Option 1: Universal Installer (Recommended)
@@ -306,6 +336,92 @@ Mem100x delivers industry-leading performance validated through comprehensive be
 - `delete_observations` - Remove observations
 - `delete_entities` - Delete entities
 
+### Memory Export/Import
+
+Mem100x supports comprehensive memory export and import with versioning for migration between different versions and MCP servers.
+
+#### Export Memory
+
+Export all entities, relations, and observations as a versioned JSON stream:
+
+```typescript
+// Export all data
+const exportResult = await client.callTool('export_memory', {
+  format: 'json', // or 'compressed' for gzip compression
+  includeMetadata: true,
+  includeObservations: true,
+  includeRelations: true,
+  exportVersion: '3.0.0'
+});
+
+// Export specific context
+const contextExport = await client.callTool('export_memory', {
+  context: 'work',
+  format: 'compressed',
+  compressionLevel: 6
+});
+
+// Export with filters
+const filteredExport = await client.callTool('export_memory', {
+  filterByDate: {
+    from: '2024-01-01T00:00:00Z',
+    to: '2024-12-31T23:59:59Z'
+  },
+  filterByEntityType: ['person', 'project']
+});
+```
+
+#### Import Memory
+
+Import entities, relations, and observations with conflict resolution:
+
+```typescript
+// Import with merge strategy
+const importResult = await client.callTool('import_memory', {
+  data: exportData,
+  importMode: 'merge', // or 'replace', 'update', 'append'
+  conflictResolution: 'merge', // or 'skip', 'overwrite', 'rename'
+  validateBeforeImport: true,
+  dryRun: false
+});
+
+// Import with migration options
+const migrationImport = await client.callTool('import_memory', {
+  data: exportData,
+  sourceVersion: '2.0.0',
+  sourceServer: 'other-mcp-server',
+  migrationOptions: {
+    preserveIds: false,
+    updateTimestamps: true,
+    remapEntityTypes: {
+      'old_type': 'new_type'
+    },
+    filterContent: {
+      includeText: true,
+      includeImages: false
+    }
+  }
+});
+```
+
+#### Export Format
+
+The export format includes:
+
+- **Version information**: Export format version and source server details
+- **Metadata**: Total counts, entity types, relation types, date ranges
+- **Contexts**: All contexts with their entities, relations, and observations
+- **Checksum**: SHA-256 integrity validation
+- **Compression**: Optional gzip compression for large exports
+
+#### Migration Support
+
+- **Version compatibility**: Import from older Mem100x versions
+- **Server migration**: Import from other MCP servers
+- **Conflict resolution**: Multiple strategies for handling duplicates
+- **Data validation**: Integrity checks before import
+- **Dry run mode**: Preview import without making changes
+
 ## MCP Content Block Support
 
 Mem100x fully supports the MCP content block union schema:
@@ -364,14 +480,45 @@ Mem100x provides extensive configuration options for power users:
 ### Quick Configuration
 
 ```bash
+# Generate a fully populated .env file with all default values
+npm run config:generate
+
+# Or print defaults to stdout
+npm run config:print-defaults
+
+# Or use the server directly
+node dist/server-multi.js --print-defaults
+
 # Copy example configuration
 cp env.example .env
 
 # Edit settings
 nano .env
 
-# Validate configuration
+# Validate configuration (detects unknown/deprecated variables)
 npm run config:validate
+```
+
+### Configuration Validation
+
+The validation tool provides comprehensive checks:
+
+- **Unknown Variables**: Detects environment variables not recognized by Mem100x
+- **Deprecated Variables**: Identifies outdated variable names with migration suggestions  
+- **Configuration Issues**: Reports validation errors with helpful tips
+- **Performance Recommendations**: Suggests optimizations based on your settings
+
+Example validation output:
+```bash
+⚠️  Unknown Environment Variables:
+   ❌ UNKNOWN_VAR
+   ❌ CUSTOM_SETTING
+   💡 These variables will be ignored. Consider removing them if not needed.
+
+🔄 Deprecated Environment Variables:
+   ⚠️  PERSONAL_DB_PATH: Use MEM100X_PERSONAL_DB_PATH instead
+   ⚠️  PORT: Use SERVER_PORT instead
+   💡 Please update these variables to their new names.
 ```
 
 ### Key Configuration Options
@@ -385,6 +532,7 @@ npm run config:validate
 ### Configuration Profiles
 
 **High-Performance Profile:**
+
 ```bash
 DATABASE_CACHE_SIZE_MB=1024
 ENTITY_CACHE_SIZE=100000
@@ -394,6 +542,7 @@ BATCH_SIZE=5000
 ```
 
 **Memory-Optimized Profile:**
+
 ```bash
 DATABASE_CACHE_SIZE_MB=64
 ENTITY_CACHE_SIZE=10000
@@ -403,6 +552,7 @@ BATCH_SIZE=100
 ```
 
 **Development Profile:**
+
 ```bash
 LOG_LEVEL=debug
 PROFILING_ENABLED=true
@@ -478,11 +628,14 @@ If you're impressed by the performance (and hopefully you will be!), please star
 - **The LLM compatibility and compliance tests now accept `-32603` (internal error) for method not found, with a warning, as a workaround for this SDK limitation.**
 
 **Workarounds Implemented:**
+
 - The server wraps plain error strings and non-MCP errors as custom error codes (-32001 for validation errors, -32002 for method not found) where possible.
 - Compliance and integration tests accept these custom codes, `-32603`, or plain strings as valid results, with warnings for non-standard codes.
 
 **Expected Resolution:**
+
 - Once the MCP SDK supports global error handling or returns proper MCP error objects for all cases, these workarounds can be removed and strict compliance with standard error codes will be restored.
 
 **Impact:**
+
 - All other tool responses and error cases are fully MCP-compliant. This limitation only affects certain invalid input and unknown tool cases at the protocol boundary.

@@ -38,6 +38,9 @@ const configSchema = z.object({
     maxBatchSize: z.number().default(5000), // New: maximum batch size
     targetBatchMemoryMb: z.number().default(50), // New: target memory per batch
     profilingEnabled: z.boolean().default(false), // <-- add this line
+    cacheWarmingEnabled: z.boolean().default(true), // New: enable cache warming
+    maxEntitiesToWarm: z.number().default(1000), // New: max entities to warm
+    maxSearchesToWarm: z.number().default(100), // New: max searches to warm
   }),
 
   // Memory Aging Configuration
@@ -174,6 +177,15 @@ function loadConfig() {
       profilingEnabled: process.env.PROFILING_ENABLED
         ? process.env.PROFILING_ENABLED === 'true'
         : undefined,
+      cacheWarmingEnabled: process.env.CACHE_WARMING_ENABLED
+        ? process.env.CACHE_WARMING_ENABLED === 'true'
+        : undefined,
+      maxEntitiesToWarm: process.env.MAX_ENTITIES_TO_WARM
+        ? parseInt(process.env.MAX_ENTITIES_TO_WARM, 10)
+        : undefined,
+      maxSearchesToWarm: process.env.MAX_SEARCHES_TO_WARM
+        ? parseInt(process.env.MAX_SEARCHES_TO_WARM, 10)
+        : undefined,
     },
     memoryAging: {
       enabled: process.env.MEMORY_AGING_ENABLED
@@ -301,3 +313,224 @@ export const config = loadConfig();
 
 // Export for testing
 export { configSchema, loadConfig };
+
+// Generate a fully populated .env file with all default values
+export function generateEnvFile(): string {
+  return `# Mem100x Configuration - Auto-generated with default values
+# Generated on: ${new Date().toISOString()}
+# Copy this file to .env and customize the settings for your environment
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database file path (default: ./data/memory.db)
+DATABASE_PATH=./data/memory.db
+
+# SQLite cache size in MB (default: 256)
+# Increase for better performance with large datasets
+DATABASE_CACHE_SIZE_MB=256
+
+# Memory-mapped file size in MB (default: 1024)
+# Increase for better I/O performance
+DATABASE_MMAP_SIZE_MB=1024
+
+# SQLite page size in KB (default: 16)
+# 16KB pages provide optimal I/O performance
+DATABASE_PAGE_SIZE_KB=16
+
+# WAL autocheckpoint frequency (default: 1000)
+# Lower values = more frequent checkpoints, better durability
+DATABASE_WAL_AUTOCHECKPOINT=1000
+
+# Database busy timeout in milliseconds (default: 30000)
+# Increase if you experience "database is locked" errors
+DATABASE_BUSY_TIMEOUT=30000
+
+# =============================================================================
+# PERFORMANCE CONFIGURATION
+# =============================================================================
+
+# Entity cache size (default: 50000)
+# Number of entities to keep in memory cache
+ENTITY_CACHE_SIZE=50000
+
+# Search cache size (default: 10000)
+# Number of search results to cache
+SEARCH_CACHE_SIZE=10000
+
+# Relation query threshold (default: 500)
+# Threshold for using optimized relation queries
+RELATION_QUERY_THRESHOLD=500
+
+# Enable compression for large observations (default: true)
+# Reduces storage size but may impact performance
+COMPRESSION_ENABLED=true
+
+# Cache strategy (default: lru)
+# Options: lru, 2q, arc, radix
+# - lru: Least Recently Used (good general purpose)
+# - 2q: Two-Queue (better for mixed access patterns)
+# - arc: Adaptive Replacement Cache (adaptive to workload)
+# - radix: Radix tree cache (best for large datasets)
+CACHE_STRATEGY=lru
+
+# Enable read connection pool (default: true)
+# Improves concurrent read performance
+USE_READ_POOL=true
+
+# Read pool size (default: 20)
+# Number of database connections in the read pool
+READ_POOL_SIZE=20
+
+# Batch size for bulk operations (default: 1000)
+# Number of operations to batch together
+BATCH_SIZE=1000
+
+# Enable bulk operations (default: true)
+# Use batch processing for better performance
+ENABLE_BULK_OPERATIONS=true
+
+# Enable prepared statements (default: true)
+# Use prepared statements for better performance
+ENABLE_PREPARED_STATEMENTS=true
+
+# Enable dynamic batch sizing (default: true)
+# Automatically adjusts batch sizes based on memory usage
+ENABLE_DYNAMIC_BATCH_SIZING=true
+
+# Maximum batch size (default: 5000)
+# Upper limit for batch operations
+MAX_BATCH_SIZE=5000
+
+# Target memory per batch in MB (default: 50)
+# Memory target for dynamic batch sizing
+TARGET_BATCH_MEMORY_MB=50
+
+# Enable cache warming (default: true)
+# Pre-populates caches on startup to avoid cold stalls
+CACHE_WARMING_ENABLED=true
+
+# Maximum entities to warm (default: 1000)
+# Number of entities to pre-load into cache
+MAX_ENTITIES_TO_WARM=1000
+
+# Maximum searches to warm (default: 100)
+# Number of search queries to pre-execute
+MAX_SEARCHES_TO_WARM=100
+
+# Enable performance profiling (default: false)
+# Log detailed performance metrics
+PROFILING_ENABLED=false
+
+# =============================================================================
+# MEMORY AGING CONFIGURATION
+# =============================================================================
+
+# Enable memory aging (default: true)
+# Set to 'false' to disable memory aging functionality entirely
+# When disabled, all entities maintain equal prominence and no aging occurs
+MEMORY_AGING_ENABLED=true
+
+# Memory aging preset (default: balanced)
+# Options: conservative, balanced, aggressive, work_focused, personal_focused
+# - conservative: Memories last longer (60-day half-life)
+# - balanced: Default human-like behavior (30-day half-life)
+# - aggressive: Memories fade faster (15-day half-life)
+# - work_focused: Work memories last longer (90-day half-life)
+# - personal_focused: Personal memories more prominent (45-day half-life)
+MEMORY_AGING_PRESET=balanced
+
+# Custom memory aging configuration (optional)
+# JSON string with custom aging parameters
+# Example: {"baseDecayRate": 0.05, "halfLifeDays": 60, "maxProminence": 15.0}
+# MEMORY_AGING_CUSTOM_CONFIG={"baseDecayRate": 0.05, "halfLifeDays": 60}
+
+# =============================================================================
+# BLOOM FILTER CONFIGURATION
+# =============================================================================
+
+# Expected number of items in bloom filter (default: 50000)
+# Affects memory usage and false positive rate
+BLOOM_FILTER_EXPECTED_ITEMS=50000
+
+# False positive rate for bloom filter (default: 0.001)
+# Lower values = more memory usage, fewer false positives
+BLOOM_FILTER_FALSE_POSITIVE_RATE=0.001
+
+# =============================================================================
+# MULTI-CONTEXT CONFIGURATION
+# =============================================================================
+
+# Personal database path (default: ./data/personal.db)
+MEM100X_PERSONAL_DB_PATH=./data/personal.db
+
+# Work database path (default: ./data/work.db)
+MEM100X_WORK_DB_PATH=./data/work.db
+
+# Default context (default: personal)
+# Options: personal, work
+DEFAULT_CONTEXT=personal
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log level (default: info)
+# Options: error, warn, info, debug
+# - error: Only errors
+# - warn: Errors and warnings
+# - info: Errors, warnings, and info messages
+# - debug: All messages including debug info
+LOG_LEVEL=info
+
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+
+# Server port (default: 3000)
+# Only used if running in HTTP mode (not MCP stdio mode)
+SERVER_PORT=3000
+
+# Server host (default: localhost)
+# Only used if running in HTTP mode (not MCP stdio mode)
+SERVER_HOST=localhost
+
+# =============================================================================
+# ADVANCED CONFIGURATION
+# =============================================================================
+
+# Disable rate limiting (default: false)
+# Set to 'true' to disable rate limiting (useful for benchmarks)
+DISABLE_RATE_LIMITING=false
+
+# =============================================================================
+# PERFORMANCE TUNING EXAMPLES
+# =============================================================================
+
+# High-performance configuration for large datasets:
+# DATABASE_CACHE_SIZE_MB=1024
+# DATABASE_MMAP_SIZE_MB=4096
+# ENTITY_CACHE_SIZE=100000
+# SEARCH_CACHE_SIZE=50000
+# CACHE_STRATEGY=arc
+# READ_POOL_SIZE=50
+# BATCH_SIZE=5000
+# MAX_BATCH_SIZE=10000
+
+# Memory-optimized configuration for limited resources:
+# DATABASE_CACHE_SIZE_MB=64
+# DATABASE_MMAP_SIZE_MB=256
+# ENTITY_CACHE_SIZE=10000
+# SEARCH_CACHE_SIZE=5000
+# CACHE_STRATEGY=lru
+# READ_POOL_SIZE=5
+# BATCH_SIZE=100
+# MAX_BATCH_SIZE=1000
+
+# Development configuration with detailed logging:
+# LOG_LEVEL=debug
+# PROFILING_ENABLED=true
+# COMPRESSION_ENABLED=false
+`;
+}

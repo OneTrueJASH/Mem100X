@@ -20,9 +20,12 @@
     "benchmark": "node scripts/benchmark.js",
     "benchmark:quick": "node benchmarks/bulk-operations-benchmark.ts",
     "config:validate": "tsx scripts/validate-config.js",
+    "config:generate": "node scripts/generate-env.js",
+    "config:print-defaults": "node scripts/generate-env.js --print-defaults",
     "test:clear-error-messages": "node test-clear-error-messages.js",
     "format": "prettier --write \"src/**/*.ts\" \"benchmark/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"benchmark/**/*.ts\""
+    "format:check": "prettier --check \"src/**/*.ts\" \"benchmark/**/*.ts\"",
+    "generate-api-reference": "node scripts/generate-api-reference.js"
   },
   "keywords": [
     "mcp",
@@ -58,7 +61,7 @@
   ],
   "type": "module",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.15.1",
+    "@modelcontextprotocol/sdk": "^1.16.0",
     "better-sqlite3": "^11.6.0",
     "winston": "^3.17.0",
     "xxhash-wasm": "^1.1.0",

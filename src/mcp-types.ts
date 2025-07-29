@@ -17,6 +17,7 @@ export interface MCPToolDefinition {
     properties: Record<string, any>;
     required?: string[];
   };
+  title?: string;
 }
 
 /**
@@ -151,7 +152,8 @@ export interface ContextDetectionResponse {
  */
 export function createMCPToolResponse(
   structuredContent: any,
-  textContent?: string
+  textContent?: string,
+  meta?: any
 ): MCPToolResponse {
   const content: RichContent[] = [];
 
@@ -185,6 +187,11 @@ export function createMCPToolResponse(
     wrappedStructuredContent = { result: structuredContent };
   } else if (typeof structuredContent !== 'object' || structuredContent === null) {
     wrappedStructuredContent = { value: structuredContent };
+  }
+
+  // Add _meta if provided
+  if (meta !== undefined) {
+    wrappedStructuredContent._meta = meta;
   }
 
   return {

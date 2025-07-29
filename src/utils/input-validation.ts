@@ -31,8 +31,9 @@ export function validateInputSize(input: any, path: string[] = []): void {
   if (typeof input === 'string') {
     if (input.length > INPUT_SIZE_LIMITS.MAX_STRING_LENGTH) {
       throw new McpError(
+        `String at ${currentPath || 'root'} exceeds maximum length of ${INPUT_SIZE_LIMITS.MAX_STRING_LENGTH} characters`,
         ErrorCode.InvalidParams,
-        `String at ${currentPath || 'root'} exceeds maximum length of ${INPUT_SIZE_LIMITS.MAX_STRING_LENGTH} characters`
+        null
       );
     }
     return;
@@ -42,8 +43,9 @@ export function validateInputSize(input: any, path: string[] = []): void {
   if (Array.isArray(input)) {
     if (input.length > INPUT_SIZE_LIMITS.MAX_ARRAY_SIZE) {
       throw new McpError(
+        `Array at ${currentPath || 'root'} exceeds maximum size of ${INPUT_SIZE_LIMITS.MAX_ARRAY_SIZE} items`,
         ErrorCode.InvalidParams,
-        `Array at ${currentPath || 'root'} exceeds maximum size of ${INPUT_SIZE_LIMITS.MAX_ARRAY_SIZE} items`
+        null
       );
     }
 
@@ -59,8 +61,9 @@ export function validateInputSize(input: any, path: string[] = []): void {
     const size = JSON.stringify(input).length;
     if (size > INPUT_SIZE_LIMITS.MAX_TOTAL_REQUEST_SIZE) {
       throw new McpError(
+        `Total request size exceeds maximum of ${INPUT_SIZE_LIMITS.MAX_TOTAL_REQUEST_SIZE} bytes`,
         ErrorCode.InvalidParams,
-        `Total request size exceeds maximum of ${INPUT_SIZE_LIMITS.MAX_TOTAL_REQUEST_SIZE} bytes`
+        null
       );
     }
 
@@ -81,8 +84,9 @@ export function validateContentBlock(content: any, path: string[] = []): void {
     RichContentSchema.parse(content);
   } catch (error) {
     throw new McpError(
+      `Invalid content block at ${currentPath || 'root'}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       ErrorCode.InvalidParams,
-      `Invalid content block at ${currentPath || 'root'}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      null
     );
   }
 
@@ -90,8 +94,9 @@ export function validateContentBlock(content: any, path: string[] = []): void {
   if (content.type === 'text' && content.text) {
     if (content.text.length > INPUT_SIZE_LIMITS.MAX_OBSERVATION_LENGTH) {
       throw new McpError(
+        `Text content at ${currentPath} exceeds maximum length of ${INPUT_SIZE_LIMITS.MAX_OBSERVATION_LENGTH} characters`,
         ErrorCode.InvalidParams,
-        `Text content at ${currentPath} exceeds maximum length of ${INPUT_SIZE_LIMITS.MAX_OBSERVATION_LENGTH} characters`
+        null
       );
     }
   }
@@ -102,8 +107,9 @@ export function validateContentBlock(content: any, path: string[] = []): void {
   ) {
     if (content.data.length > INPUT_SIZE_LIMITS.MAX_BASE64_LENGTH) {
       throw new McpError(
+        `${content.type} content at ${currentPath} exceeds maximum size of ${INPUT_SIZE_LIMITS.MAX_BASE64_LENGTH} bytes`,
         ErrorCode.InvalidParams,
-        `${content.type} content at ${currentPath} exceeds maximum size of ${INPUT_SIZE_LIMITS.MAX_BASE64_LENGTH} bytes`
+        null
       );
     }
   }
@@ -115,14 +121,15 @@ export function validateContentBlock(content: any, path: string[] = []): void {
 export function validateEntityInput(entity: any): void {
   if (entity.name && entity.name.length > INPUT_SIZE_LIMITS.MAX_ENTITY_NAME_LENGTH) {
     throw new McpError(
+      `Entity name exceeds maximum length of ${INPUT_SIZE_LIMITS.MAX_ENTITY_NAME_LENGTH} characters`,
       ErrorCode.InvalidParams,
-      `Entity name exceeds maximum length of ${INPUT_SIZE_LIMITS.MAX_ENTITY_NAME_LENGTH} characters`
+      null
     );
   }
 
   if (entity.observations) {
     if (!Array.isArray(entity.observations)) {
-      throw new McpError(ErrorCode.InvalidParams, 'Entity observations must be an array');
+      throw new McpError(ErrorCode.InvalidParams, 'Entity observations must be an array', null);
     }
 
     entity.observations.forEach((obs: any, index: number) => {
@@ -137,15 +144,17 @@ export function validateEntityInput(entity: any): void {
 export function validateRelationInput(relation: any): void {
   if (relation.from && relation.from.length > INPUT_SIZE_LIMITS.MAX_ENTITY_NAME_LENGTH) {
     throw new McpError(
+      `Relation 'from' exceeds maximum length of ${INPUT_SIZE_LIMITS.MAX_ENTITY_NAME_LENGTH} characters`,
       ErrorCode.InvalidParams,
-      `Relation 'from' exceeds maximum length of ${INPUT_SIZE_LIMITS.MAX_ENTITY_NAME_LENGTH} characters`
+      null
     );
   }
 
   if (relation.to && relation.to.length > INPUT_SIZE_LIMITS.MAX_ENTITY_NAME_LENGTH) {
     throw new McpError(
+      `Relation 'to' exceeds maximum length of ${INPUT_SIZE_LIMITS.MAX_ENTITY_NAME_LENGTH} characters`,
       ErrorCode.InvalidParams,
-      `Relation 'to' exceeds maximum length of ${INPUT_SIZE_LIMITS.MAX_ENTITY_NAME_LENGTH} characters`
+      null
     );
   }
 
@@ -154,8 +163,9 @@ export function validateRelationInput(relation: any): void {
     relation.relationType.length > INPUT_SIZE_LIMITS.MAX_RELATION_TYPE_LENGTH
   ) {
     throw new McpError(
+      `Relation type exceeds maximum length of ${INPUT_SIZE_LIMITS.MAX_RELATION_TYPE_LENGTH} characters`,
       ErrorCode.InvalidParams,
-      `Relation type exceeds maximum length of ${INPUT_SIZE_LIMITS.MAX_RELATION_TYPE_LENGTH} characters`
+      null
     );
   }
 }
@@ -172,7 +182,7 @@ export function validateToolInput(toolName: string, args: any): void {
     case 'create_entities':
       if (args.entities) {
         if (!Array.isArray(args.entities)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Entities must be an array');
+          throw new McpError(ErrorCode.InvalidParams, 'Entities must be an array', null);
         }
         args.entities.forEach((entity: any, index: number) => {
           validateEntityInput(entity);
@@ -183,7 +193,7 @@ export function validateToolInput(toolName: string, args: any): void {
     case 'create_relations':
       if (args.relations) {
         if (!Array.isArray(args.relations)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Relations must be an array');
+          throw new McpError(ErrorCode.InvalidParams, 'Relations must be an array', null);
         }
         args.relations.forEach((relation: any, index: number) => {
           validateRelationInput(relation);
@@ -194,17 +204,18 @@ export function validateToolInput(toolName: string, args: any): void {
     case 'add_observations':
       if (args.observations) {
         if (!Array.isArray(args.observations)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Observations must be an array');
+          throw new McpError(ErrorCode.InvalidParams, 'Observations must be an array', null);
         }
         args.observations.forEach((obs: any, obsIndex: number) => {
           if (obs.entityName && obs.entityName.length > INPUT_SIZE_LIMITS.MAX_ENTITY_NAME_LENGTH) {
-            throw new McpError(ErrorCode.InvalidParams, `Entity name exceeds maximum length`);
+            throw new McpError(ErrorCode.InvalidParams, `Entity name exceeds maximum length`, null);
           }
           if (obs.contents) {
             if (!Array.isArray(obs.contents)) {
               throw new McpError(
                 ErrorCode.InvalidParams,
-                `Contents must be an array for observation at index ${obsIndex}`
+                `Contents must be an array for observation at index ${obsIndex}`,
+                null
               );
             }
             obs.contents.forEach((content: any, contentIndex: number) => {
@@ -223,20 +234,21 @@ export function validateToolInput(toolName: string, args: any): void {
     case 'delete_observations':
       if (args.deletions) {
         if (!Array.isArray(args.deletions)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Deletions must be an array');
+          throw new McpError(ErrorCode.InvalidParams, 'Deletions must be an array', null);
         }
         args.deletions.forEach((deletion: any, index: number) => {
           if (
             deletion.entityName &&
             deletion.entityName.length > INPUT_SIZE_LIMITS.MAX_ENTITY_NAME_LENGTH
           ) {
-            throw new McpError(ErrorCode.InvalidParams, `Entity name exceeds maximum length`);
+            throw new McpError(ErrorCode.InvalidParams, `Entity name exceeds maximum length`, null);
           }
           if (deletion.observations) {
             if (!Array.isArray(deletion.observations)) {
               throw new McpError(
                 ErrorCode.InvalidParams,
-                `Observations must be an array for deletion at index ${index}`
+                `Observations must be an array for deletion at index ${index}`,
+                null
               );
             }
             deletion.observations.forEach((obs: any, obsIndex: number) => {
@@ -255,8 +267,9 @@ export function validateToolInput(toolName: string, args: any): void {
     case 'search_nodes':
       if (args.query && args.query.length > 1000) {
         throw new McpError(
+          `Search query exceeds maximum length of 1000 characters`,
           ErrorCode.InvalidParams,
-          `Search query exceeds maximum length of 1000 characters`
+          null
         );
       }
       break;

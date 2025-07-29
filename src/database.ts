@@ -41,6 +41,7 @@ import { needsFTSMigration, migrateFTSToPorterUnicode61 } from './utils/fts-migr
 import { MemoryAgingSystem, MEMORY_AGING_PRESETS } from './utils/memory-aging.js';
 import { systemResilience } from './utils/system-resilience.js';
 import { PrivacySecurityManager, PRIVACY_PRESETS } from './utils/privacy-security.js';
+import { CacheWarmer } from './utils/cache-warming.js';
 
 const LARGE_BATCH_THRESHOLD = 1000;
 
@@ -97,6 +98,9 @@ export class MemoryDatabase {
 
   // Privacy and security system
   private privacySecurity: PrivacySecurityManager;
+
+  // Cache warming system
+  private cacheWarmer: CacheWarmer;
 
   // Prepared statements for maximum performance
   private statements: {
@@ -181,6 +185,18 @@ export class MemoryDatabase {
       config.performance.searchCacheSize
     );
 
+    // Initialize cache warming system
+    this.cacheWarmer = new CacheWarmer(
+      this.entityCache,
+      this.searchCache,
+      this,
+      {
+        enabled: config.performance.cacheWarmingEnabled,
+        maxEntitiesToWarm: config.performance.maxEntitiesToWarm,
+        maxSearchesToWarm: config.performance.maxSearchesToWarm
+      }
+    );
+
     // Initialize database
     this.initDatabase();
 
@@ -201,10 +217,23 @@ export class MemoryDatabase {
 
     // Initialize bloom filter
     this.initializeBloomFilter();
+
+    // Initialize cache warming
+    this.initializeCacheWarming();
   }
 
   private initDatabase(): void {
     const perf = new PerformanceTracker('database_initialization', { dbPath: this.dbPath });
+
+    // Warn users if they're using the default database path (potentially ephemeral)
+    const defaultDbPath = './data/memory.db';
+    if (this.dbPath === defaultDbPath) {
+      logInfo('⚠️  WARNING: Using default database path', {
+        path: this.dbPath,
+        warning: 'This database may be ephemeral and data could be lost. Consider setting DATABASE_PATH environment variable to a persistent location.',
+        recommendation: 'Set DATABASE_PATH=/path/to/persistent/location in your environment or .env file'
+      });
+    }
 
     const dir = dirname(this.dbPath);
     if (!existsSync(dir)) {
@@ -920,18 +949,22 @@ export class MemoryDatabase {
 
     this.transaction(() => {
       for (const relation of relations) {
+        // Normalize fields to lower case for case-insensitive matching
+        const from = relation.from.toLowerCase();
+        const to = relation.to.toLowerCase();
+        const relationType = relation.relationType.toLowerCase();
         const result = this.statements.createRelation!.run(
-          relation.from,
-          relation.to,
-          relation.relationType
+          from,
+          to,
+          relationType
         );
 
         if (result.changes > 0) {
           created.push({
             type: 'relation',
-            from: relation.from,
-            to: relation.to,
-            relationType: relation.relationType,
+            from,
+            to,
+            relationType,
           });
         }
       }
@@ -956,15 +989,22 @@ export class MemoryDatabase {
       for (let i = 0; i < relations.length; i += batchSize) {
         const batch = relations.slice(i, i + batchSize);
 
+        // Normalize fields to lower case for case-insensitive matching
+        const normalizedBatch = batch.map((relation) => ({
+          from: relation.from.toLowerCase(),
+          to: relation.to.toLowerCase(),
+          relationType: relation.relationType.toLowerCase(),
+        }));
+
         // Build bulk insert query for this batch
-        const placeholders = batch.map(() => '(?, ?, ?)').join(', ');
+        const placeholders = normalizedBatch.map(() => '(?, ?, ?)').join(', ');
         const bulkQuery = `
           INSERT OR IGNORE INTO relations (from_entity, to_entity, relation_type)
           VALUES ${placeholders}
         `;
 
         // Flatten parameters for this batch
-        const params = batch.flatMap((relation) => [
+        const params = normalizedBatch.flatMap((relation) => [
           relation.from,
           relation.to,
           relation.relationType,
@@ -974,7 +1014,7 @@ export class MemoryDatabase {
         const result = this.db.prepare(bulkQuery).run(...params);
 
         // Build results for this batch
-        batch.forEach((relation) => {
+        normalizedBatch.forEach((relation) => {
           created.push({
             type: 'relation',
             from: relation.from,
@@ -995,10 +1035,7 @@ export class MemoryDatabase {
     // Check cache first
     const cached = this.entityCache.get(lowerName);
     if (cached) {
-      // Track access even for cached entities when memory aging is enabled
-      if (config.memoryAging.enabled) {
-        this.updateEntityAccess(name);
-      }
+      // Do NOT call updateEntityAccess here to avoid recursion
       return cached;
     }
 
@@ -1021,7 +1058,7 @@ export class MemoryDatabase {
     // Cache the result
     this.entityCache.set(lowerName, entity);
 
-    // Track access when memory aging is enabled
+    // Track access when memory aging is enabled (only after DB fetch)
     if (config.memoryAging.enabled) {
       this.updateEntityAccess(name);
     }
@@ -1879,9 +1916,15 @@ export class MemoryDatabase {
   deleteRelations(relations: CreateRelationInput[]): void {
     this.transaction(() => {
       for (const relation of relations) {
-        this.statements.deleteRelation!.run(relation.from, relation.to, relation.relationType);
+        // Normalize fields to lower case for case-insensitive matching
+        const from = relation.from.toLowerCase();
+        const to = relation.to.toLowerCase();
+        const relationType = relation.relationType.toLowerCase();
+        this.statements.deleteRelation!.run(from, to, relationType);
       }
     });
+    // Clear search cache after deletion to avoid stale results
+    this.searchCache.clear();
   }
 
   openNodes(names: string[]): GraphResult {
@@ -2545,6 +2588,29 @@ export class MemoryDatabase {
    */
   shutdownPrivacySystem(): void {
     this.privacySecurity.shutdown();
+  }
+
+  private initializeCacheWarming(): void {
+    if (config.performance.cacheWarmingEnabled) {
+      // Start cache warming asynchronously to avoid blocking startup
+      setImmediate(async () => {
+        try {
+          const result = await this.cacheWarmer.warmCaches();
+          if (result.success) {
+            logInfo('Cache warming completed successfully', {
+              entitiesWarmed: result.entitiesWarmed,
+              searchesWarmed: result.searchesWarmed,
+              warmingTime: result.warmingTime,
+              cacheHitRate: result.cacheHitRate.toFixed(2) + '%'
+            });
+          } else {
+            logDebug('Cache warming failed', { error: result.error });
+          }
+        } catch (error) {
+          logDebug('Cache warming error', { error: error instanceof Error ? error.message : String(error) });
+        }
+      });
+    }
   }
 }
 

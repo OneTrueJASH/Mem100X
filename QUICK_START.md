@@ -12,6 +12,45 @@ npm install
 npm run build
 ```
 
+## Quick Configuration Setup
+
+```bash
+# Generate a fully populated .env file with all default values
+npm run config:generate
+
+# Or print the configuration to see all options
+npm run config:print-defaults
+
+# Validate your configuration (detects issues and provides recommendations)
+npm run config:validate
+```
+
+### Configuration Validation Features
+
+The validation tool helps you identify and fix configuration issues:
+
+- **🔍 Unknown Variables**: Finds environment variables not used by Mem100x
+- **🔄 Deprecated Variables**: Detects outdated variable names with migration guidance
+- **💡 Performance Tips**: Suggests optimizations for your specific setup
+- **✅ Configuration Summary**: Shows current settings and recommendations
+
+## ⚠️ Important: Database Persistence
+
+**By default, Mem100x uses local database files that may be ephemeral.** To ensure your data persists:
+
+### Set Persistent Database Paths:
+
+```bash
+# For single-context usage
+export DATABASE_PATH="/path/to/persistent/memory.db"
+
+# For multi-context usage  
+export MEM100X_PERSONAL_DB_PATH="/path/to/persistent/personal.db"
+export MEM100X_WORK_DB_PATH="/path/to/persistent/work.db"
+```
+
+**Why this matters:** Default paths may be in temporary directories that get cleared, causing **permanent data loss**. The server will log warnings if using default paths.
+
 ## Default Usage (Multi-Context)
 
 ### 1. Start the server
@@ -157,24 +196,4 @@ All benchmarks use the MCP server interface for accurate measurements.
 ### Server won't start?
 
 - Check the path in your Claude config is absolute
-- Ensure you ran `npm run build` first
-
-### Not seeing the tools?
-
-- Restart Claude Desktop after config changes
-- Check logs: `cat ~/Library/Logs/Claude/mcp*.log`
-
-### Want more control?
-
-- Set `MEMORY_DB=/custom/path/memory.db` for custom database location
-- Set `DEBUG=1` for detailed logging
-
-## Next Steps
-
-1. **Check performance metrics**: See the speed in action with benchmarks
-2. **Read the docs**: Deep dive into all features
-3. **Star the repo**: If you love the speed!
-
----
-
-**Ready to experience the fastest MCP memory server ever built? Let's go!**
+- Ensure you ran `npm run build`

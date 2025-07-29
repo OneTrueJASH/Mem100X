@@ -32,8 +32,9 @@ export function validateDestructiveOperation(toolName: string, args: any): void 
   // Check for confirmation flag
   if (!args.confirm || args.confirm !== true) {
     throw new McpError(
+      `Destructive operation '${toolName}' requires explicit confirmation. Please add "confirm": true to your request.`,
       ErrorCode.InvalidParams,
-      `Destructive operation '${toolName}' requires explicit confirmation. Please add "confirm": true to your request.`
+      null
     );
   }
 }
@@ -48,6 +49,12 @@ export function addDestructiveSafetyInfo(toolDefinition: any, toolName: string):
 
   // Clone the definition to avoid mutation
   const safeDef = JSON.parse(JSON.stringify(toolDefinition));
+  // Explicitly copy critical properties in case they are non-enumerable or lost
+  for (const key of ['title', 'name', 'description', 'inputSchema']) {
+    if (toolDefinition[key]) {
+      safeDef[key] = toolDefinition[key];
+    }
+  }
 
   // Add confirm property to input schema
   if (!safeDef.inputSchema.properties.confirm) {
