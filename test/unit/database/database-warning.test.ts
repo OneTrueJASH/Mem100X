@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { MemoryDatabase } from '../dist/database.js';
-import { MultiDatabaseManager } from '../dist/multi-database.js';
-import { config } from '../dist/config.js';
-import { existsSync, unlinkSync } from 'fs';
+import { MemoryDatabase } from '../../../dist/database.js';
+import { MultiDatabaseManager } from '../../../dist/multi-database.js';
+import { config } from '../../../dist/config.js';
+import { existsSync, unlinkSync, mkdtempSync, rmSync } from 'fs';
+import { join } from 'path';
+import os from 'os';
 
 describe('Database Path Warnings', () => {
   const testDbPath = './data/test-warning.db';
   const customDbPath = '/tmp/test-persistent.db';
+  let tempDir: string;
 
   afterEach(() => {
     // Clean up test files
@@ -15,6 +18,9 @@ describe('Database Path Warnings', () => {
     }
     if (existsSync(customDbPath)) {
       unlinkSync(customDbPath);
+    }
+    if (tempDir && existsSync(tempDir)) {
+      rmSync(tempDir, { recursive: true, force: true });
     }
   });
 
@@ -46,7 +52,20 @@ describe('Database Path Warnings', () => {
 
   it('should warn for multi-database default paths', () => {
     // This test verifies that multi-database warnings are in place
-    const manager = new MultiDatabaseManager(config);
+    // Create a temporary directory for test databases to avoid conflicts
+    tempDir = mkdtempSync(join(os.tmpdir(), 'mem100x-warning-test-'));
+
+    // Create a test config with temporary paths
+    const testConfig = {
+      ...config,
+      multiContext: {
+        ...config.multiContext,
+        personalDbPath: join(tempDir, 'test-personal.db'),
+        workDbPath: join(tempDir, 'test-work.db'),
+      }
+    };
+
+    const manager = new MultiDatabaseManager(testConfig);
 
     // The warning should be logged during initialization for default paths
     expect(manager).toBeDefined();

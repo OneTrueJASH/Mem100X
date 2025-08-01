@@ -60,8 +60,8 @@ export class RateLimiter {
     if (entry.count >= this.config.maxRequests) {
       const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
       throw new McpError(
-        ErrorCode.InvalidRequest,
         `Rate limit exceeded. Please retry after ${retryAfter} seconds.`,
+        ErrorCode.InvalidRequest,
         {
           retryAfter,
           limit: this.config.maxRequests,
@@ -165,6 +165,9 @@ export function createRateLimiters() {
  * Determine which rate limiter to use for a tool
  */
 export function getRateLimiterForTool(toolName: string): 'write' | 'expensive' | 'global' {
+  // Convert to lowercase for case-insensitive matching
+  const normalizedName = toolName.toLowerCase();
+
   const writeTools = [
     'create_entities',
     'create_relations',
@@ -172,11 +175,20 @@ export function getRateLimiterForTool(toolName: string): 'write' | 'expensive' |
     'delete_entities',
     'delete_relations',
     'delete_observations',
+    'add_memory',
+    'update_memory',
+    'delete_memory',
   ];
 
-  const expensiveTools = ['find_shortest_path', 'get_neighbors'];
+  const expensiveTools = [
+    'find_shortest_path',
+    'get_neighbors',
+    'search_memories',
+    'export_memory',
+    'import_memory',
+  ];
 
-  if (writeTools.includes(toolName)) return 'write';
-  if (expensiveTools.includes(toolName)) return 'expensive';
+  if (writeTools.includes(normalizedName)) return 'write';
+  if (expensiveTools.includes(normalizedName)) return 'expensive';
   return 'global';
 }

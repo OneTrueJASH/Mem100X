@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { MultiDatabaseManager } from '../src/multi-database.js';
-import { PrivacySecurityManager } from '../src/utils/privacy-security.js';
-import { config as baseConfig } from '../src/config.js';
+import { MultiDatabaseManager } from '../../dist/multi-database.js';
+import { PrivacySecurityManager } from '../../dist/utils/privacy-security.js';
+import { config as baseConfig } from '../../dist/config.js';
 import { mkdtempSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
@@ -254,7 +254,7 @@ describe('Error Handling & Resilience', () => {
 
 describe('Elicitation & Input Validation', () => {
   it('should return elicitation response for missing required fields in create_entities', async () => {
-    const { main } = await import('../src/server-multi.js');
+    const { main } = await import('../../dist/server-multi.js');
     // Simulate a CallToolRequest for create_entities with missing entityType
     const request = {
       params: {
@@ -264,8 +264,8 @@ describe('Elicitation & Input Validation', () => {
         }
       }
     };
-    // Call the handler directly (simulate server.setRequestHandler)
-    const response = await (main as any).__callToolHandlerForTest(request);
+    // Call the handler directly with existing manager to avoid database lock
+    const response = await (main as any).__callToolHandlerForTest(request, manager);
     expect(response.structuredContent.elicitation).toBe(true);
     expect(Array.isArray(response.structuredContent.missingFields)).toBe(true);
     expect(response.structuredContent.missingFields.some((f: any) => f.path.includes('entityType'))).toBe(true);
@@ -273,14 +273,14 @@ describe('Elicitation & Input Validation', () => {
   });
 
   it('should return elicitation response for missing context in set_context', async () => {
-    const { main } = await import('../src/server-multi.js');
+    const { main } = await import('../../dist/server-multi.js');
     const request = {
       params: {
         name: 'set_context',
         arguments: { }
       }
     };
-    const response = await (main as any).__callToolHandlerForTest(request);
+    const response = await (main as any).__callToolHandlerForTest(request, manager);
     expect(response.structuredContent.elicitation).toBe(true);
     expect(response.structuredContent.missingFields.some((f: any) => f.path.includes('context'))).toBe(true);
     expect(response.content[0].text).toMatch(/Missing or invalid input/);
@@ -289,9 +289,9 @@ describe('Elicitation & Input Validation', () => {
 
 describe('Protocol Version Negotiation', () => {
   it('should succeed if client and server versions match', async () => {
-    const { main } = await import('../src/server-multi.js');
+    const { main } = await import('../../dist/server-multi.js');
     // Get the server version from package.json
-    const pkg = await import('../package.json', { assert: { type: 'json' } });
+    const pkg = await import('../../package.json', { assert: { type: 'json' } });
     const version = pkg.default.version;
     const request = {
       params: {
@@ -305,7 +305,7 @@ describe('Protocol Version Negotiation', () => {
   });
 
   it('should return an error if client and server versions do not match', async () => {
-    const { main } = await import('../src/server-multi.js');
+    const { main } = await import('../../dist/server-multi.js');
     const request = {
       params: {
         version: '0.0.0', // Intentionally wrong
@@ -324,7 +324,7 @@ describe('Protocol Version Negotiation', () => {
 
 describe('UI/UX Surfacing', () => {
   it('should include title in all tool definitions', async () => {
-    const { getAllToolDefinitions } = await import('../src/tool-definitions.js');
+    const { getAllToolDefinitions } = await import('../../dist/tool-definitions.js');
     const defs = getAllToolDefinitions();
     for (const key of Object.keys(defs)) {
       expect(defs[key].title).toBeDefined();
@@ -339,7 +339,7 @@ describe('UI/UX Surfacing', () => {
     const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'mem100x-listfiles-'));
     const testFile = path.join(tmpDir, 'test.txt');
     fs.writeFileSync(testFile, 'hello');
-    const { handleListFiles } = await import('../src/tool-handlers.js');
+    const { handleListFiles } = await import('../../dist/tool-handlers.js');
     const ctx = { manager, startTime: performance.now(), toolName: 'list_files' };
     const args = { path: tmpDir };
     const result = handleListFiles(args, ctx);
@@ -351,11 +351,11 @@ describe('UI/UX Surfacing', () => {
   });
 
   it('should include structuredContent in all tool responses and be pretty-printable', async () => {
-    const { main } = await import('../src/server-multi.js');
+    const { main } = await import('../../dist/server-multi.js');
     // Use a simple tool: get_context_info
     const response = await (main as any).__callToolHandlerForTest({
       params: { name: 'get_context_info', arguments: {} },
-    });
+    }, manager);
     expect(response.structuredContent).toBeDefined();
     // Try pretty-printing
     const pretty = JSON.stringify(response.structuredContent, null, 2);
@@ -367,7 +367,7 @@ describe('UI/UX Surfacing', () => {
 describe('MCP Protocol Compliance', () => {
   it('should register tools and resources according to MCP', async () => {
     // Use dynamic import for ESM
-    const { getAllToolDefinitions } = await import('../src/tool-definitions.js');
+    const { getAllToolDefinitions } = await import('../../dist/tool-definitions.js');
     const defs = getAllToolDefinitions();
     expect(defs).toBeDefined();
     expect(Object.keys(defs).length).toBeGreaterThan(0);
@@ -376,8 +376,8 @@ describe('MCP Protocol Compliance', () => {
     // Use dynamic import for ESM
     const { Server } = await import('@modelcontextprotocol/sdk/server/index.js');
     const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js');
-    const { config } = await import('../src/config.js');
-    const { MultiDatabaseManager } = await import('../src/multi-database.js');
+    const { config } = await import('../../dist/config.js');
+    const { MultiDatabaseManager } = await import('../../dist/multi-database.js');
     const server = new Server({ name: 'test', version: '0.0.1' });
     expect(server).toBeDefined();
     // We won't actually connect stdio in a test environment
@@ -393,7 +393,7 @@ describe('Mem100x File Operations', () => {
     fs.writeFileSync(testFile, 'hello');
     const ctx = { manager, startTime: performance.now(), toolName: 'list_files' };
     const args = { path: tmpDir };
-    const { handleListFiles } = await import('../src/tool-handlers.js');
+    const { handleListFiles } = await import('../../dist/tool-handlers.js');
     const result = handleListFiles(args, ctx);
     // Assert content includes a resource_link
     expect(result.structuredContent.resourceLinks.items.some((r: any) => r.title === 'test.txt')).toBe(true);
@@ -415,7 +415,7 @@ describe('Mem100x File Operations', () => {
     const ctx = { manager, startTime: performance.now(), toolName: 'list_files' };
     const meta = { traceId: 'abc123', progressToken: 42 };
     const args = { path: tmpDir, _meta: meta };
-    const { handleListFiles } = await import('../src/tool-handlers.js');
+    const { handleListFiles } = await import('../../dist/tool-handlers.js');
     const result = handleListFiles(args, ctx);
     // Assert _meta is present and matches
     expect(result.structuredContent._meta).toEqual(meta);

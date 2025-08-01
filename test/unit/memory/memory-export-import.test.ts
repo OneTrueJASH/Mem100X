@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { MultiDatabaseManager } from '../dist/multi-database.js';
-import { MemoryExport, ExportOptions, ImportOptions } from '../dist/types.js';
-import { handleExportMemory, handleImportMemory } from '../dist/tool-handlers.js';
-import { createTextContent } from '../dist/utils/fast-json.js';
+import { MultiDatabaseManager } from '../../../dist/multi-database.js';
+import { MemoryExport, ExportOptions, ImportOptions } from '../../../dist/types.js';
+import { handleExportMemory, handleImportMemory } from '../../../dist/tool-handlers.js';
+import { createTextContent } from '../../../dist/utils/fast-json.js';
 import { createHash } from 'crypto';
-import { config } from '../dist/config.js';
+import { config } from '../../../dist/config.js';
 import { mkdtempSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
@@ -318,7 +318,7 @@ describe('Memory Export/Import', () => {
     // Create invalid export data
     const invalidData = {
       version: '3.0.0',
-      // Missing required fields
+      contexts: null, // Explicitly invalid context
     };
 
     const importArgs = {

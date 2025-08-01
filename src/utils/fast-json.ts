@@ -12,25 +12,33 @@ import {
   ResourceContent,
 } from '../types.js';
 import { RichContentSchema } from '../tool-schemas.js';
+import { logDebug } from './logger.js';
 
 // Optimized stringify for observation arrays with validation
 export function stringifyObservations(observations: RichContent[]): string {
-  return JSON.stringify(observations);
+  logDebug('Stringifying observations', { observations });
+  const result = JSON.stringify(observations);
+  logDebug('Stringified observations result', { result });
+  return result;
 }
 
 // Optimized parse for observations with validation
 export function parseObservations(json: string): RichContent[] {
+  logDebug('Parsing observations JSON', { json });
   try {
     if (!json || json === null || json === undefined) {
+      logDebug('Parsed observations: empty JSON', { json });
       return [];
     }
     const parsed = JSON.parse(json);
+    logDebug('Parsed observations: raw parsed', { parsed });
     if (!Array.isArray(parsed)) {
+      logDebug('Parsed observations: not an array', { parsed });
       return [];
     }
 
     // Validate each item against the content block union schema
-    return parsed
+    const result = parsed
       .map((item) => {
         if (typeof item === 'string') {
           // Backward compatibility: convert string to RichContent
@@ -41,7 +49,8 @@ export function parseObservations(json: string): RichContent[] {
           // Validate against the complete content block union
           try {
             return RichContentSchema.parse(item);
-          } catch {
+          } catch (e) {
+            logDebug('Observation item validation failed', { item, error: e });
             // If validation fails, try to convert to text content
             if (item.text) {
               return { type: 'text', text: String(item.text) } as TextContent;
@@ -55,7 +64,10 @@ export function parseObservations(json: string): RichContent[] {
         return null;
       })
       .filter(Boolean) as RichContent[];
-  } catch {
+    logDebug('Parsed observations: filtered result', { result });
+    return result;
+  } catch (e) {
+    logDebug('Error parsing observations JSON', { json, error: e });
     return [];
   }
 }

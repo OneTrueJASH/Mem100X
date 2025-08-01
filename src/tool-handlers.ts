@@ -1020,9 +1020,23 @@ export async function handleExportMemory(args: any, ctx: ToolContext): Promise<M
       summary.compressionRatio = originalSize / size;
     }
 
+    let finalExportData: string | MemoryExport;
+    const originalDataString = JSON.stringify(exportData);
+    const originalSize = Buffer.byteLength(originalDataString, 'utf8');
+
+    if (options.format === 'compressed') {
+      const compressedBuffer = await gzipAsync(Buffer.from(originalDataString), { level: options.compressionLevel });
+      finalExportData = compressedBuffer.toString('base64');
+      summary.size = Buffer.byteLength(finalExportData, 'utf8');
+      summary.compressionRatio = originalSize / summary.size;
+    } else {
+      finalExportData = exportData;
+      summary.size = originalSize;
+    }
+
     const result: ExportResult = {
       success: true,
-      data: exportData,
+      data: finalExportData,
       summary: summary,
       duration,
       warnings: [],
@@ -1134,8 +1148,10 @@ export async function handleImportMemory(args: any, ctx: ToolContext): Promise<M
           return createMCPToolResponse(successResult);
         }
 
-        const errorResult: ImportResult = {
+        const errorResult: ImportResult & { error?: string, validationErrors?: string[] } = {
           success: false,
+          error: 'Invalid import data',
+          validationErrors: validationResult.errors,
           summary: {
             entitiesImported: 0,
             entitiesSkipped: 0,
@@ -1158,31 +1174,7 @@ export async function handleImportMemory(args: any, ctx: ToolContext): Promise<M
       }
     }
     
-    // Special handling for empty contexts - treat as success
-    if (importData && importData.contexts && typeof importData.contexts === 'object' && 
-        Object.keys(importData.contexts).length === 0) {
-      const emptyResult: ImportResult = {
-        success: true,
-        summary: {
-          entitiesImported: 0,
-          entitiesSkipped: 0,
-          entitiesUpdated: 0,
-          relationsImported: 0,
-          relationsSkipped: 0,
-          observationsImported: 0,
-          contextsCreated: 0,
-          errors: []
-        },
-        details: {
-          entityMapping: {},
-          relationMapping: {},
-          contextMapping: {}
-        },
-        warnings: [],
-        duration: performance.now() - startTime
-      };
-      return createMCPToolResponse(emptyResult);
-    }
+    
 
     try {
       const importResult = await importMemoryData(ctx.manager, importData, options);
@@ -1449,6 +1441,12 @@ async function importMemoryData(manager: MultiDatabaseManager, importData: Memor
   }
 
   // Process each context
+  if (!importData.contexts || typeof importData.contexts !== 'object') {
+    // This case should ideally be caught by validateImportData, but as a safeguard
+    // or for empty but valid imports, we should not proceed with iteration.
+    return result;
+  }
+
   for (const [contextName, contextData] of Object.entries(importData.contexts)) {
     try {
       const targetContext = options.context || contextName;

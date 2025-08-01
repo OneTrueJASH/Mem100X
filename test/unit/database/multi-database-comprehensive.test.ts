@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MultiDatabaseManager } from '../dist/multi-database.js';
-import { createTextContent } from '../dist/utils/fast-json.js';
-import { config } from '../dist/config.js';
+import { MultiDatabaseManager } from '../../../dist/multi-database.js';
+import { createTextContent } from '../../../dist/utils/fast-json.js';
+import { config } from '../../../dist/config.js';
 import { mkdtempSync, rmSync, existsSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
@@ -320,9 +320,20 @@ describe('MultiDatabaseManager Comprehensive Tests', () => {
     });
 
     it('should add observations', () => {
-      // Skip this test due to database corruption issue
-      // TODO: Fix addObservations method to prevent corruption
-      expect(true).toBe(true);
+      const updates = [{
+        entityName: 'TestEntity',
+        contents: [createTextContent('New observation')]
+      }];
+
+      manager.addObservations(updates, 'personal');
+
+      // Verify the observation was added
+      const entity = manager.getEntity('TestEntity', 'personal');
+      expect(entity).toBeDefined();
+      expect(entity!.observations).toHaveLength(2); // Initial + new observation
+      expect(entity!.observations.some(obs =>
+        obs.type === 'text' && obs.text === 'New observation'
+      )).toBe(true);
     });
 
     it('should delete observations', () => {

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { MultiDatabaseManager } from '../dist/multi-database.js';
-import { handleExportMemory, handleImportMemory } from '../dist/tool-handlers.js';
-import { createTextContent } from '../dist/utils/fast-json.js';
-import { config } from '../dist/config.js';
+import { MultiDatabaseManager } from '../../../dist/multi-database.js';
+import { handleExportMemory, handleImportMemory } from '../../../dist/tool-handlers.js';
+import { createTextContent } from '../../../dist/utils/fast-json.js';
+import { config } from '../../../dist/config.js';
 import { mkdtempSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
 import os from 'os';

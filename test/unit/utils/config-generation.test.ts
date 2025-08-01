@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateEnvFile } from '../dist/config.js';
+import { generateEnvFile } from '../../../dist/config.js';
 
 describe('Configuration Generation', () => {
   it('should generate a complete .env file with all default values', () => {

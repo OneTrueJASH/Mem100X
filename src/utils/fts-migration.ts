@@ -25,6 +25,17 @@ export function migrateFTSToPorterUnicode61(dbPath: string): MigrationResult {
 
     const db = new Database(dbPath);
 
+    // Check if database is in a stable state
+    try {
+      db.prepare('SELECT 1').get();
+    } catch (error) {
+      db.close();
+      return {
+        success: false,
+        error: `Database is not in a stable state: ${String(error)}`
+      };
+    }
+
     // Check if FTS table exists
     const ftsExists = db.prepare(`
       SELECT name FROM sqlite_master
@@ -63,7 +74,7 @@ export function migrateFTSToPorterUnicode61(dbPath: string): MigrationResult {
       };
     }
 
-    // Begin migration
+    // Begin migration with better error handling
     db.exec('BEGIN TRANSACTION');
 
     try {
@@ -80,11 +91,19 @@ export function migrateFTSToPorterUnicode61(dbPath: string): MigrationResult {
         )
       `);
 
-      // Copy data from old FTS table to new one
-      db.exec(`
+      // Copy data from old FTS table to new one with validation
+      const copyResult = db.exec(`
         INSERT INTO entities_fts_new(name, entity_type, observations)
         SELECT name, entity_type, observations FROM entities_fts
       `);
+
+      // Verify the copy was successful
+      const oldCount = db.prepare('SELECT COUNT(*) as count FROM entities_fts').get() as { count: number };
+      const newCount = db.prepare('SELECT COUNT(*) as count FROM entities_fts_new').get() as { count: number };
+
+      if (oldCount.count !== newCount.count) {
+        throw new Error(`Data copy failed: old count ${oldCount.count}, new count ${newCount.count}`);
+      }
 
       // Drop old FTS table
       db.exec('DROP TABLE entities_fts');
@@ -102,55 +121,60 @@ export function migrateFTSToPorterUnicode61(dbPath: string): MigrationResult {
       `);
 
       db.exec(`
-        CREATE TRIGGER IF NOT EXISTS entities_fts_update AFTER UPDATE ON entities
-        BEGIN
-          DELETE FROM entities_fts WHERE name = old.name;
-          INSERT INTO entities_fts(name, entity_type, observations)
-          VALUES (new.name, new.entity_type, new.observations);
-        END
-      `);
-
-      db.exec(`
         CREATE TRIGGER IF NOT EXISTS entities_fts_delete AFTER DELETE ON entities
         BEGIN
           DELETE FROM entities_fts WHERE name = old.name;
         END
       `);
 
-      // Optimize the new FTS table
-      db.exec('INSERT INTO entities_fts(entities_fts) VALUES("optimize")');
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS entities_fts_update AFTER UPDATE ON entities
+        BEGIN
+          UPDATE entities_fts SET
+            name = new.name,
+            entity_type = new.entity_type,
+            observations = new.observations
+          WHERE name = old.name;
+        END
+      `);
 
+      // Commit the transaction
       db.exec('COMMIT');
 
-      const migrationTime = Date.now() - startTime;
       logInfo('FTS migration completed successfully', {
-        migrationTime,
-        oldConfig: 'previous',
-        newConfig: 'porter unicode61'
+        oldCount: oldCount.count,
+        newCount: newCount.count,
+        migrationTime: Date.now() - startTime
       });
 
+      db.close();
       return {
         success: true,
-        oldConfig: 'previous',
+        oldConfig: 'legacy',
         newConfig: 'porter unicode61',
-        migrationTime
+        migrationTime: Date.now() - startTime
       };
 
     } catch (error) {
-      db.exec('ROLLBACK');
-      throw error;
-    } finally {
+      // Rollback on any error
+      try {
+        db.exec('ROLLBACK');
+      } catch (rollbackError) {
+        logError('Failed to rollback FTS migration', rollbackError as Error);
+      }
+
       db.close();
+      return {
+        success: false,
+        error: `FTS migration failed: ${String(error)}`
+      };
     }
 
   } catch (error) {
-    const errorObj = error instanceof Error ? error : new Error(String(error));
-    logError('FTS migration failed', errorObj, { dbPath });
-
+    logError('FTS migration failed', error as Error, { dbPath });
     return {
       success: false,
-      error: errorObj.message,
-      migrationTime: Date.now() - startTime
+      error: `FTS migration failed: ${String(error)}`
     };
   }
 }

@@ -393,7 +393,7 @@ export interface ExportOptions {
 
 export interface ExportResult {
   success: boolean;
-  data: MemoryExport;
+  data: MemoryExport | string;  // string when compressed
   summary: {
     totalEntities: number;
     totalRelations: number;

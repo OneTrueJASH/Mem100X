@@ -6,7 +6,7 @@
 import { config } from './config.js';
 
 export const PRAGMAS = `
-  PRAGMA journal_mode = WAL;
+  PRAGMA journal_mode = DELETE;
   PRAGMA synchronous = NORMAL;
   PRAGMA cache_size = -${config.database.cacheSizeMb * 256};
   PRAGMA temp_store = MEMORY;
@@ -142,22 +142,6 @@ export const FTS_SCHEMA = `
   -- Note: fts5vocab tables are created automatically by SQLite, no need to create manually
 `;
 
-// Function to create FTS schema with custom configuration
-export function createFTSSchema(configName: keyof typeof FTS_CONFIGURATIONS = 'DEFAULT'): string {
-  const ftsConfig = FTS_CONFIGURATIONS[configName];
-  return `
-    CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
-      name,
-      entity_type,
-      observations,
-      tokenize='${ftsConfig.tokenize}',
-      prefix='${ftsConfig.prefix}',
-      content='entities',
-      content_rowid='rowid'
-    );
-  `;
-}
-
 export const FTS_TRIGGERS = `
   -- Triggers to keep FTS table in sync with entities table
   CREATE TRIGGER IF NOT EXISTS entities_fts_insert AFTER INSERT ON entities
@@ -179,56 +163,56 @@ export const FTS_TRIGGERS = `
   END;
 `;
 
-export const FTS_REBUILD = `
-  -- Rebuild FTS index from existing data
-  INSERT INTO entities_fts(name, entity_type, observations)
-  SELECT name, entity_type, observations FROM entities;
-`;
+// export const FTS_REBUILD = `
+//   -- Rebuild FTS index from existing data
+//   INSERT INTO entities_fts(name, entity_type, observations)
+//   SELECT name, entity_type, observations FROM entities;
+// `;
 
-// Additional FTS optimization queries
-export const FTS_OPTIMIZATION = `
-  -- Optimize FTS index
-  INSERT INTO entities_fts(entities_fts) VALUES('optimize');
+// // Additional FTS optimization queries
+// export const FTS_OPTIMIZATION = `
+//   -- Optimize FTS index
+//   INSERT INTO entities_fts(entities_fts) VALUES('optimize');
+// 
+//   -- Merge FTS segments for better performance
+//   INSERT INTO entities_fts(entities_fts) VALUES('merge');
+// 
+//   -- Rebuild FTS index completely
+//   INSERT INTO entities_fts(entities_fts) VALUES('rebuild');
+// `;
 
-  -- Merge FTS segments for better performance
-  INSERT INTO entities_fts(entities_fts) VALUES('merge');
-
-  -- Rebuild FTS index completely
-  INSERT INTO entities_fts(entities_fts) VALUES('rebuild');
-`;
-
-// FTS statistics and analysis queries
-export const FTS_STATS = `
-  -- Get FTS table statistics
-  SELECT
-    'entities_fts' as table_name,
-    COUNT(*) as total_rows,
-    (SELECT COUNT(*) FROM entities_fts WHERE entities_fts MATCH '*') as indexed_terms
-  FROM entities_fts;
-
-  -- Get vocabulary statistics
-  SELECT
-    term,
-    doc,
-    cnt
-  FROM entities_fts_vocab
-  ORDER BY cnt DESC
-  LIMIT 100;
-`;
+// // FTS statistics and analysis queries
+// export const FTS_STATS = `
+//   -- Get FTS table statistics
+//   SELECT
+//     'entities_fts' as table_name,
+//     COUNT(*) as total_rows,
+//     (SELECT COUNT(*) FROM entities_fts WHERE entities_fts MATCH '*') as indexed_terms
+//   FROM entities_fts;
+// 
+//   -- Get vocabulary statistics
+//   SELECT
+//     term,
+//     doc,
+//     cnt
+//   FROM entities_fts_vocab
+//   ORDER BY cnt DESC
+//   LIMIT 100;
+// `;
 
 /**
  * Get complete schema creation SQL
  */
 export function getCompleteSchema(): string {
-  return [TABLES, INDEXES, FTS_SCHEMA, FTS_TRIGGERS, FTS_REBUILD].join('\n');
+  return [TABLES, INDEXES, FTS_SCHEMA, FTS_TRIGGERS].join('\n');
 }
 
 /**
  * Get complete schema with custom FTS configuration
  */
 export function getCompleteSchemaWithFTS(ftsConfigName: keyof typeof FTS_CONFIGURATIONS = 'DEFAULT'): string {
-  const customFTS = createFTSSchema(ftsConfigName);
-  return [TABLES, INDEXES, customFTS, FTS_TRIGGERS, FTS_REBUILD].join('\n');
+  // const customFTS = createFTSSchema(ftsConfigName);
+  return [TABLES, INDEXES].join('\n');
 }
 
 /**

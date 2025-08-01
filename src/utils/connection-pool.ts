@@ -65,8 +65,10 @@ export class ConnectionPool extends EventEmitter {
     });
 
     // Apply optimized pragmas
-    db.pragma('journal_mode = WAL');
-    db.pragma('synchronous = NORMAL');
+    if (!this.options.readonly) {
+      db.pragma('journal_mode = WAL');
+      db.pragma('synchronous = NORMAL');
+    }
     db.pragma('busy_timeout = 5000');
     db.pragma('cache_size = -64000'); // 64MB
 

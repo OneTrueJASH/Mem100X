@@ -1,0 +1,267 @@
+{
+  "entities": {
+    "people": [
+      {
+        "name": "Alice Johnson",
+        "entityType": "person",
+        "observations": [
+          {
+            "type": "text",
+            "text": "Alice is a software engineer who works at TechCorp"
+          },
+          {
+            "type": "text", 
+            "text": "Alice lives in San Francisco and enjoys hiking"
+          }
+        ]
+      },
+      {
+        "name": "Bob Smith",
+        "entityType": "person",
+        "observations": [
+          {
+            "type": "text",
+            "text": "Bob is a project manager at StartupXYZ"
+          },
+          {
+            "type": "text",
+            "text": "Bob is married to Alice and they have two children"
+          }
+        ]
+      },
+      {
+        "name": "Carol Davis",
+        "entityType": "person", 
+        "observations": [
+          {
+            "type": "text",
+            "text": "Carol is a data scientist who works remotely"
+          }
+        ]
+      }
+    ],
+    "projects": [
+      {
+        "name": "Project Alpha",
+        "entityType": "project",
+        "observations": [
+          {
+            "type": "text",
+            "text": "A machine learning project for customer segmentation"
+          },
+          {
+            "type": "text",
+            "text": "Started in January 2024, expected completion in June 2024"
+          }
+        ]
+      },
+      {
+        "name": "Project Beta",
+        "entityType": "project",
+        "observations": [
+          {
+            "type": "text",
+            "text": "Web application for inventory management"
+          },
+          {
+            "type": "text",
+            "text": "Uses React frontend and Node.js backend"
+          }
+        ]
+      }
+    ],
+    "places": [
+      {
+        "name": "San Francisco",
+        "entityType": "place",
+        "observations": [
+          {
+            "type": "text",
+            "text": "Major tech hub in California"
+          },
+          {
+            "type": "text",
+            "text": "Known for its diverse culture and innovation"
+          }
+        ]
+      },
+      {
+        "name": "TechCorp Office",
+        "entityType": "place",
+        "observations": [
+          {
+            "type": "text",
+            "text": "Modern office building in downtown San Francisco"
+          }
+        ]
+      }
+    ],
+    "organizations": [
+      {
+        "name": "TechCorp",
+        "entityType": "organization",
+        "observations": [
+          {
+            "type": "text",
+            "text": "Technology company focused on AI and machine learning"
+          },
+          {
+            "type": "text",
+            "text": "Founded in 2018, headquartered in San Francisco"
+          }
+        ]
+      },
+      {
+        "name": "StartupXYZ",
+        "entityType": "organization",
+        "observations": [
+          {
+            "type": "text",
+            "text": "Early-stage startup developing productivity tools"
+          }
+        ]
+      }
+    ]
+  },
+  "relations": [
+    {
+      "from": "Alice Johnson",
+      "to": "TechCorp",
+      "relationType": "works_at"
+    },
+    {
+      "from": "Alice Johnson",
+      "to": "San Francisco",
+      "relationType": "lives_in"
+    },
+    {
+      "from": "Bob Smith",
+      "to": "StartupXYZ",
+      "relationType": "works_at"
+    },
+    {
+      "from": "Bob Smith",
+      "to": "Alice Johnson",
+      "relationType": "married_to"
+    },
+    {
+      "from": "Alice Johnson",
+      "to": "Project Alpha",
+      "relationType": "works_on"
+    },
+    {
+      "from": "Bob Smith",
+      "to": "Project Beta",
+      "relationType": "manages"
+    },
+    {
+      "from": "Carol Davis",
+      "to": "Project Alpha",
+      "relationType": "works_on"
+    },
+    {
+      "from": "TechCorp",
+      "to": "TechCorp Office",
+      "relationType": "located_at"
+    }
+  ],
+  "contexts": {
+    "personal": {
+      "name": "personal",
+      "description": "Personal life and relationships",
+      "patterns": ["family", "friend", "hobby", "personal"],
+      "entityTypes": ["person", "place", "hobby"],
+      "entities": ["Alice Johnson", "Bob Smith", "San Francisco"],
+      "relations": [
+        {
+          "from": "Bob Smith",
+          "to": "Alice Johnson",
+          "relationType": "married_to"
+        },
+        {
+          "from": "Alice Johnson",
+          "to": "San Francisco",
+          "relationType": "lives_in"
+        }
+      ]
+    },
+    "work": {
+      "name": "work",
+      "description": "Work and professional activities",
+      "patterns": ["project", "client", "meeting", "work"],
+      "entityTypes": ["project", "client", "task", "organization"],
+      "entities": ["Project Alpha", "Project Beta", "TechCorp", "StartupXYZ", "TechCorp Office"],
+      "relations": [
+        {
+          "from": "Alice Johnson",
+          "to": "TechCorp",
+          "relationType": "works_at"
+        },
+        {
+          "from": "Bob Smith",
+          "to": "StartupXYZ",
+          "relationType": "works_at"
+        },
+        {
+          "from": "Alice Johnson",
+          "to": "Project Alpha",
+          "relationType": "works_on"
+        },
+        {
+          "from": "Bob Smith",
+          "to": "Project Beta",
+          "relationType": "manages"
+        },
+        {
+          "from": "Carol Davis",
+          "to": "Project Alpha",
+          "relationType": "works_on"
+        },
+        {
+          "from": "TechCorp",
+          "to": "TechCorp Office",
+          "relationType": "located_at"
+        }
+      ]
+    }
+  },
+  "searchQueries": [
+    "Alice Johnson",
+    "Project Alpha",
+    "TechCorp employees",
+    "San Francisco residents",
+    "machine learning projects",
+    "software engineers",
+    "project managers",
+    "married couples"
+  ],
+  "exportFormats": {
+    "json": {
+      "format": "json",
+      "includeMetadata": true,
+      "includeObservations": true
+    },
+    "csv": {
+      "format": "csv",
+      "includeMetadata": false,
+      "includeObservations": false
+    },
+    "minimal": {
+      "format": "json",
+      "includeMetadata": false,
+      "includeObservations": false
+    }
+  },
+  "performanceTestData": {
+    "largeDataset": {
+      "entityCount": 1000,
+      "relationCount": 5000,
+      "observationCount": 2000
+    },
+    "stressTest": {
+      "concurrentRequests": 100,
+      "requestInterval": 10,
+      "testDuration": 30000
+    }
+  }
+} 

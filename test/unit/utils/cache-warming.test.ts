@@ -1,18 +1,26 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { MemoryDatabase } from '../dist/database.js';
-import { CacheWarmer } from '../dist/utils/cache-warming.js';
-import { createStringCache } from '../dist/utils/cache-interface.js';
-import { config } from '../dist/config.js';
+import { MemoryDatabase } from '../../../dist/database.js';
+import { CacheWarmer } from '../../../dist/utils/cache-warming.js';
+import { createStringCache } from '../../../dist/utils/cache-interface.js';
+import { config } from '../../../dist/config.js';
+import { mkdtempSync, rmSync, existsSync } from 'fs';
+import { join } from 'path';
+import os from 'os';
 
 describe('Cache Warming', () => {
   let db: MemoryDatabase;
   let cacheWarmer: CacheWarmer;
   let entityCache: any;
   let searchCache: any;
+  let tempDir: string;
 
   beforeEach(async () => {
+    // Create temporary directory for test database
+    tempDir = mkdtempSync(join(os.tmpdir(), 'mem100x-cache-test-'));
+    const dbPath = join(tempDir, 'test-cache-warming.db');
+
     // Create test database
-    db = new MemoryDatabase('./data/test-cache-warming.db');
+    db = new MemoryDatabase(dbPath);
 
     // Create test caches
     entityCache = createStringCache('lru', 100);
@@ -43,6 +51,9 @@ describe('Cache Warming', () => {
 
   afterEach(async () => {
     await db.close();
+    if (tempDir && existsSync(tempDir)) {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('should warm caches successfully', async () => {

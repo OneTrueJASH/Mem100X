@@ -74,7 +74,7 @@ const configSchema = z.object({
 
   // Logging Configuration
   logging: z.object({
-    level: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
+    level: z.enum(['error', 'warn', 'info', 'debug']).default('debug'),
   }),
 
   // Server Configuration

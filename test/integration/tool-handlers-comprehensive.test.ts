@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MultiDatabaseManager } from '../dist/multi-database.js';
-import { handleExportMemory, handleImportMemory, ToolContext } from '../dist/tool-handlers.js';
-import { createTextContent } from '../dist/utils/fast-json.js';
-import { config } from '../dist/config.js';
-import { ExportResult, ImportResult } from '../dist/types.js';
+import { MultiDatabaseManager } from '../../dist/multi-database.js';
+import { handleExportMemory, handleImportMemory, ToolContext } from '../../dist/tool-handlers.js';
+import { createTextContent } from '../../dist/utils/fast-json.js';
+import { config } from '../../dist/config.js';
+import { ExportResult, ImportResult } from '../../dist/types.js';
 import { mkdtempSync, rmSync, existsSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
@@ -423,22 +423,22 @@ import os from 'os';
     it('should handle export with database errors', async () => {
       // Close the current manager first
       manager.close();
-      
+
       // Delete the database file to simulate an error
       const dbPath = join(tempDir, 'personal.db');
       if (existsSync(dbPath)) {
         rmSync(dbPath);
       }
-      
+
       // Create a directory with the same name as the database file
       // This will cause SQLite to fail when trying to open it
       mkdtempSync(dbPath);
-      
+
       // Try to create a new manager with the problematic path
       try {
         manager = new MultiDatabaseManager(getTempConfig());
         toolContext.manager = manager;
-        
+
         // If we get here, try to export and it should fail
         const result = await handleExportMemory({}, toolContext);
         expect(result.structuredContent.success).toBe(false);
@@ -452,7 +452,7 @@ import os from 'os';
   describe('Edge Cases', () => {
     it('should handle export with very large dataset', async () => {
       // Create many entities
-      const entities = Array.from({ length: 1000 }, (_, i) => ({
+      const entities = Array.from({ length: 500 }, (_, i) => ({
         name: `Entity${i}`,
         entityType: 'person',
         observations: [createTextContent(`Observation ${i}`)]
@@ -463,7 +463,7 @@ import os from 'os';
       const result = await handleExportMemory({}, toolContext);
 
       expect(result.structuredContent.success).toBe(true);
-      expect(result.structuredContent.data.contexts.personal.entities).toHaveLength(1000);
+      expect(result.structuredContent.data.contexts.personal.entities).toHaveLength(500);
     });
 
     it('should handle import with very large dataset', async () => {

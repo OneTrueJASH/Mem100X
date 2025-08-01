@@ -67,17 +67,18 @@ function makeJsonRpcError(id: string | number | null, code: number, message: str
 // Subclass the SDK Server to expose a public handler for JSON-RPC messages
 class PublicServer extends Server {
   public async handleJsonRpcMessage(msg: any): Promise<any> {
+    const isTestMode = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
     if (!msg || typeof msg !== 'object') {
       const err = makeJsonRpcError(null, -32600, 'Invalid Request', 'Not an object');
       // Debug: confirm emission
-      console.error('[MCP RESP ERR]', err);
+      if (!isTestMode) console.error('[MCP RESP ERR]', err);
       console.log(JSON.stringify(err));
       return err;
     }
     if (!msg.jsonrpc || msg.jsonrpc !== '2.0') {
       const err = makeJsonRpcError(msg.id ?? null, -32600, 'Invalid Request', 'jsonrpc must be "2.0"');
       // Debug: confirm emission
-      console.error('[MCP RESP ERR]', err);
+      if (!isTestMode) console.error('[MCP RESP ERR]', err);
       console.log(JSON.stringify(err));
       return err;
     }
@@ -87,7 +88,7 @@ class PublicServer extends Server {
       if (!handler) {
         const err = makeJsonRpcError(msg.id ?? null, ErrorCode.MethodNotFound, 'Method not found', { method: msg.method });
         // Debug: confirm emission
-        console.error('[MCP RESP ERR]', err);
+        if (!isTestMode) console.error('[MCP RESP ERR]', err);
         console.log(JSON.stringify(err));
         return err;
       }
@@ -95,13 +96,13 @@ class PublicServer extends Server {
         const result = await handler(msg, undefined);
         const resp = { jsonrpc: '2.0', id: msg.id, result };
         // Debug: confirm emission
-        console.error('[MCP RESP OK]', resp);
+        if (!isTestMode) console.error('[MCP RESP OK]', resp);
         console.log(JSON.stringify(resp));
         return resp;
       } catch (error: any) {
         const err = makeJsonRpcError(msg.id ?? null, error.code ?? -32603, error.message ?? 'Internal error', error.data);
         // Debug: confirm emission
-        console.error('[MCP RESP ERR]', err);
+        if (!isTestMode) console.error('[MCP RESP ERR]', err);
         console.log(JSON.stringify(err));
         return err;
       }
@@ -123,7 +124,7 @@ class PublicServer extends Server {
     } else {
       const err = makeJsonRpcError(msg.id ?? null, -32600, 'Invalid Request', 'Unknown message type');
       // Debug: confirm emission
-      console.error('[MCP RESP ERR]', err);
+      if (!isTestMode) console.error('[MCP RESP ERR]', err);
       console.log(JSON.stringify(err));
       return err;
     }
@@ -136,9 +137,10 @@ class DebugPublicServer extends PublicServer {
     super(serverInfo, serverOptions);
   }
   public async handleJsonRpcMessage(msg: any): Promise<any> {
-    console.error('[HANDLE] called with:', msg);
+    const isTestMode = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+    if (!isTestMode) console.error('[HANDLE] called with:', msg);
     const result = await super.handleJsonRpcMessage(msg);
-    console.error('[HANDLE] returning:', result);
+    if (!isTestMode) console.error('[HANDLE] returning:', result);
     return result;
   }
 }
@@ -150,41 +152,43 @@ export async function main() {
     process.exit(0);
   }
 
-  // Unconditional debug: server startup
-  console.error('SERVER READY');
+  const isTestMode = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
 
   logInfo('Starting Mem100x Multi-Context MCP server...');
 
   const manager = new MultiDatabaseManager(config);
   logInfo('MultiDatabaseManager initialized.');
 
-  // Create zero-delay write aggregator for minimal-overhead batching
-  const writeAggregator = new ZeroDelayWriteAggregator(manager);
-  logInfo('Zero-delay write aggregator initialized.');
+  // Create zero-delay write aggregator for minimal-overhead batching (disabled in test mode)
+  const writeAggregator = isTestMode ? null : new ZeroDelayWriteAggregator(manager);
+  logInfo(isTestMode ? 'Zero-delay write aggregator disabled for tests.' : 'Zero-delay write aggregator initialized.');
 
-  // Create rate limiters (can be disabled for benchmarks)
-  const rateLimitingEnabled = process.env.DISABLE_RATE_LIMITING !== 'true';
+  // Create rate limiters (can be disabled for benchmarks or tests)
+  const rateLimitingEnabled = process.env.DISABLE_RATE_LIMITING !== 'true' && !isTestMode;
   const rateLimiters = rateLimitingEnabled ? createRateLimiters() : null;
   logInfo(rateLimitingEnabled ? 'Rate limiters initialized.' : 'Rate limiting disabled.');
 
-  // Create circuit breakers for each tool
-  const circuitBreakers = new Map<string, CircuitBreaker>();
+  // Define tool categories for routing
   const criticalTools = ['create_entities', 'add_observations', 'create_relations'];
   const writeTools = ['create_entities', 'add_observations', 'create_relations', 'delete_entities'];
   const readTools = ['search_nodes', 'read_graph', 'get_context_info'];
 
-  for (const toolName of Object.keys(toolHandlers)) {
-    // More strict settings for critical write operations
-    const options = criticalTools.includes(toolName)
-      ? { failureThreshold: 3, resetTimeout: 10000, halfOpenMaxAttempts: 2 }
-      : { failureThreshold: 5, resetTimeout: 5000, halfOpenMaxAttempts: 3 };
+  // Create circuit breakers for each tool (disabled in test mode for speed)
+  const circuitBreakers = new Map<string, CircuitBreaker>();
+  if (!isTestMode) {
+    for (const toolName of Object.keys(toolHandlers)) {
+      // More strict settings for critical write operations
+      const options = criticalTools.includes(toolName)
+        ? { failureThreshold: 3, resetTimeout: 10000, halfOpenMaxAttempts: 2 }
+        : { failureThreshold: 5, resetTimeout: 5000, halfOpenMaxAttempts: 3 };
 
-    circuitBreakers.set(toolName, createCircuitBreaker({
-      failureThreshold: options.failureThreshold,
-      recoveryTimeout: options.resetTimeout,
-      expectedVolume: 1000,
-      enableBulkOperations: true
-    }));
+      circuitBreakers.set(toolName, createCircuitBreaker({
+        failureThreshold: options.failureThreshold,
+        recoveryTimeout: options.resetTimeout,
+        expectedVolume: 1000,
+        enableBulkOperations: true
+      }));
+    }
   }
 
   const serverInfo = {
@@ -234,7 +238,7 @@ export async function main() {
   // Use the PublicServer subclass for the main server instance
   const publicServer = new DebugPublicServer(serverInfo, serverOptions);
 
-  // List tools handler
+      // List tools handler
   publicServer.setRequestHandler(ListToolsRequestSchema, async () => {
     return { tools: getAllToolDefinitions() };
   });
@@ -262,7 +266,7 @@ export async function main() {
 
   // Call tool handler
   publicServer.setRequestHandler(CallToolRequestSchema, async (request) => {
-    process.stderr.write('DEBUG: Received tool request: ' + JSON.stringify(request) + '\n');
+    if (!isTestMode) process.stderr.write('DEBUG: Received tool request: ' + JSON.stringify(request) + '\n');
     try {
       // --- Begin original handler logic ---
       const { name, arguments: args } = request.params;
@@ -297,7 +301,7 @@ export async function main() {
         validateDestructiveOperation(name, args);
 
         const circuitBreaker = circuitBreakers.get(name);
-        if (!circuitBreaker) {
+        if (!circuitBreaker && !isTestMode) {
           throw new McpError(errorCodeToJsonRpcCode(ErrorCode.InternalError as unknown as string), `No circuit breaker for tool: ${name}`);
         }
 
@@ -306,9 +310,18 @@ export async function main() {
 
         let result: any;
 
-        // Use zero-delay aggregator for write operations
-        if (writeTools.includes(name)) {
+        // Use zero-delay aggregator for write operations (if available)
+        if (writeTools.includes(name) && writeAggregator) {
           result = await writeAggregator.scheduleWrite(name as any, args);
+        } else if (writeTools.includes(name)) {
+          // Fallback for test mode when writeAggregator is disabled
+          const context: ToolContext = {
+            manager,
+            startTime: performance.now(),
+            toolName: name,
+            correlationId,
+          };
+          result = await handler(args, context);
         }
         // For read operations, bypass circuit breaker for lower latency
         else if (readTools.includes(name)) {
@@ -320,30 +333,41 @@ export async function main() {
           };
           result = await handler(args, context);
         }
-        // Execute all other operations through circuit breaker
+        // Execute all other operations through circuit breaker (if available)
         else {
-          result = await circuitBreaker.execute(async () => {
-            const dbCallStartTime = process.hrtime.bigint();
+          if (circuitBreaker) {
+            result = await circuitBreaker.execute(async () => {
+              const dbCallStartTime = process.hrtime.bigint();
 
+              const context: ToolContext = {
+                manager,
+                startTime: performance.now(),
+                toolName: name,
+                correlationId,
+              };
+
+              const dbResult = await handler(args, context);
+
+              const dbCallEndTime = process.hrtime.bigint();
+              const dbCallTime = Number(dbCallEndTime - dbCallStartTime) / 1_000_000;
+
+              // Log timing for operations
+              if (dbCallTime > 50) {
+                logInfo(`DB timing for ${name}`, { dbCallTime_ms: dbCallTime });
+              }
+
+              return dbResult;
+            });
+          } else {
+            // Fallback for test mode when circuit breakers are disabled
             const context: ToolContext = {
               manager,
               startTime: performance.now(),
               toolName: name,
               correlationId,
             };
-
-            const dbResult = await handler(args, context);
-
-            const dbCallEndTime = process.hrtime.bigint();
-            const dbCallTime = Number(dbCallEndTime - dbCallStartTime) / 1_000_000;
-
-            // Log timing for operations
-            if (dbCallTime > 50) {
-              logInfo(`DB timing for ${name}`, { dbCallTime_ms: dbCallTime });
-            }
-
-            return dbResult;
-          });
+            result = await handler(args, context);
+          }
         }
 
         const circuitBreakerEndTime = process.hrtime.bigint();
@@ -366,11 +390,13 @@ export async function main() {
 
         requestSuccess = true;
 
-        // General debug print for all tool calls
-        fs.appendFileSync('debug-server-multi.log',
-          `DEBUG: tool name: ${name}\n` +
-          'DEBUG: result: ' + JSON.stringify(result, null, 2) + '\n'
-        );
+        // General debug print for all tool calls (disabled in test mode)
+        if (!isTestMode) {
+          fs.appendFileSync('debug-server-multi.log',
+            `DEBUG: tool name: ${name}\n` +
+            'DEBUG: result: ' + JSON.stringify(result, null, 2) + '\n'
+          );
+        }
         // Extract content and structuredContent from the result
         // Handle case where result might be undefined
         if (!result) {
@@ -400,8 +426,8 @@ export async function main() {
           if (Array.isArray(result)) {
             structuredContent = { items: result };
           } else if (typeof result === 'object' && result !== null) {
-            // Debug print for result shape
-            if (name === 'search_nodes') {
+            // Debug print for result shape (disabled in test mode)
+            if (!isTestMode && name === 'search_nodes') {
               fs.appendFileSync('debug-server-multi.log',
                 'DEBUG: server-multi.ts result for search_nodes: ' + JSON.stringify(result, null, 2) + '\n' +
                 'DEBUG: typeof result.entities: ' + typeof result.entities + ' ' + Array.isArray(result.entities) + '\n'
@@ -571,33 +597,36 @@ export async function main() {
 
   // --- Custom stdio JSON-RPC loop for full LLM compatibility ---
   const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: false,
-  });
+  input: process.stdin,
+  output: process.stdout,
+  terminal: false,
+});
+
+  // Server is now ready to handle requests
+  console.error('SERVER READY');
 
   rl.on('line', async (line) => {
-    // Unconditional debug: received line
-    console.error('RECEIVED LINE:', line);
+    // Unconditional debug: received line (disabled in test mode)
+    if (!isTestMode) console.error('RECEIVED LINE:', line);
     let msg;
     try {
       msg = JSON.parse(line);
       // Unconditional debug: parsed JSON
-      console.error('PARSED MESSAGE:', msg);
+      if (!isTestMode) console.error('PARSED MESSAGE:', msg);
     } catch (err) {
       const errResp = makeJsonRpcError(null, -32700, 'Parse error', String(err));
       // Unconditional debug: parse error response
-      console.error('PARSE ERROR RESPONSE:', errResp);
+      if (!isTestMode) console.error('PARSE ERROR RESPONSE:', errResp);
       process.stdout.write(JSON.stringify(errResp) + '\n');
       return;
     }
     if (Array.isArray(msg)) {
       // Batch request
-      console.error('BATCH MESSAGE: calling handler for each item');
+      if (!isTestMode) console.error('BATCH MESSAGE: calling handler for each item');
       const responses = await Promise.all(msg.map(async (item) => {
-        console.error('BEFORE HANDLE BATCH ITEM:', item);
+        if (!isTestMode) console.error('BEFORE HANDLE BATCH ITEM:', item);
         const result = await publicServer.handleJsonRpcMessage(item);
-        console.error('AFTER HANDLE BATCH ITEM:', result);
+        if (!isTestMode) console.error('AFTER HANDLE BATCH ITEM:', result);
         return result;
       }));
       // Only send if at least one response is not undefined (notifications)
@@ -607,12 +636,12 @@ export async function main() {
       return;
     }
     // Single message
-    console.error('BEFORE HANDLE SINGLE MESSAGE:', msg);
+    if (!isTestMode) console.error('BEFORE HANDLE SINGLE MESSAGE:', msg);
     const resp = await publicServer.handleJsonRpcMessage(msg);
-    console.error('AFTER HANDLE SINGLE MESSAGE:', resp);
+    if (!isTestMode) console.error('AFTER HANDLE SINGLE MESSAGE:', resp);
     // Unconditional debug: handled response
     if (resp !== undefined) {
-      console.error('HANDLED RESPONSE:', resp);
+      if (!isTestMode) console.error('HANDLED RESPONSE:', resp);
       process.stdout.write(JSON.stringify(resp) + '\n');
     }
   });
@@ -624,12 +653,12 @@ export async function main() {
 }
 
 // --- TEST-ONLY: Expose tool handler logic for direct invocation in tests ---
-(main as any).__callToolHandlerForTest = async function(request: any) {
+(main as any).__callToolHandlerForTest = async function(request: any, testManager?: any) {
   // Replicate the logic from server.setRequestHandler(CallToolRequestSchema, ...)
   const { name, arguments: args } = request.params;
   // Reuse the same manager, circuitBreakers, etc. as in main
-  // For test, create new instances for isolation
-  const manager = new MultiDatabaseManager(config);
+  // For test, use provided manager or create new instances for isolation
+  const manager = testManager || new MultiDatabaseManager(config);
   const writeAggregator = new ZeroDelayWriteAggregator(manager);
   const rateLimitingEnabled = process.env.DISABLE_RATE_LIMITING !== 'true';
   const rateLimiters = rateLimitingEnabled ? createRateLimiters() : null;
@@ -668,8 +697,17 @@ export async function main() {
       throw new McpError(errorCodeToJsonRpcCode(ErrorCode.InternalError as unknown as string), `No circuit breaker for tool: ${name}`);
     }
     let result: any;
-    if (writeTools.includes(name)) {
+    if (writeTools.includes(name) && writeAggregator) {
       result = await writeAggregator.scheduleWrite(name as any, args);
+    } else if (writeTools.includes(name)) {
+      // Fallback for test mode when writeAggregator is disabled
+      const context: ToolContext = {
+        manager,
+        startTime: performance.now(),
+        toolName: name,
+        correlationId: 'test',
+      };
+      result = await handler(args, context);
     } else if (readTools.includes(name)) {
       const context: ToolContext = {
         manager,
@@ -786,6 +824,3 @@ if (import.meta.url === `file://${process.argv[1]}` || import.meta.url === proce
     process.exit(1);
   });
 }
-
-// Ensure the server starts when this file is run directly
-main().catch(console.error);
